@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.error;
 
 public class ConfigManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -35,7 +36,7 @@ public class ConfigManager {
                 GSON.toJson(CONFIG, writer);
             }
         } catch (IOException exception) {
-            LOGGER.error("Failed to save FrogHelper config to {}", CONFIG_PATH, exception);
+            error(LOGGER, "Failed to save FrogHelper config to {}", CONFIG_PATH, exception);
         }
     }
 
@@ -90,7 +91,7 @@ public class ConfigManager {
         try (Reader reader = Files.newBufferedReader(CONFIG_PATH)) {
             return sanitize(GSON.fromJson(reader, HudConfig.class));
         } catch (Exception exception) {
-            LOGGER.error("Failed to load FrogHelper config from {}", CONFIG_PATH, exception);
+            error(LOGGER, "Failed to load FrogHelper config from {}", CONFIG_PATH, exception);
             return sanitize(new HudConfig());
         }
     }

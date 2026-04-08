@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.Set;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.info;
 
 public final class BoosterChatDebug {
     private static final Set<String> LOGGED_MESSAGES = new LinkedHashSet<>();
@@ -47,7 +48,7 @@ public final class BoosterChatDebug {
             return;
         }
 
-        LOGGER.info("Booster chat debug: raw='{}', normalized='{}'", raw, normalized);
+        info(LOGGER, "Booster chat debug: raw='{}', normalized='{}'", raw, normalized);
     }
 
     private static boolean looksLikeBoosterText(String text) {

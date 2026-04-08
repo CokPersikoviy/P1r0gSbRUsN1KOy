@@ -33,6 +33,7 @@ final class ProtocolState {
     Map<Integer, DwStaffType> staffTypes = new LinkedHashMap<>();
     Map<String, Long> lastAbilityTimers = new LinkedHashMap<>();
     Map<String, Integer> payloadSampleCounts = new LinkedHashMap<>();
+    ProtocolDiagnostics diagnostics = new ProtocolDiagnostics();
 
     BossRepository bossRepository;
     ActiveRunesStore activeRunesStore;
@@ -67,6 +68,7 @@ final class ProtocolState {
         staffTypes = new LinkedHashMap<>();
         lastAbilityTimers = new LinkedHashMap<>();
         payloadSampleCounts = new LinkedHashMap<>();
+        diagnostics = new ProtocolDiagnostics();
 
         currentServerInfo = CurrentServerInfo.unknown();
         currentGameEvent = DwGameEvent.NONE;

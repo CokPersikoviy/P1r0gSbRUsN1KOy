@@ -1,6 +1,7 @@
 package ru.wilyfox.client.hud.config;
 
 public class RenderConfig {
+    public boolean debug = false;
     public boolean hideBlockBreakParticles = false;
     public boolean hideLightningEffect = false;
     public boolean hideHurtCameraShake = false;

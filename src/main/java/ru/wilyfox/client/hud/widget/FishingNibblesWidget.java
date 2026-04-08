@@ -68,7 +68,8 @@ public final class FishingNibblesWidget extends AbstractWidget {
     @Override
     public boolean isVisible() {
         return ConfigManager.get().fishing.showFishingNibblesWidget
-                && (DiamondWorldProtocolClient.hasFishingNibbles() || isEditorPreview());
+                && (isEditorPreview()
+                || (DiamondWorldProtocolClient.isCurrentFishingLocation() && DiamondWorldProtocolClient.hasFishingNibbles()));
     }
 
     @Override
@@ -91,7 +92,7 @@ public final class FishingNibblesWidget extends AbstractWidget {
     }
 
     private List<String> buildLines() {
-        if (!DiamondWorldProtocolClient.hasFishingNibbles()) {
+        if (!DiamondWorldProtocolClient.isCurrentFishingLocation() || !DiamondWorldProtocolClient.hasFishingNibbles()) {
             if (!isEditorPreview()) {
                 return List.of();
             }

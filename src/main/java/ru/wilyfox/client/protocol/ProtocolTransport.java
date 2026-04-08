@@ -12,6 +12,7 @@ import ru.wilyfox.client.wand.WandCooldownTracker;
 import java.util.Locale;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.info;
 
 final class ProtocolTransport {
     private static final long INITIAL_HANDSHAKE_INTERVAL_MS = 2_000L;
@@ -33,9 +34,12 @@ final class ProtocolTransport {
         PayloadTypeRegistry.playS2C().register(DwEvoPlusPayload.TYPE, DwEvoPlusPayload.STREAM_CODEC);
 
         ClientPlayNetworking.registerGlobalReceiver(DwEvoPlusPayload.TYPE, (payload, context) -> {
-            state.receivedEvoPlusPayload = true;
-            state.lastPayloadAt = System.currentTimeMillis();
-            router.route(state, payload.data());
+            byte[] data = payload.data().clone();
+            context.client().execute(() -> {
+                state.receivedEvoPlusPayload = true;
+                state.lastPayloadAt = System.currentTimeMillis();
+                router.route(state, data);
+            });
         });
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> reset(state));
@@ -121,7 +125,7 @@ final class ProtocolTransport {
 
     private static void sendHandshake() {
         String fingerprint = DwHandshakeFingerprint.generate();
-        LOGGER.info("DW protocol: sending handshake on channel dw:handshake, fingerprint={}", fingerprint);
+        info(LOGGER, "DW protocol: sending handshake on channel dw:handshake, fingerprint={}", fingerprint);
         ClientPlayNetworking.send(new DwHandshakePayload(fingerprint));
     }
 }

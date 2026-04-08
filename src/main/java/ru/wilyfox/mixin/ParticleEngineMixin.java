@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.info;
 
 @Mixin(ParticleEngine.class)
 public class ParticleEngineMixin {
@@ -68,7 +69,8 @@ public class ParticleEngineMixin {
             return;
         }
 
-        LOGGER.info(
+        info(
+                LOGGER,
                 "Fishing particle debug: location={}, particle={}, options={}, pos=({}, {}, {})",
                 locationId,
                 particleKey,

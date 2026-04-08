@@ -15,9 +15,23 @@ import ru.wilyfox.client.seller.SellerCooldownStore;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.List;
 import java.util.Set;
 
 public final class DiamondWorldProtocolClient {
+    private static final Set<String> MANUAL_FISHING_LOCATION_IDS = Set.of(
+            "bay",
+            "swamp",
+            "citycanal",
+            "ambergrot",
+            "azurepond",
+            "basalt",
+            "netherval",
+            "magma",
+            "endwharf",
+            "silence",
+            "crystal"
+    );
     private static final ProtocolState STATE = new ProtocolState();
     private static final ProtocolRouter ROUTER = new ProtocolRouter();
 
@@ -135,6 +149,22 @@ public final class DiamondWorldProtocolClient {
         return Set.copyOf(STATE.fishingLocationIds);
     }
 
+    public static boolean isCurrentFishingLocation() {
+        return isFishingLocation(STATE.currentGameLocation);
+    }
+
+    public static List<String> getDiagnosticsStats() {
+        return STATE.diagnostics.buildStatsLines();
+    }
+
+    public static List<String> getDiagnosticsAnomalies() {
+        return STATE.diagnostics.buildAnomalyLines();
+    }
+
+    public static void resetDiagnostics() {
+        STATE.diagnostics.reset();
+    }
+
     public static Map<String, Double> getFishingNibbles() {
         return Map.copyOf(STATE.fishingNibbles);
     }
@@ -174,5 +204,46 @@ public final class DiamondWorldProtocolClient {
 
         String normalized = value.trim().toLowerCase(Locale.ROOT);
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private static boolean isFishingLocation(String value) {
+        String normalized = normalizeLocationId(value);
+        if (normalized == null) {
+            return false;
+        }
+
+        if (MANUAL_FISHING_LOCATION_IDS.contains(normalized)) {
+            return true;
+        }
+
+        String compactCurrent = compactLocationKey(normalized);
+        if (compactCurrent == null) {
+            return false;
+        }
+
+        for (String locationId : STATE.fishingLocationIds) {
+            if (compactCurrent.equals(compactLocationKey(locationId))) {
+                return true;
+            }
+        }
+
+        for (Map.Entry<String, String> entry : STATE.fishingLocationNames.entrySet()) {
+            if (compactCurrent.equals(compactLocationKey(entry.getKey()))
+                    || compactCurrent.equals(compactLocationKey(entry.getValue()))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static String compactLocationKey(String value) {
+        String normalized = normalizeLocationId(value);
+        if (normalized == null) {
+            return null;
+        }
+
+        String compact = normalized.replaceAll("[^\\p{L}\\p{N}]+", "");
+        return compact.isBlank() ? null : compact;
     }
 }

@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.error;
 
 public final class PlayerClanStorage {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -111,7 +112,7 @@ public final class PlayerClanStorage {
                 ENTRIES.put(normalized, sanitized);
             }
         } catch (Exception exception) {
-            LOGGER.error("Failed to load FrogHelper clan storage from {}", STORAGE_PATH, exception);
+            error(LOGGER, "Failed to load FrogHelper clan storage from {}", STORAGE_PATH, exception);
         }
     }
 
@@ -128,7 +129,7 @@ public final class PlayerClanStorage {
                 GSON.toJson(file, writer);
             }
         } catch (Exception exception) {
-            LOGGER.error("Failed to save FrogHelper clan storage to {}", STORAGE_PATH, exception);
+            error(LOGGER, "Failed to save FrogHelper clan storage to {}", STORAGE_PATH, exception);
         }
     }
 

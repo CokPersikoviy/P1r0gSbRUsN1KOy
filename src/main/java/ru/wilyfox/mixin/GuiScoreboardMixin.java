@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.info;
 
 @Mixin(Gui.class)
 public abstract class GuiScoreboardMixin implements ScoreboardSidebarAccessor {
@@ -192,7 +193,7 @@ public abstract class GuiScoreboardMixin implements ScoreboardSidebarAccessor {
         }
 
         froghelper$lastBoosterScoreboardLog = snapshot;
-        LOGGER.info("Booster debug: scoreboard={}", snapshot);
+        info(LOGGER, "Booster debug: scoreboard={}", snapshot);
     }
 
     private static boolean froghelper$looksLikeBoosterText(String text) {

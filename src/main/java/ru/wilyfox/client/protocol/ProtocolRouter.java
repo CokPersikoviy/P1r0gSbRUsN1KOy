@@ -4,6 +4,7 @@ import io.netty.buffer.Unpooled;
 import net.minecraft.network.FriendlyByteBuf;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.info;
 
 final class ProtocolRouter {
     void route(ProtocolState state, byte[] data) {
@@ -11,10 +12,12 @@ final class ProtocolRouter {
         int length = data.length;
 
         if (envelope != null) {
-            LOGGER.info("DW protocol: received dw:evoplus payload, bytes={}, typeId={}", length, envelope.typeId());
+            state.diagnostics.onPayloadReceived(envelope.typeId());
+            info(LOGGER, "DW protocol: received dw:evoplus payload, bytes={}, typeId={}", length, envelope.typeId());
             ProtocolDebugLogger.logPayloadSampleIfNeeded(state, envelope.typeId(), envelope.body());
         } else {
-            LOGGER.info("DW protocol: received dw:evoplus payload, bytes={}, typeId=<unreadable>", length);
+            info(LOGGER, "DW protocol: received dw:evoplus payload, bytes={}, typeId=<unreadable>", length);
+            state.diagnostics.onUnreadableEnvelope(length);
             ProtocolDebugLogger.logUnknownPayload("unreadable typeId", data);
             return;
         }
@@ -23,43 +26,48 @@ final class ProtocolRouter {
         byte[] body = envelope.body();
 
         switch (typeId) {
-            case "bosstimers" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleBossTimers(state, body));
-            case "bosstypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleBossTypes(state, body));
-            case "activerunes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleActiveRunes(state, body));
-            case "serverinfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleServerInfo(state, body));
-            case "pettypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handlePetTypes(state, body));
-            case "potiontypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handlePotionTypes(state, body));
-            case "sellers" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleSellers(state, body));
-            case "combo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleCombo(state, body));
-            case "comboblocks" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleComboBlocks(state, body));
-            case "potiontimers" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handlePotionTimers(state, body));
-            case "statisticinfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleStatisticInfo(state, body));
-            case "fishingpots" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleFishingSpots(state, body));
-            case "spotnibbles" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleSpotNibbles(state, body));
-            case "stafftypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleStaffTypes(state, body));
-            case "stafftimers" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleStaffTimers(state, body));
-            case "abilitytypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleAbilityTypes(state, body));
-            case "abilitytimers" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleAbilityTimers(state, body));
-            case "bossdamage" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleBossDamage(state, body));
-            case "levelinfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleLevelInfo(state, body));
-            case "harpooncd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleHarpoonCooldown(body));
-            case "marketcd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleNamedCooldown("marketcd", "Market", body));
-            case "gourmetcd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleGourmetCooldown(state, body));
-            case "potioncd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleNamedCooldown("potioncd", "Potion", body));
-            case "token" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleToken(body));
-            case "boosters" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleBoosters(state, body));
-            case "gameevent" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleGameEvent(state, body));
-            case "claninfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleClanInfo(state, body));
-            default -> ProtocolDebugLogger.logUnknownPayload("unknown typeId=" + typeId, body);
+            case "bosstimers" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleBossTimers(state, body), state);
+            case "bosstypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleBossTypes(state, body), state);
+            case "activerunes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleActiveRunes(state, body), state);
+            case "serverinfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleServerInfo(state, body), state);
+            case "pettypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handlePetTypes(state, body), state);
+            case "potiontypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handlePotionTypes(state, body), state);
+            case "sellers" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleSellers(state, body), state);
+            case "combo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleCombo(state, body), state);
+            case "comboblocks" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleComboBlocks(state, body), state);
+            case "potiontimers" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handlePotionTimers(state, body), state);
+            case "statisticinfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleStatisticInfo(state, body), state);
+            case "fishingpots" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleFishingSpots(state, body), state);
+            case "spotnibbles" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleSpotNibbles(state, body), state);
+            case "stafftypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleStaffTypes(state, body), state);
+            case "stafftimers" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleStaffTimers(state, body), state);
+            case "abilitytypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleAbilityTypes(state, body), state);
+            case "abilitytimers" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleAbilityTimers(state, body), state);
+            case "bossdamage" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleBossDamage(state, body), state);
+            case "levelinfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleLevelInfo(state, body), state);
+            case "harpooncd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleHarpoonCooldown(body), state);
+            case "marketcd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleNamedCooldown("marketcd", "Market", body), state);
+            case "gourmetcd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleGourmetCooldown(state, body), state);
+            case "potioncd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleNamedCooldown("potioncd", "Potion", body), state);
+            case "token" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleToken(body), state);
+            case "boosters" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleBoosters(state, body), state);
+            case "gameevent" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleGameEvent(state, body), state);
+            case "claninfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleClanInfo(state, body), state);
+            default -> {
+                state.diagnostics.onUnknownType(typeId, body.length);
+                ProtocolDebugLogger.logUnknownPayloadBody("unknown typeId=" + typeId, typeId, body);
+            }
         }
     }
 
-    private void dispatch(String subchannel, byte[] data, PayloadHandler handler) {
+    private void dispatch(String subchannel, byte[] data, PayloadHandler handler, ProtocolState state) {
         try {
             if (!handler.handle()) {
+                state.diagnostics.onDecodeFailure(subchannel, data.length, null);
                 ProtocolDebugLogger.logDecodeFailure(subchannel, data, null);
             }
         } catch (Exception exception) {
+            state.diagnostics.onDecodeFailure(subchannel, data.length, exception);
             ProtocolDebugLogger.logDecodeFailure(subchannel, data, exception);
             throw exception;
         }

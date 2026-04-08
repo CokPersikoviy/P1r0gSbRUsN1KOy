@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.info;
+import static ru.wilyfox.client.debug.DebugLogger.warn;
 
 final class ProtocolPayloadHandlers {
     private static final int BOSSTIMER_PREVIEW_LIMIT = 8;
@@ -38,7 +40,7 @@ final class ProtocolPayloadHandlers {
             applyBossTimers(state, packet);
 
             if (packet.timers().isEmpty()) {
-                LOGGER.info("DW protocol: bosstimers parsed successfully, entries=0");
+                info(LOGGER, "DW protocol: bosstimers parsed successfully, entries=0");
                 return true;
             }
 
@@ -50,7 +52,8 @@ final class ProtocolPayloadHandlers {
                     .map(entry -> entry.getKey() + "=" + ProtocolPayloadSupport.formatRemainingMillis(entry.getValue()))
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: bosstimers parsed successfully, entries={}, min={}, max={}, first={}",
                     packet.timers().size(),
                     ProtocolPayloadSupport.formatRemainingMillis(min),
@@ -59,7 +62,7 @@ final class ProtocolPayloadHandlers {
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse bosstimers payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse bosstimers payload", exception);
             return false;
         }
     }
@@ -70,7 +73,7 @@ final class ProtocolPayloadHandlers {
             state.bossTypes = new LinkedHashMap<>(packet.types());
 
             if (packet.types().isEmpty()) {
-                LOGGER.info("DW protocol: bosstypes parsed successfully, entries=0");
+                info(LOGGER, "DW protocol: bosstypes parsed successfully, entries=0");
                 return true;
             }
 
@@ -87,16 +90,17 @@ final class ProtocolPayloadHandlers {
                     .collect(Collectors.joining(", "));
 
             long raidCount = packet.types().values().stream().filter(DwBossType::raid).count();
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: bosstypes parsed successfully, entries={}, raids={}, first={}",
                     packet.types().size(),
                     raidCount,
                     preview
             );
-            LOGGER.info("DW protocol: bosstypes icon preview={}", iconPreview);
+            info(LOGGER, "DW protocol: bosstypes icon preview={}", iconPreview);
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse bosstypes payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse bosstypes payload", exception);
             return false;
         }
     }
@@ -113,14 +117,15 @@ final class ProtocolPayloadHandlers {
                     .limit(ACTIVE_RUNES_PREVIEW_LIMIT)
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: activerunes parsed successfully, entries={}, first={}",
                     packet.runes().size(),
                     preview
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse activerunes payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse activerunes payload", exception);
             return false;
         }
     }
@@ -129,7 +134,8 @@ final class ProtocolPayloadHandlers {
         try {
             CurrentServerInfo serverInfo = DwServerInfoDecoder.decode(data);
             state.currentServerInfo = serverInfo;
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: serverinfo parsed successfully, family={}, server={}, mirror={}, display={}",
                     serverInfo.family(),
                     serverInfo.serverNumber(),
@@ -138,7 +144,7 @@ final class ProtocolPayloadHandlers {
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse serverinfo payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse serverinfo payload", exception);
             return false;
         }
     }
@@ -149,7 +155,7 @@ final class ProtocolPayloadHandlers {
             state.petTypes = new LinkedHashMap<>(packet.types());
 
             if (packet.types().isEmpty()) {
-                LOGGER.info("DW protocol: pettypes parsed successfully, entries=0");
+                info(LOGGER, "DW protocol: pettypes parsed successfully, entries=0");
                 return true;
             }
 
@@ -158,14 +164,15 @@ final class ProtocolPayloadHandlers {
                     .map(type -> type.id() + "=" + type.name())
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: pettypes parsed successfully, entries={}, first={}",
                     packet.types().size(),
                     preview
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse pettypes payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse pettypes payload", exception);
             return false;
         }
     }
@@ -183,14 +190,15 @@ final class ProtocolPayloadHandlers {
                     .map(entry -> entry.id() + "={" + entry.modelId() + ", " + entry.name() + "}")
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: potiontypes parsed successfully, entries={}, first={}",
                     packet.entries().size(),
                     preview
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse potiontypes payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse potiontypes payload", exception);
             return false;
         }
     }
@@ -208,14 +216,15 @@ final class ProtocolPayloadHandlers {
                     .map(entry -> entry.id() + "=" + entry.name() + " (" + (entry.remainingMillis() < 0L ? "ready" : ProtocolPayloadSupport.formatRemainingMillis(entry.remainingMillis())) + ")")
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: sellers parsed successfully, entries={}, first={}",
                     packet.entries().size(),
                     preview
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse sellers payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse sellers payload", exception);
             return false;
         }
     }
@@ -228,7 +237,8 @@ final class ProtocolPayloadHandlers {
                 state.comboProgressStore.updateCombo(packet.booster(), packet.nextBooster(), packet.blocks(), packet.requiredBlocks());
             }
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: combo parsed successfully, booster=x{}, next=x{}, blocks={}/{}, progress={}%",
                     ProtocolPayloadSupport.formatCompactMultiplier(packet.booster()),
                     ProtocolPayloadSupport.formatCompactMultiplier(packet.nextBooster()),
@@ -238,7 +248,7 @@ final class ProtocolPayloadHandlers {
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse combo payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse combo payload", exception);
             return false;
         }
     }
@@ -251,10 +261,10 @@ final class ProtocolPayloadHandlers {
                 state.comboProgressStore.updateBlocks(packet.blocks());
             }
 
-            LOGGER.info("DW protocol: comboblocks parsed successfully, blocks={}", packet.blocks());
+            info(LOGGER, "DW protocol: comboblocks parsed successfully, blocks={}", packet.blocks());
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse comboblocks payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse comboblocks payload", exception);
             return false;
         }
     }
@@ -276,7 +286,8 @@ final class ProtocolPayloadHandlers {
                     .filter(entry -> entry.remainedMillis() > 0L && entry.quality() > 0)
                     .count();
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: potiontimers parsed successfully, entries={}, active={}, first={}",
                     packet.entries().size(),
                     activeCount,
@@ -284,7 +295,7 @@ final class ProtocolPayloadHandlers {
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse potiontimers payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse potiontimers payload", exception);
             return false;
         }
     }
@@ -335,20 +346,21 @@ final class ProtocolPayloadHandlers {
                     .map(pet -> pet.name() + " [" + pet.level() + "] " + ProtocolPayloadSupport.formatEnergy(pet.energy()) + "\u26a1")
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: statisticinfo parsed successfully, keys={}, activePets={}, activeMiners={}, first={}",
                     packet.values().size(),
                     activePets.size(),
                     activeMiners.size(),
                     preview
             );
-            LOGGER.info("DW protocol: statisticinfo keys=[{}]", keysPreview);
+            info(LOGGER, "DW protocol: statisticinfo keys=[{}]", keysPreview);
             if (state.currentGameLocation != null) {
-                LOGGER.info("DW protocol: statisticinfo location candidate={}", state.currentGameLocation);
+                info(LOGGER, "DW protocol: statisticinfo location candidate={}", state.currentGameLocation);
             }
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse statisticinfo payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse statisticinfo payload", exception);
             return false;
         }
     }
@@ -362,7 +374,8 @@ final class ProtocolPayloadHandlers {
                 state.levelProgressStore.updateRequirements(packet.requiredBlocks(), packet.requiredMoney(), packet.maxLevel());
             }
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: levelinfo parsed successfully, level={}, blocks={}, money={}, requiredBlocks={}, requiredMoney={}, max={}",
                     packet.level(),
                     packet.blocks(),
@@ -373,7 +386,7 @@ final class ProtocolPayloadHandlers {
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse levelinfo payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse levelinfo payload", exception);
             return false;
         }
     }
@@ -406,14 +419,15 @@ final class ProtocolPayloadHandlers {
                     .map(entry -> entry.getKey() + "=" + entry.getValue())
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: fishingpots parsed successfully, entries={}, first={}",
                     packet.locations().size(),
                     preview
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse fishingpots payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse fishingpots payload", exception);
             return false;
         }
     }
@@ -440,14 +454,15 @@ final class ProtocolPayloadHandlers {
                     .map(entry -> entry.getKey() + "=" + String.format(java.util.Locale.ROOT, "%.3f", entry.getValue()))
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: spotnibbles parsed successfully, entries={}, first={}",
                     packet.nibbles().size(),
                     preview
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse spotnibbles payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse spotnibbles payload", exception);
             return false;
         }
     }
@@ -467,14 +482,15 @@ final class ProtocolPayloadHandlers {
                     .map(type -> type.id() + "=" + type.name() + " (cmd=" + type.modelId() + ")")
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: stafftypes parsed successfully, entries={}, first={}",
                     packet.types().size(),
                     preview
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse stafftypes payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse stafftypes payload", exception);
             return false;
         }
     }
@@ -490,14 +506,15 @@ final class ProtocolPayloadHandlers {
                     .map(entry -> entry.getKey() + "=" + ProtocolPayloadSupport.formatRemainingMillis(entry.getValue()))
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: stafftimers parsed successfully, entries={}, first={}",
                     packet.timers().size(),
                     preview
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse stafftimers payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse stafftimers payload", exception);
             return false;
         }
     }
@@ -518,14 +535,15 @@ final class ProtocolPayloadHandlers {
                     .map(type -> type.id() + "=" + type.name())
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: abilitytypes parsed successfully, entries={}, first={}",
                     packet.types().size(),
                     preview
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse abilitytypes payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse abilitytypes payload", exception);
             return false;
         }
     }
@@ -551,14 +569,15 @@ final class ProtocolPayloadHandlers {
                     .map(entry -> entry.getKey() + "=" + ProtocolPayloadSupport.formatRemainingMillis(entry.getValue()))
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: abilitytimers parsed successfully, entries={}, first={}",
                     packet.timers().size(),
                     preview
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse abilitytimers payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse abilitytimers payload", exception);
             return false;
         }
     }
@@ -580,7 +599,8 @@ final class ProtocolPayloadHandlers {
                 ));
             }
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: bossdamage parsed successfully, boss={} [{}], damage={}",
                     bossName,
                     bossLevel,
@@ -588,7 +608,7 @@ final class ProtocolPayloadHandlers {
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse bossdamage payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse bossdamage payload", exception);
             return false;
         }
     }
@@ -602,14 +622,15 @@ final class ProtocolPayloadHandlers {
                 state.abilityCooldownStore.replaceExternalCooldown("gourmetcd", "Гурман", remaining);
             }
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: gourmetcd parsed successfully, remaining={}, raw={}",
                     remaining > 0L ? ProtocolPayloadSupport.formatRemainingMillis(remaining) : "ready",
                     packet.remainingMillis()
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse gourmetcd payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse gourmetcd payload", exception);
             return false;
         }
     }
@@ -626,14 +647,15 @@ final class ProtocolPayloadHandlers {
                     remaining
             );
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: harpooncd parsed successfully, remaining={}, raw={}",
                     remaining > 0L ? ProtocolPayloadSupport.formatRemainingMillis(remaining) : "ready",
                     packet.remainingMillis()
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse harpooncd payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse harpooncd payload", exception);
             return false;
         }
     }
@@ -642,7 +664,8 @@ final class ProtocolPayloadHandlers {
         try {
             DwCooldownValuePacket packet = DwCooldownValueDecoder.decode(data);
             long remaining = Math.max(0L, packet.remainingMillis());
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: {} parsed successfully, displayName={}, remaining={}, raw={}",
                     typeId,
                     displayName,
@@ -651,7 +674,7 @@ final class ProtocolPayloadHandlers {
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse {} payload", typeId, exception);
+            warn(LOGGER, "DW protocol: failed to parse {} payload", typeId, exception);
             return false;
         }
     }
@@ -659,7 +682,8 @@ final class ProtocolPayloadHandlers {
     static boolean handleToken(byte[] data) {
         try {
             DwTokenPacket packet = DwTokenDecoder.decode(data);
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: token parsed successfully, present={}, length={}, value={}",
                     packet.value() != null,
                     packet.value() != null ? packet.value().length() : 0,
@@ -667,7 +691,7 @@ final class ProtocolPayloadHandlers {
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse token payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse token payload", exception);
             return false;
         }
     }
@@ -676,14 +700,15 @@ final class ProtocolPayloadHandlers {
         try {
             DwGameEventPacket packet = DwGameEventDecoder.decode(data);
             state.currentGameEvent = packet.event();
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: gameevent parsed successfully, event={}, display={}",
                     packet.event().name(),
                     packet.event().displayName()
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse gameevent payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse gameevent payload", exception);
             return false;
         }
     }
@@ -699,14 +724,15 @@ final class ProtocolPayloadHandlers {
                     .map(entry -> entry.getKey() + "=" + entry.getValue())
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: claninfo parsed successfully, entries={}, first={}",
                     packet.values().size(),
                     preview
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse claninfo payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse claninfo payload", exception);
             return false;
         }
     }
@@ -729,7 +755,8 @@ final class ProtocolPayloadHandlers {
                     .limit(BOOSTER_PREVIEW_LIMIT)
                     .collect(Collectors.joining(", "));
 
-            LOGGER.info(
+            info(
+                    LOGGER,
                     "DW protocol: boosters parsed successfully, groups={}, entries={}, first={}",
                     packet.boosters().size(),
                     totalEntries,
@@ -737,7 +764,7 @@ final class ProtocolPayloadHandlers {
             );
             return true;
         } catch (Exception exception) {
-            LOGGER.warn("DW protocol: failed to parse boosters payload", exception);
+            warn(LOGGER, "DW protocol: failed to parse boosters payload", exception);
             return false;
         }
     }

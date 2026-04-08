@@ -23,8 +23,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.debug;
+import static ru.wilyfox.client.debug.DebugLogger.error;
 
 public final class DiscordRpcService {
     private static final String APPLICATION_ID = "1490415144134770830";
@@ -39,6 +43,8 @@ public final class DiscordRpcService {
     });
 
     private static final Object LOCK = new Object();
+    private static final AtomicBoolean AUTO_UPDATE_SCHEDULED = new AtomicBoolean(false);
+    private static final AtomicReference<PresenceData> PENDING_AUTO_PRESENCE = new AtomicReference<>();
 
     private static DiscordIpcClient client;
     private static String activeClientId = "";
@@ -84,6 +90,7 @@ public final class DiscordRpcService {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             DiscordRpcConfig config = ConfigManager.get().discordRpc;
             if (!config.active) {
+                PENDING_AUTO_PRESENCE.set(null);
                 if (mode == Mode.AUTO) {
                     EXECUTOR.execute(DiscordRpcService::stopAutoInternal);
                 } else if (!"Disabled".equals(status)) {
@@ -93,6 +100,7 @@ public final class DiscordRpcService {
             }
 
             if (!shouldRunAuto(client)) {
+                PENDING_AUTO_PRESENCE.set(null);
                 if (mode == Mode.AUTO) {
                     EXECUTOR.execute(DiscordRpcService::stopAutoInternal);
                 }
@@ -105,7 +113,16 @@ public final class DiscordRpcService {
                 return;
             }
 
-            EXECUTOR.execute(DiscordRpcService::updateAutoPresence);
+            PresenceData presence = buildAutoPresence(client, config);
+            if (presence == null) {
+                PENDING_AUTO_PRESENCE.set(null);
+                if (mode == Mode.AUTO) {
+                    EXECUTOR.execute(DiscordRpcService::stopAutoInternal);
+                }
+                return;
+            }
+
+            enqueueAutoPresenceUpdate(presence);
         });
     }
 
@@ -113,15 +130,32 @@ public final class DiscordRpcService {
         return status;
     }
 
-    private static void updateAutoPresence() {
-        DiscordRpcConfig config = ConfigManager.get().discordRpc;
-        Minecraft minecraft = Minecraft.getInstance();
-        PresenceData presence = buildAutoPresence(minecraft, config);
-        if (presence == null) {
-            stopAutoInternal();
-            return;
+    private static void enqueueAutoPresenceUpdate(PresenceData presence) {
+        PENDING_AUTO_PRESENCE.set(presence);
+        if (AUTO_UPDATE_SCHEDULED.compareAndSet(false, true)) {
+            EXECUTOR.execute(DiscordRpcService::drainAutoPresenceUpdates);
         }
+    }
 
+    private static void drainAutoPresenceUpdates() {
+        try {
+            while (true) {
+                PresenceData presence = PENDING_AUTO_PRESENCE.getAndSet(null);
+                if (presence == null) {
+                    break;
+                }
+
+                updateAutoPresence(presence);
+            }
+        } finally {
+            AUTO_UPDATE_SCHEDULED.set(false);
+            if (PENDING_AUTO_PRESENCE.get() != null && AUTO_UPDATE_SCHEDULED.compareAndSet(false, true)) {
+                EXECUTOR.execute(DiscordRpcService::drainAutoPresenceUpdates);
+            }
+        }
+    }
+
+    private static void updateAutoPresence(PresenceData presence) {
         long now = System.currentTimeMillis();
 
         try {
@@ -140,19 +174,17 @@ public final class DiscordRpcService {
                 mode = Mode.AUTO;
             }
 
-            presence = buildAutoPresence(minecraft, config);
-            if (presence == null) {
-                stopAutoInternal();
-                return;
-            }
+            PresenceData resolvedPresence = presence.withStartedAtSeconds(
+                    presence.includeElapsedTime() ? startedAtMillis / 1000L : 0L
+            );
 
-            String signature = presence.signature();
+            String signature = resolvedPresence.signature();
             if (signature.equals(lastPresenceSignature) && now - lastAutoUpdateAt < DEFAULT_UPDATE_INTERVAL_MS) {
                 status = "Running (Auto)";
                 return;
             }
 
-            applyPresence(presence);
+            applyPresence(resolvedPresence);
             lastAutoUpdateAt = now;
             lastPresenceSignature = signature;
             status = "Running (Auto)";
@@ -181,7 +213,6 @@ public final class DiscordRpcService {
         }
         String details = buildDetails(currentServer, config, rpcMode);
         String state = buildState(currentServer, config, rpcMode);
-        long startedAtSeconds = config.showElapsedTime ? startedAtMillis / 1000L : 0L;
         String smallImageKey = "";
         String smallImageText = "";
 
@@ -203,24 +234,25 @@ public final class DiscordRpcService {
         return new PresenceData(
                 limit(details, 128),
                 limit(state, 128),
-                startedAtSeconds,
+                0L,
                 rpcMode.largeImageKey(),
                 rpcMode.largeImageText(),
                 smallImageKey,
-                smallImageText
+                smallImageText,
+                config.showElapsedTime
         );
     }
 
     private static PresenceData buildNeutralPresence(DiscordRpcConfig config) {
-        long startedAtSeconds = config.showElapsedTime ? startedAtMillis / 1000L : 0L;
         return new PresenceData(
                 "FrogHelper",
                 "",
-                startedAtSeconds,
+                0L,
                 "froghelper",
                 "FrogHelper",
                 "",
-                ""
+                "",
+                config.showElapsedTime
         );
     }
 
@@ -592,7 +624,7 @@ public final class DiscordRpcService {
                 try {
                     localClient.close();
                 } catch (IOException closeException) {
-                    LOGGER.debug("Discord RPC retry shutdown failed", closeException);
+                    debug(LOGGER, "Discord RPC retry shutdown failed", closeException);
                 }
 
                 if (!isCapacityError(exception) || attempt == CAPACITY_RETRY_ATTEMPTS) {
@@ -612,6 +644,7 @@ public final class DiscordRpcService {
     }
 
     private static void stopAutoInternal() {
+        PENDING_AUTO_PRESENCE.set(null);
         if (mode != Mode.AUTO) {
             return;
         }
@@ -627,13 +660,13 @@ public final class DiscordRpcService {
             try {
                 client.clearActivity();
             } catch (IOException exception) {
-                LOGGER.debug("Discord RPC clear activity failed", exception);
+                debug(LOGGER, "Discord RPC clear activity failed", exception);
             }
 
             try {
                 client.close();
             } catch (IOException exception) {
-                LOGGER.debug("Discord RPC shutdown failed", exception);
+                debug(LOGGER, "Discord RPC shutdown failed", exception);
             }
         }
 
@@ -674,7 +707,7 @@ public final class DiscordRpcService {
     private static void failAndShutdown(String logMessage, Throwable throwable) {
         String summary = formatThrowable(throwable);
         status = summary;
-        LOGGER.error("{}: {}", logMessage, summary, throwable);
+        error(LOGGER, "{}: {}", logMessage, summary, throwable);
         synchronized (LOCK) {
             stopSessionLocked();
         }
@@ -746,8 +779,22 @@ public final class DiscordRpcService {
             String largeImageKey,
             String largeImageText,
             String smallImageKey,
-            String smallImageText
+            String smallImageText,
+            boolean includeElapsedTime
     ) {
+        private PresenceData withStartedAtSeconds(long startedAtSeconds) {
+            return new PresenceData(
+                    details,
+                    state,
+                    startedAtSeconds,
+                    largeImageKey,
+                    largeImageText,
+                    smallImageKey,
+                    smallImageText,
+                    includeElapsedTime
+            );
+        }
+
         private String signature() {
             return details + "|" + state + "|" + startedAtSeconds + "|" + largeImageKey + "|" + largeImageText
                     + "|" + smallImageKey + "|" + smallImageText;

@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.warn;
 
 final class ProtocolDebugLogger {
     private static final int HEX_PREVIEW_BYTES = 128;
@@ -23,22 +24,27 @@ final class ProtocolDebugLogger {
 
         int sampleIndex = seen + 1;
         state.payloadSampleCounts.put(subchannel, sampleIndex);
-        logPayloadStructure("sample #" + sampleIndex, subchannel, data, null);
+        logPayloadStructure("sample #" + sampleIndex, subchannel, data, null, false);
     }
 
     static void logUnknownPayload(String reason, byte[] data) {
-        logPayloadStructure(reason, null, data, null);
+        logPayloadStructure(reason, null, data, null, true);
+    }
+
+    static void logUnknownPayloadBody(String reason, String subchannel, byte[] body) {
+        logPayloadStructure(reason, subchannel, body, null, false);
     }
 
     static void logDecodeFailure(String subchannel, byte[] data, Exception exception) {
-        logPayloadStructure("decode failure", subchannel, data, exception);
+        logPayloadStructure("decode failure", subchannel, data, exception, false);
     }
 
-    private static void logPayloadStructure(String reason, String subchannel, byte[] data, Exception exception) {
-        PayloadBody body = extractBody(data);
+    private static void logPayloadStructure(String reason, String subchannel, byte[] data, Exception exception, boolean decodeEnvelope) {
+        PayloadBody body = decodeEnvelope ? extractEnvelopeBody(data) : PayloadBody.raw(data);
         String label = subchannel == null ? "<unknown>" : subchannel;
 
-        LOGGER.warn(
+        warn(
+                LOGGER,
                 "DW protocol: {} for subchannel={}, totalBytes={}, bodyBytes={}, bodyUtfPreview={}, bodyHexPreview={}",
                 reason,
                 label,
@@ -50,11 +56,12 @@ final class ProtocolDebugLogger {
 
         String numericPreview = numericPreview(body.body);
         if (numericPreview != null) {
-            LOGGER.warn("DW protocol: {} numeric preview for subchannel={} -> {}", reason, label, numericPreview);
+            warn(LOGGER, "DW protocol: {} numeric preview for subchannel={} -> {}", reason, label, numericPreview);
         }
 
         if (body.subchannelBytes >= 0) {
-            LOGGER.warn(
+            warn(
+                    LOGGER,
                     "DW protocol: {} framing for subchannel={}, subchannelBytes={}, trailingBytesAfterBody={}",
                     reason,
                     label,
@@ -64,11 +71,11 @@ final class ProtocolDebugLogger {
         }
 
         if (exception != null) {
-            LOGGER.warn("DW protocol: {} exception for subchannel={}: {}", reason, label, exception.toString());
+            warn(LOGGER, "DW protocol: {} exception for subchannel={}: {}", reason, label, exception.toString());
         }
     }
 
-    private static PayloadBody extractBody(byte[] data) {
+    private static PayloadBody extractEnvelopeBody(byte[] data) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
@@ -79,7 +86,7 @@ final class ProtocolDebugLogger {
             buf.readBytes(body);
             return new PayloadBody(bodyStart, body, buf.readableBytes());
         } catch (Exception ignored) {
-            return new PayloadBody(-1, data.clone(), 0);
+            return PayloadBody.raw(data);
         } finally {
             buf.release();
         }
@@ -202,5 +209,8 @@ final class ProtocolDebugLogger {
     }
 
     private record PayloadBody(int subchannelBytes, byte[] body, int trailingBytes) {
+        private static PayloadBody raw(byte[] data) {
+            return new PayloadBody(-1, data.clone(), 0);
+        }
     }
 }

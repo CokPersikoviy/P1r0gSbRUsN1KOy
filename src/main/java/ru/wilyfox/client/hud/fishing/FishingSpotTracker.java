@@ -6,22 +6,10 @@ import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import java.util.*;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.info;
 
 public final class FishingSpotTracker {
     private static final FishingSpotTracker INSTANCE = new FishingSpotTracker();
-    private static final Set<String> MANUAL_FISHING_LOCATION_IDS = Set.of(
-            "bay",
-            "swamp",
-            "citycanal",
-            "ambergrot",
-            "azurepond",
-            "basalt",
-            "netherval",
-            "magma",
-            "endwharf",
-            "silence",
-            "crystal"
-    );
 
     private static final long LIFETIME_MS = 1500L;
 
@@ -164,22 +152,17 @@ public final class FishingSpotTracker {
     }
 
     private boolean isFishingLocation() {
+        if (DiamondWorldProtocolClient.isCurrentFishingLocation()) {
+            return true;
+        }
+
         String currentLocation = getCurrentFishingLocationId();
         if (currentLocation == null) {
             return false;
         }
 
-        if (MANUAL_FISHING_LOCATION_IDS.contains(currentLocation)) {
-            return true;
-        }
-
-        Set<String> protocolLocations = DiamondWorldProtocolClient.getFishingLocationIds();
-        if (protocolLocations.contains(currentLocation)) {
-            return true;
-        }
-
         if (loggedUnknownLocations.add(currentLocation)) {
-            LOGGER.info("Fishing location debug: unknown location={}", currentLocation);
+            info(LOGGER, "Fishing location debug: unknown location={}", currentLocation);
         }
 
         return false;

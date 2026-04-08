@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.Set;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.info;
 
 public class BossTracker {
     private final Set<Integer> pendingEntityIds = new HashSet<>();
@@ -64,13 +65,13 @@ public class BossTracker {
 
     private void tryCommit() {
         if (pendingBossName != null && pendingBossTimeMillis != null) {
-            LOGGER.info("COMMIT boss={}, time={}", pendingBossName, pendingBossTimeMillis);
+            info(LOGGER, "COMMIT boss={}, time={}", pendingBossName, pendingBossTimeMillis);
 
             long respawnAt = Instant.now().toEpochMilli() + pendingBossTimeMillis;
             respawnAt = ((respawnAt + 999) / 1000) * 1000;
             repository.upsert(pendingBossName, respawnAt);
 
-            LOGGER.info("Bosses size={}", repository.getAll().size());
+            info(LOGGER, "Bosses size={}", repository.getAll().size());
 
             pendingBossName = null;
             pendingBossTimeMillis = null;

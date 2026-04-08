@@ -8,6 +8,7 @@ final class DwProtocolCodec {
     private static final int BYTE_XOR_KEY = 103;
     private static final int SEGMENT_MASK = 0x7F;
     private static final int CONTINUATION_MASK = 0x80;
+    private static final int MAX_STRING_BYTES = 32_767;
     private static final int INT_XOR_MASK = -2027096677 - 533040692;
     private static final long LONG_XOR_MASK = 7020125408405881293L - (-430912393916016026L);
     private static final long DOUBLE_XOR_MASK = 7094196544379894642L - (-356841257942002677L);
@@ -26,6 +27,13 @@ final class DwProtocolCodec {
 
     static String readString(ByteBuf buf) {
         int length = readVarInt(buf);
+        if (length < 0 || length > MAX_STRING_BYTES) {
+            throw new IllegalArgumentException("DW string length is out of range: " + length);
+        }
+        if (length > buf.readableBytes()) {
+            throw new IllegalArgumentException("DW string length exceeds readable bytes: " + length + " > " + buf.readableBytes());
+        }
+
         byte[] bytes = new byte[length];
 
         for (int i = 0; i < length; i++) {

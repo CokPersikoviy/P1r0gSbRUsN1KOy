@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.info;
 
 @Mixin(PlayerTabOverlay.class)
 public abstract class PlayerTabOverlayMixin {
@@ -134,7 +135,7 @@ public abstract class PlayerTabOverlayMixin {
         }
 
         froghelper$lastBoosterTabLog = snapshot;
-        LOGGER.info("Booster debug: tab={}", snapshot);
+        info(LOGGER, "Booster debug: tab={}", snapshot);
     }
 
     private static boolean froghelper$looksLikeBoosterText(String text) {

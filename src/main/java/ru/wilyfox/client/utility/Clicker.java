@@ -7,6 +7,7 @@ import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.keybinds.KeyBinds;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.info;
 
 public final class Clicker {
     private static boolean autoAttackEnabled = false;
@@ -18,7 +19,7 @@ public final class Clicker {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (KeyBinds.AUTO_ATTACK.consumeClick()) {
                 autoAttackEnabled = !autoAttackEnabled;
-                LOGGER.info("Auto {}: {}", getActionName(), autoAttackEnabled);
+                info(LOGGER, "Auto {}: {}", getActionName(), autoAttackEnabled);
             }
 
             if (!autoAttackEnabled) {

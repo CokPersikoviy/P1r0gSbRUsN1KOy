@@ -17,7 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class PetExperienceOverlay {
-    private static final Pattern PET_EXP_PATTERN = Pattern.compile("Опыт питомца:\\s*(\\d+)");
+    private static final Pattern PET_EXP_PATTERN = Pattern.compile("Опыт питомца:\\s*([\\d\\s\\u00A0.,'_]+)");
 
     private PetExperienceOverlay() {
     }
@@ -69,11 +69,33 @@ public final class PetExperienceOverlay {
         for (String line : getLoreLines(stack)) {
             Matcher matcher = PET_EXP_PATTERN.matcher(line);
             if (matcher.find()) {
-                return Long.parseLong(matcher.group(1));
+                long experiencePerItem = parseFlexibleLong(matcher.group(1));
+                if (experiencePerItem > 0L) {
+                    return experiencePerItem * Math.max(1, stack.getCount());
+                }
             }
         }
 
         return 0L;
+    }
+
+    private static long parseFlexibleLong(String value) {
+        if (value == null || value.isBlank()) {
+            return 0L;
+        }
+
+        String digitsOnly = value
+                .replace('\u00A0', ' ')
+                .replaceAll("[^\\d]", "");
+        if (digitsOnly.isBlank()) {
+            return 0L;
+        }
+
+        try {
+            return Long.parseLong(digitsOnly);
+        } catch (NumberFormatException ignored) {
+            return 0L;
+        }
     }
 
     private static List<String> getLoreLines(ItemStack stack) {

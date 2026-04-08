@@ -848,6 +848,14 @@ public class HudSettingsPanel {
         componentsByCategory.get(SettingsCategory.RENDER).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
+                        "Debug",
+                        () -> ConfigManager.get().render.debug,
+                        value -> ConfigManager.get().render.debug = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.RENDER).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
                         "Hide block particles",
                         () -> ConfigManager.get().render.hideBlockBreakParticles,
                         value -> ConfigManager.get().render.hideBlockBreakParticles = value

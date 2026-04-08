@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.info;
 
 final class ProtocolPayloadSupport {
     private ProtocolPayloadSupport() {
@@ -93,7 +94,7 @@ final class ProtocolPayloadSupport {
 
             if (!state.loggedFirstMinerPayload) {
                 state.loggedFirstMinerPayload = true;
-                LOGGER.info("DW protocol: first miner object={}", object);
+                info(LOGGER, "DW protocol: first miner object={}", object);
             }
 
             result.add(new ActiveMinerInfo(
