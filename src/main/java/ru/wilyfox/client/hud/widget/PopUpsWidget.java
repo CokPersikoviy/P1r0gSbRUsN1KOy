@@ -100,8 +100,8 @@ public final class PopUpsWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
+        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
         context.drawString(mc.font, "Pop-Ups", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "No active pop-up's", PADDING_X, 16, WidgetTheme.TEXT_MUTED);
 
@@ -118,12 +118,12 @@ public final class PopUpsWidget extends AbstractWidget {
             int height,
             float alpha
     ) {
-        int panelColor = withScaledAlpha(WidgetTheme.PANEL_BG, alpha);
+        int panelColor = withScaledAlpha(WidgetTheme.WIDGET_PANEL_BG, alpha);
         int bodyColor = withScaledAlpha(WidgetTheme.TEXT_PRIMARY, alpha);
         int titleColor = withScaledAlpha(getTitleColor(notification.severity()), alpha);
         int accentColor = withScaledAlpha(getAccentColor(notification.severity()), alpha);
-        int borderColor = withScaledAlpha(WidgetTheme.ACCENT_LINE, alpha * 0.35f);
-        int glowColor = withScaledAlpha(WidgetTheme.PANEL_BG_SOFT, alpha);
+        int borderColor = withScaledAlpha(WidgetTheme.WIDGET_ACCENT_LINE, alpha * 0.35f);
+        int glowColor = withScaledAlpha(WidgetTheme.WIDGET_PANEL_BG_SOFT, alpha);
 
         context.fill(x, y, x + width, y + height, panelColor);
         context.fill(x, y, x + width, y + 1, accentColor);
@@ -241,3 +241,4 @@ public final class PopUpsWidget extends AbstractWidget {
         return Math.max(0.0f, Math.min(1.0f, value));
     }
 }
+

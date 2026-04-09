@@ -54,8 +54,8 @@ public class PotionTimersWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, WidgetTheme.PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
+        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
 
         int y = PADDING_Y;
         context.drawString(mc.font, "Potions", PADDING_X, y, WidgetTheme.TITLE);
@@ -146,11 +146,12 @@ public class PotionTimersWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
+        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
         context.drawString(mc.font, "Potions", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "No active potions", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
         context.pose().popPose();
     }
 }
+

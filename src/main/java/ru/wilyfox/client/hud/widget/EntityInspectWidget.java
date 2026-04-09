@@ -92,8 +92,8 @@ public final class EntityInspectWidget extends AbstractWidget {
     }
 
     private void renderCard(GuiGraphics context, Minecraft mc, InspectSnapshot snapshot) {
-        context.fill(0, 0, CARD_WIDTH, CARD_HEIGHT, WidgetTheme.PANEL_BG);
-        context.fill(0, 0, CARD_WIDTH, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, CARD_WIDTH, CARD_HEIGHT, WidgetTheme.WIDGET_PANEL_BG);
+        context.fill(0, 0, CARD_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
         context.fill(0, HEADER_HEIGHT, CARD_WIDTH, HEADER_HEIGHT + 1, WidgetTheme.BAR_BG);
 
         context.drawString(mc.font, "Entity Inspect", 8, 6, WidgetTheme.TITLE);
@@ -101,8 +101,8 @@ public final class EntityInspectWidget extends AbstractWidget {
 
         int previewX2 = PREVIEW_BOX_X + PREVIEW_BOX_SIZE;
         int previewY2 = PREVIEW_BOX_Y + PREVIEW_BOX_SIZE;
-        context.fill(PREVIEW_BOX_X, PREVIEW_BOX_Y, previewX2, previewY2, WidgetTheme.PANEL_BG_SOFT);
-        context.fill(PREVIEW_BOX_X, PREVIEW_BOX_Y, previewX2, PREVIEW_BOX_Y + 1, WidgetTheme.ACCENT_LINE);
+        context.fill(PREVIEW_BOX_X, PREVIEW_BOX_Y, previewX2, previewY2, WidgetTheme.WIDGET_PANEL_BG_SOFT);
+        context.fill(PREVIEW_BOX_X, PREVIEW_BOX_Y, previewX2, PREVIEW_BOX_Y + 1, WidgetTheme.WIDGET_ACCENT_LINE);
 
         context.renderItem(snapshot.previewItem, PREVIEW_BOX_X + 34, PREVIEW_BOX_Y + 18);
         context.drawCenteredString(mc.font, snapshot.previewLabel, PREVIEW_BOX_X + PREVIEW_BOX_SIZE / 2, PREVIEW_BOX_Y + 44, WidgetTheme.TEXT_SECONDARY);
@@ -140,8 +140,8 @@ public final class EntityInspectWidget extends AbstractWidget {
 
     private void renderSlotRow(GuiGraphics context, Minecraft mc, SlotInfo slot, int y) {
         int rowWidth = CARD_WIDTH - SLOT_X - 8;
-        context.fill(SLOT_X, y - 2, SLOT_X + rowWidth, y + 43, WidgetTheme.PANEL_BG_SOFT);
-        context.fill(SLOT_X, y - 2, SLOT_X + 1, y + 43, WidgetTheme.ACCENT_LINE);
+        context.fill(SLOT_X, y - 2, SLOT_X + rowWidth, y + 43, WidgetTheme.WIDGET_PANEL_BG_SOFT);
+        context.fill(SLOT_X, y - 2, SLOT_X + 1, y + 43, WidgetTheme.WIDGET_ACCENT_LINE);
 
         context.drawString(mc.font, slot.label, SLOT_X + 6, y, WidgetTheme.TEXT_SECONDARY);
         context.drawString(mc.font, slot.material, SLOT_X + 54, y, slot.empty ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SOFT);
@@ -422,3 +422,4 @@ public final class EntityInspectWidget extends AbstractWidget {
         }
     }
 }
+

@@ -11,6 +11,7 @@ public class PopUpsConfig {
     public boolean bossSpawnEvent = true;
     public boolean abilityReadyEvent = true;
     public boolean wandReadyEvent = true;
+    public boolean windStaffReadyEvent = true;
     public boolean sellerReadyEvent = true;
     public boolean minerReturnedEvent = true;
     public boolean runeSetReadyEvent = true;

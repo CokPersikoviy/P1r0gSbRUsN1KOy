@@ -26,14 +26,10 @@ public final class DebugLogger {
     }
 
     public static void warn(Logger logger, String message, Object... args) {
-        if (isEnabled()) {
-            logger.warn(message, args);
-        }
+        logger.warn(message, args);
     }
 
     public static void error(Logger logger, String message, Object... args) {
-        if (isEnabled()) {
-            logger.error(message, args);
-        }
+        logger.error(message, args);
     }
 }

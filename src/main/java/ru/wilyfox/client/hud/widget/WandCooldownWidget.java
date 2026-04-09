@@ -46,8 +46,8 @@ public class WandCooldownWidget extends AbstractWidget {
         int width = getUnscaledWidth(entries.size());
         int height = getUnscaledHeight();
 
-        context.fill(0, 0, width, height, WidgetTheme.PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
+        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
 
         int x = 0;
         for (WandCooldownEntry entry : entries) {
@@ -108,8 +108,8 @@ public class WandCooldownWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0.0f);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
+        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
         context.fill(0, SLOT_SIZE - BAR_HEIGHT, EMPTY_WIDTH, SLOT_SIZE, WidgetTheme.BAR_BG);
 
         context.drawString(mc.font, "Wand Cooldowns", 6, 6, WidgetTheme.TITLE);
@@ -118,3 +118,4 @@ public class WandCooldownWidget extends AbstractWidget {
         context.pose().popPose();
     }
 }
+

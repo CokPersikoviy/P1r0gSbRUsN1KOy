@@ -7,7 +7,10 @@ import ru.wilyfox.client.hud.config.ThemePreset;
 public final class WidgetTheme {
     public static int PANEL_BG = 0x90131313;
     public static int PANEL_BG_SOFT = 0x66131313;
+    public static int WIDGET_PANEL_BG = 0x90131313;
+    public static int WIDGET_PANEL_BG_SOFT = 0x66131313;
     public static int ACCENT_LINE = 0xA8D0D0D0;
+    public static int WIDGET_ACCENT_LINE = 0xA8D0D0D0;
     public static int TITLE = 0xFFE4E4E4;
     public static int TEXT_PRIMARY = 0xFFD8D8D8;
     public static int TEXT_SECONDARY = 0xFFBBBBBB;
@@ -159,6 +162,10 @@ public final class WidgetTheme {
         PANEL_BG = 0x90000000 | panelBgRgb;
         PANEL_BG_SOFT = 0x7A000000 | panelSoftRgb;
         ACCENT_LINE = 0xC0000000 | accentRgb;
+        int opacityPercent = getWidgetBackgroundOpacityPercent();
+        WIDGET_PANEL_BG = withOpacityPercent(PANEL_BG, opacityPercent);
+        WIDGET_PANEL_BG_SOFT = withOpacityPercent(PANEL_BG_SOFT, opacityPercent);
+        WIDGET_ACCENT_LINE = withOpacityPercent(ACCENT_LINE, opacityPercent);
         TITLE = 0xFF000000 | titleRgb;
         TEXT_PRIMARY = 0xFF000000 | primaryRgb;
         TEXT_SECONDARY = 0xFF000000 | secondaryRgb;
@@ -211,6 +218,21 @@ public final class WidgetTheme {
                 barBgRgb,
                 barFillRgb
         );
+    }
+
+    private static int getWidgetBackgroundOpacityPercent() {
+        ThemeConfig config = ConfigManager.get() != null ? ConfigManager.get().theme : null;
+        if (config == null) {
+            return 100;
+        }
+
+        return Math.max(0, Math.min(100, config.widgetBackgroundOpacityPercent));
+    }
+
+    private static int withOpacityPercent(int argb, int opacityPercent) {
+        int alpha = (argb >>> 24) & 0xFF;
+        int scaledAlpha = Math.round(alpha * (opacityPercent / 100.0f));
+        return withAlpha(argb, scaledAlpha);
     }
 
     public static int withAlpha(int argb, int alpha) {

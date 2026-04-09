@@ -724,6 +724,15 @@ public class HudSettingsPanel {
         componentsByCategory.get(SettingsCategory.POP_UPS).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
+                        "Event: Wind Staff",
+                        () -> ConfigManager.get().popUps.windStaffReadyEvent,
+                        value -> ConfigManager.get().popUps.windStaffReadyEvent = value
+                )
+        );
+
+        componentsByCategory.get(SettingsCategory.POP_UPS).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
                         "Event: Seller ready",
                         () -> ConfigManager.get().popUps.sellerReadyEvent,
                         value -> ConfigManager.get().popUps.sellerReadyEvent = value
@@ -1093,6 +1102,18 @@ public class HudSettingsPanel {
                         BoostersWidget.baseValues(),
                         value -> "x" + String.format(java.util.Locale.US, "%.1f", value / 10.0)
                 )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new SliderSettingsComponent(
+                        0, 0, 0, 0,
+                        "BG Opacity",
+                        () -> ConfigManager.get().theme.widgetBackgroundOpacityPercent,
+                        value -> ConfigManager.get().theme.widgetBackgroundOpacityPercent = value,
+                        0, 100
+                )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new BreakLineSettingsComponent("Visibility")
         );
         componentsByCategory.get(SettingsCategory.WIDGET).add(
                 new ToggleSettingsComponent(

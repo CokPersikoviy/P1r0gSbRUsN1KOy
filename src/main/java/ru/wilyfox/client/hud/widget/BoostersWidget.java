@@ -78,8 +78,8 @@ public final class BoostersWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, WidgetTheme.PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
+        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
 
         int y = PADDING_Y;
         context.drawString(mc.font, "Boosters", PADDING_X, y, WidgetTheme.TITLE);
@@ -123,8 +123,8 @@ public final class BoostersWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, WidgetTheme.PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
+        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
 
         context.drawString(mc.font, "Boosters", PADDING_X, PADDING_Y, WidgetTheme.TITLE);
 
@@ -211,3 +211,4 @@ public final class BoostersWidget extends AbstractWidget {
         return MULTIPLIER_FORMAT.format(multiplier);
     }
 }
+

@@ -13,7 +13,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.wilyfox.client.hud.config.ConfigManager;
@@ -62,17 +61,6 @@ public abstract class PlayerTabOverlayMixin {
         }
 
         cir.setReturnValue(base.copy().withStyle(style -> style.withColor(0xFF3030).withBold(true)));
-    }
-
-    @Redirect(
-            method = "render",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/client/gui/GuiGraphics;drawString(Lnet/minecraft/client/gui/Font;Lnet/minecraft/network/chat/Component;III)I"
-            )
-    )
-    private int froghelper$renderTargetNameInRed(GuiGraphics graphics, Font font, Component text, int x, int y, int color) {
-        return graphics.drawString(font, text, x, y, froghelper$isTargetText(text) ? 0xFFFF3030 : color);
     }
 
     @Inject(method = "render", at = @At("TAIL"))
@@ -146,25 +134,5 @@ public abstract class PlayerTabOverlayMixin {
                 || text.contains("boost")
                 || text.contains("money")
                 || text.contains("shard");
-    }
-
-    private static boolean froghelper$isTargetText(Component component) {
-        if (component == null) {
-            return false;
-        }
-
-        String plain = Formatting.stripMinecraftFormatting(component.getString());
-        if (plain == null || plain.isBlank()) {
-            return false;
-        }
-
-        String normalized = plain.toLowerCase(Locale.ROOT);
-        for (String target : TargetListStore.getTargets()) {
-            if (normalized.contains(target.toLowerCase(Locale.ROOT))) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

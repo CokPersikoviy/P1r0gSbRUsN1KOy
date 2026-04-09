@@ -114,11 +114,12 @@ public class ScoreboardWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(getScale(), getScale(), 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
+        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
         context.drawString(Minecraft.getInstance().font, "Scoreboard", 6, 6, WidgetTheme.TITLE);
         context.drawString(Minecraft.getInstance().font, "Sidebar hidden", 6, 16, WidgetTheme.TEXT_MUTED);
 
         context.pose().popPose();
     }
 }
+

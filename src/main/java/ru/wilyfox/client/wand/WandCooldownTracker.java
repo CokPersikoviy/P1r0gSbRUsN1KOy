@@ -161,6 +161,10 @@ public final class WandCooldownTracker {
         return !protocolEntries.isEmpty() || !localEntries.isEmpty() || !specialEntries.isEmpty();
     }
 
+    public static boolean isWindStaffName(String name) {
+        return WIND_CANONICAL_NAME.equals(normalizeStaffName(name));
+    }
+
     public void clear() {
         protocolEntries.clear();
         localEntries.clear();

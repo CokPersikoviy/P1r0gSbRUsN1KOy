@@ -5,4 +5,5 @@ public class ThemeConfig {
     public int customAccentRed = 208;
     public int customAccentGreen = 208;
     public int customAccentBlue = 208;
+    public int widgetBackgroundOpacityPercent = 100;
 }

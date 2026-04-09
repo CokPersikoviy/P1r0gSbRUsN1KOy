@@ -50,8 +50,8 @@ public final class FishingNibblesWidget extends AbstractWidget {
             return;
         }
 
-        context.fill(0, 0, getUnscaledWidth(lines, mc), getUnscaledHeight(lines, mc), WidgetTheme.PANEL_BG);
-        context.fill(0, 0, getUnscaledWidth(lines, mc), 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, getUnscaledWidth(lines, mc), getUnscaledHeight(lines, mc), WidgetTheme.WIDGET_PANEL_BG);
+        context.fill(0, 0, getUnscaledWidth(lines, mc), 1, WidgetTheme.WIDGET_ACCENT_LINE);
 
         int y = PADDING_Y;
         context.drawString(mc.font, "Fishing Nibbles", PADDING_X, y, WidgetTheme.TITLE);
@@ -151,9 +151,10 @@ public final class FishingNibblesWidget extends AbstractWidget {
     }
 
     private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
+        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
         context.drawString(mc.font, "Fishing Nibbles", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "No fishing data", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
     }
 }
+

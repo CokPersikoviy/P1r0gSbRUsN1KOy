@@ -56,8 +56,8 @@ public final class ComboProgressWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, WidgetTheme.PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
+        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
         context.drawString(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
         context.drawString(mc.font, progressLine, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, progressColor);
 
@@ -119,8 +119,8 @@ public final class ComboProgressWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
+        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
         context.drawString(mc.font, "Combo x1.0 -> x1.1", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "0/1,000", PADDING_X, 16, WidgetTheme.TEXT_MUTED);
 
@@ -135,3 +135,4 @@ public final class ComboProgressWidget extends AbstractWidget {
         return String.format(Locale.US, "%,d", Math.max(0, value));
     }
 }
+

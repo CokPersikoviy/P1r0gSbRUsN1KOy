@@ -7,6 +7,7 @@ import ru.wilyfox.boss.BossInfo;
 import ru.wilyfox.boss.BossRepository;
 import ru.wilyfox.client.ability.AbilityCooldownStore;
 import ru.wilyfox.client.booster.BoosterStore;
+import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.miner.ActiveMinerInfo;
 import ru.wilyfox.client.miner.ActiveMinersStore;
 import ru.wilyfox.client.potion.PotionStore;
@@ -211,6 +212,10 @@ public final class PopUpEventNotifier {
 
         for (Map.Entry<String, String> previous : previousWandNames.entrySet()) {
             if (!current.containsKey(previous.getKey())) {
+                if (!shouldNotifyWandReady(previous.getValue())) {
+                    continue;
+                }
+
                 PopUpManager.getInstance().publish(PopUpRequest.of(
                         PopUpSource.WAND_READY,
                         "Staff Recharged",
@@ -222,6 +227,18 @@ public final class PopUpEventNotifier {
 
         previousWandNames.clear();
         previousWandNames.putAll(current);
+    }
+
+    private boolean shouldNotifyWandReady(String wandName) {
+        if (wandName == null || wandName.isBlank()) {
+            return true;
+        }
+
+        if (WandCooldownTracker.isWindStaffName(wandName) && !ConfigManager.get().popUps.windStaffReadyEvent) {
+            return false;
+        }
+
+        return true;
     }
 
     private void checkSellerReady() {

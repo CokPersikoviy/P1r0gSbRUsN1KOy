@@ -82,8 +82,8 @@ public class BossHudWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, getUnscaledWidth(), getUnscaledHeight(), WidgetTheme.PANEL_BG);
-        context.fill(0, 0, getUnscaledWidth(), 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, getUnscaledWidth(), getUnscaledHeight(), WidgetTheme.WIDGET_PANEL_BG);
+        context.fill(0, 0, getUnscaledWidth(), 1, WidgetTheme.WIDGET_ACCENT_LINE);
 
         int contentY = PADDING_Y;
         context.drawString(mc.font, "Boss Timers", PADDING_X, contentY, WidgetTheme.TITLE);
@@ -356,8 +356,8 @@ public class BossHudWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
+        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
         context.drawString(mc.font, "Boss Timers", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "No active timers", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
@@ -418,3 +418,4 @@ public class BossHudWidget extends AbstractWidget {
         return ResourceLocation.withDefaultNamespace(normalized);
     }
 }
+

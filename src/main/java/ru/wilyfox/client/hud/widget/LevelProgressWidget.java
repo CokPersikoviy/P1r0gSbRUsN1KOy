@@ -58,8 +58,8 @@ public class LevelProgressWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, WidgetTheme.PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
+        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
         context.drawString(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
         context.drawString(mc.font, blocksLine, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, blocksColor);
         context.drawString(mc.font, moneyLine, PADDING_X, PADDING_Y + (mc.font.lineHeight + 2) * 2, moneyColor);
@@ -121,8 +121,8 @@ public class LevelProgressWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.ACCENT_LINE);
+        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
+        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
         context.drawString(mc.font, "Level Progress", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "Waiting for levelinfo", PADDING_X, 16, WidgetTheme.TEXT_MUTED);
 
@@ -164,3 +164,4 @@ public class LevelProgressWidget extends AbstractWidget {
         return MONEY_FORMAT.format(value);
     }
 }
+
