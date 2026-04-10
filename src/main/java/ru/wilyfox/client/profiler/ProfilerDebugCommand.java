@@ -30,11 +30,22 @@ public final class ProfilerDebugCommand {
         }
 
         String args = normalized.length() > COMMAND.length()
-                ? normalized.substring(COMMAND.length()).trim().toLowerCase(Locale.ROOT)
+                ? normalized.substring(COMMAND.length()).trim()
                 : "status";
 
         ModProfiler profiler = ModProfiler.getInstance();
-        switch (args) {
+        String command;
+        String option;
+        int separatorIndex = args.indexOf(' ');
+        if (separatorIndex >= 0) {
+            command = args.substring(0, separatorIndex).trim().toLowerCase(Locale.ROOT);
+            option = args.substring(separatorIndex + 1).trim();
+        } else {
+            command = args.toLowerCase(Locale.ROOT);
+            option = "";
+        }
+
+        switch (command) {
             case "", "status" -> showLocalMessage(profiler.buildStatusLine());
             case "start" -> {
                 profiler.reset();
@@ -49,19 +60,19 @@ public final class ProfilerDebugCommand {
                 profiler.reset();
                 showLocalMessage("Profiler stats reset.");
             }
-            case "report" -> showLines(profiler.buildReportLines());
-            case "dump", "save" -> dumpReport(profiler);
-            default -> showLocalMessage("Usage: /fhprof <status|start|stop|reset|report|dump>");
+            case "report" -> showLines(profiler.buildReportLines(option));
+            case "dump", "save" -> dumpReport(profiler, option);
+            default -> showLocalMessage("Usage: /fhprof <status|start|stop|reset|report [prefix]|dump [prefix]>");
         }
 
         return true;
     }
 
-    private static void dumpReport(ModProfiler profiler) {
+    private static void dumpReport(ModProfiler profiler, String prefixFilter) {
         Minecraft minecraft = Minecraft.getInstance();
         Path outputDirectory = minecraft.gameDirectory.toPath().resolve("froghelper-profiler");
         try {
-            Path outputFile = profiler.writeMarkdownReport(outputDirectory);
+            Path outputFile = profiler.writeMarkdownReport(outputDirectory, prefixFilter);
             showLocalMessage("Profiler report saved to " + outputFile);
         } catch (IOException exception) {
             showLocalMessage("Failed to save profiler report: " + exception.getMessage());
