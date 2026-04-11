@@ -14,6 +14,7 @@ public class SliderSettingsComponent extends SettingsComponent{
     private final int min;
     private final int max;
     private boolean dragging = false;
+    private boolean dirty = false;
 
     public SliderSettingsComponent(int x, int y, int width, int height, String label,
                                    IntSupplier getter,
@@ -88,7 +89,7 @@ public class SliderSettingsComponent extends SettingsComponent{
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if (button == 0 && dragging) {
             dragging = false;
-            ConfigManager.save();
+            saveIfDirty();
             return true;
         }
 
@@ -106,6 +107,18 @@ public class SliderSettingsComponent extends SettingsComponent{
         t = Math.max(0.0, Math.min(1.0, t));
 
         int value = min + (int) Math.round((max - min) * t);
-        setter.accept(value);
+        if (value != getter.getAsInt()) {
+            setter.accept(value);
+            dirty = true;
+        }
+    }
+
+    private void saveIfDirty() {
+        if (!dirty) {
+            return;
+        }
+
+        dirty = false;
+        ConfigManager.save();
     }
 }

@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.Component;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -41,7 +42,7 @@ public final class ChatTabManager {
             return;
         }
 
-        ChatMessageEntry entry = new ChatMessageEntry(component.copy());
+        ChatMessageEntry entry = new ChatMessageEntry(component.copy(), Instant.now());
 
         allMessages.add(entry);
         messagesByTab.get(ChatTab.ALL).add(entry);
@@ -105,7 +106,7 @@ public final class ChatTabManager {
             chat.clearMessages(false);
 
             for (ChatMessageEntry entry : getMessages(activeTab)) {
-                chat.addMessage(entry.component().copy());
+                ChatMessageDecorator.withTimestamp(entry.timestamp(), () -> chat.addMessage(entry.component().copy()));
             }
         } finally {
             rebuilding = false;

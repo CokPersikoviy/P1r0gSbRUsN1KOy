@@ -3,7 +3,9 @@ package ru.wilyfox.client.chat;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 
+import java.time.Instant;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.regex.Pattern;
 
@@ -16,7 +18,14 @@ public final class ChatTimestampFormatter {
     }
 
     public static MutableComponent createTimestampPrefix() {
-        String value = "[" + LocalTime.now().format(TIME_FORMAT) + "] ";
+        return createTimestampPrefix(Instant.now());
+    }
+
+    public static MutableComponent createTimestampPrefix(Instant timestamp) {
+        LocalTime time = timestamp == null
+                ? LocalTime.now()
+                : LocalTime.ofInstant(timestamp, ZoneId.systemDefault());
+        String value = "[" + time.format(TIME_FORMAT) + "] ";
         return Component.literal(value).withColor(TIMESTAMP_COLOR);
     }
 

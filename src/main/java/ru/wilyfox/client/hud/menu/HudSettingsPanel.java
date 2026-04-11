@@ -970,7 +970,7 @@ public class HudSettingsPanel {
                         "Extra chat history",
                         () -> ConfigManager.get().render.extraChatHistoryLines,
                         value -> ConfigManager.get().render.extraChatHistoryLines = value,
-                        0, 900, 50
+                        0, 10000, 50
                 )
         );
         componentsByCategory.get(SettingsCategory.RENDER).add(

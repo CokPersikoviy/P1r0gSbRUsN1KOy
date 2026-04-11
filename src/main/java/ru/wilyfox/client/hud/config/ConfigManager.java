@@ -157,6 +157,7 @@ public class ConfigManager {
         if (sanitized.discordRpc.largeImageKey == null) sanitized.discordRpc.largeImageKey = "froghelper";
         if (sanitized.discordRpc.largeImageText == null) sanitized.discordRpc.largeImageText = "FrogHelper";
         sanitized.discordRpc.updateIntervalSeconds = Math.max(1, Math.min(60, sanitized.discordRpc.updateIntervalSeconds));
+        sanitized.render.extraChatHistoryLines = Math.max(0, Math.min(10000, sanitized.render.extraChatHistoryLines));
         sanitized.theme.widgetBackgroundOpacityPercent = Math.max(0, Math.min(100, sanitized.theme.widgetBackgroundOpacityPercent));
 
         WidgetTheme.syncConfiguredTheme();
