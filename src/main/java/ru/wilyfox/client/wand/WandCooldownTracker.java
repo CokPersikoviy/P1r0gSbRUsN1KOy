@@ -9,7 +9,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.CustomModelData;
-import ru.wilyfox.utils.CooldownWindow;
 import ru.wilyfox.utils.Formatting;
 
 import java.util.ArrayList;
@@ -18,56 +17,57 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.LongSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class WandCooldownTracker {
+    private static final long MIN_PROTOCOL_REMAINING_MILLIS = 2_000L;
+    private static final long READY_WINDOW_MILLIS = 1_000L;
     private static final Pattern COOLDOWN_PATTERN = Pattern.compile("Перезарядка:\\s*(\\d+(?:[.,]\\d+)?)с\\.?");
-    private static final String WAND_PREFIX = "Посох ";
-    private static final Map<String, String> STAFF_NAME_ALIASES = Map.ofEntries(
-            Map.entry(normalizeStaffName("Посох жизни"), normalizeStaffName("Посох регенерации")),
-            Map.entry(normalizeStaffName("Посох мощи"), normalizeStaffName("Посох силы")),
-            Map.entry(normalizeStaffName("Посох дракона"), normalizeStaffName("Посох энда")),
-            Map.entry(normalizeStaffName("Посох пламени"), normalizeStaffName("Посох огня")),
-            Map.entry(normalizeStaffName("Посох грома"), normalizeStaffName("Посох молний")),
-            Map.entry(normalizeStaffName("Посох разрушения"), normalizeStaffName("Посох шахтера")),
-            Map.entry(normalizeStaffName("Посох листопада"), normalizeStaffName("Посох листьев")),
-            Map.entry(normalizeStaffName("Посох вихря"), normalizeStaffName("Посох ветра"))
-    );
-    private static final String WIND_CANONICAL_NAME = normalizeStaffName("Посох ветра");
 
-    private final Map<Integer, WandCooldownEntry> protocolEntries = new LinkedHashMap<>();
-    private final Map<String, WandCooldownEntry> localEntries = new LinkedHashMap<>();
+    // DiamondWorld's awakened wind staff is named "Посох вихря" in the item/type registry.
+    private static final String WIND_STAFF_NAME = "Посох ветра";
+    private static final String AWAKENED_WIND_STAFF_NAME = "Посох вихря";
+
+    private final Map<Integer, CooldownState> protocolEntries = new LinkedHashMap<>();
+    private final Map<WindStaffVariant, LocalWindCooldown> localWindEntries = new LinkedHashMap<>();
     private final Map<String, WandCooldownEntry> specialEntries = new LinkedHashMap<>();
-    private final Map<Integer, String> staffNames = new LinkedHashMap<>();
-    private final Map<Integer, Integer> staffModelIds = new LinkedHashMap<>();
-    private final Map<String, ItemStack> observedStacks = new LinkedHashMap<>();
+    private final Map<Integer, StaffType> staffTypes = new LinkedHashMap<>();
+    private final LongSupplier clock;
+
+    public WandCooldownTracker() {
+        this(System::currentTimeMillis);
+    }
+
+    WandCooldownTracker(LongSupplier clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
 
     public void replaceTypes(Map<Integer, String> namesById, Map<Integer, Integer> modelIdsById) {
-        staffNames.clear();
-        staffNames.putAll(namesById);
-        staffModelIds.clear();
-        staffModelIds.putAll(modelIdsById);
+        staffTypes.clear();
+        namesById.forEach((id, name) -> staffTypes.put(
+                id,
+                new StaffType(name, modelIdsById.getOrDefault(id, id))
+        ));
     }
 
     public void replaceProtocol(Map<Integer, Long> remainingMillisById) {
-        cleanup();
-        // stafftimers arrives incrementally (only the staff whose cooldown just changed), NOT as a
-        // full snapshot — so ids absent from this packet are still on cooldown and must be kept.
-        // Duplicates from re-awakening (a staff getting a new id mid-cooldown) are collapsed by the
-        // canonical-name merge in getActiveEntries(); stale ids fall off via time-based cleanup().
-        for (Map.Entry<Integer, Long> entry : remainingMillisById.entrySet()) {
-            String name = staffNames.getOrDefault(entry.getKey(), "Staff " + entry.getKey());
-            int modelId = staffModelIds.getOrDefault(entry.getKey(), entry.getKey());
-            upsertEntry(protocolEntries, entry.getKey(), "protocol|" + entry.getKey(), createStaffStack(modelId, name), name, entry.getValue());
+        long now = clock.getAsLong();
+        cleanupElapsed(now);
 
-            // Protocol-preferred: the server's value is authoritative, so drop the optimistic local bridge
-            // for this staff the moment its FIRST packet arrives — the shown value corrects immediately.
-            // The wind staff stays local-driven (its protocol lags) and keeps its local window.
-            String canonical = canonicalStaffName(name);
-            if (!WIND_CANONICAL_NAME.equals(canonical)) {
-                localEntries.remove(canonical);
+        // stafftimers is incremental. EvoPlus accepts only newly reported cooldowns above two seconds.
+        for (Map.Entry<Integer, Long> entry : remainingMillisById.entrySet()) {
+            long remainingMillis = entry.getValue();
+            if (remainingMillis <= MIN_PROTOCOL_REMAINING_MILLIS) {
+                continue;
             }
+
+            protocolEntries.put(
+                    entry.getKey(),
+                    createWindow(protocolEntries.get(entry.getKey()), remainingMillis, now)
+            );
         }
     }
 
@@ -76,15 +76,27 @@ public final class WandCooldownTracker {
             return;
         }
 
-        cleanup();
-        upsertEntry(
-                specialEntries,
-                key,
+        long now = clock.getAsLong();
+        cleanupElapsed(now);
+
+        WandCooldownEntry previous = specialEntries.get(key);
+        CooldownState previousWindow = previous == null
+                ? null
+                : new CooldownState(previous.startedAt(), previous.endsAt(), previous.durationMillis());
+        CooldownState window = createWindow(previousWindow, remainingMillis, now);
+        if (window == null) {
+            specialEntries.remove(key);
+            return;
+        }
+
+        specialEntries.put(key, new WandCooldownEntry(
                 "special|" + key,
                 stack != null ? stack.copy() : new ItemStack(Items.TRIDENT),
                 name != null && !name.isBlank() ? name : key,
-                remainingMillis
-        );
+                window.startedAt(),
+                window.endsAt(),
+                window.durationMillis()
+        ));
     }
 
     public void trigger(ItemStack stack, Player player, InteractionHand hand) {
@@ -93,7 +105,8 @@ public final class WandCooldownTracker {
         }
 
         String itemName = stack.getHoverName().getString().trim();
-        if (!itemName.startsWith(WAND_PREFIX)) {
+        WindStaffVariant variant = WindStaffVariant.fromName(itemName);
+        if (variant == null) {
             return;
         }
 
@@ -102,94 +115,118 @@ public final class WandCooldownTracker {
             return;
         }
 
-        String canonicalName = canonicalStaffName(itemName);
-        observedStacks.put(canonicalName, stack.copy());
-
-        // Start an OPTIMISTIC local cooldown for EVERY staff on use (was wind-only). The `stafftimers`
-        // protocol packet is incremental/server-timed and can lag or drop, so a non-wind staff's bar
-        // "sometimes doesn't start" until the packet arrives; the local entry starts it instantly, and
-        // getActiveEntries() still merges the protocol value on top (keeps the fresher/longer window).
-        long now = System.currentTimeMillis();
-        WandCooldownEntry existing = localEntries.get(canonicalName);
-        if (existing != null && existing.endsAt() > now) {
-            return; // already on a local cooldown — don't restart it
+        long now = clock.getAsLong();
+        cleanupElapsed(now);
+        LocalWindCooldown existing = localWindEntries.get(variant);
+        if (existing != null && existing.window().endsAt() > now) {
+            return;
         }
 
-        localEntries.put(canonicalName, new WandCooldownEntry(
-                "local|" + canonicalName,
+        localWindEntries.put(variant, new LocalWindCooldown(
                 stack.copy(),
                 itemName,
-                now,
-                now + cooldownMillis,
-                cooldownMillis
+                new CooldownState(now, now + cooldownMillis, cooldownMillis)
         ));
     }
 
     public List<WandCooldownEntry> getActiveEntries() {
-        cleanup();
+        long now = clock.getAsLong();
+        cleanupElapsed(now);
 
-        Map<String, WandCooldownEntry> merged = new LinkedHashMap<>();
-        for (WandCooldownEntry protocolEntry : protocolEntries.values()) {
-            String canonicalName = canonicalStaffName(protocolEntry.name());
-            ItemStack observed = observedStacks.get(canonicalName);
-            ItemStack stack = observed != null ? observed.copy() : protocolEntry.stack();
-            WandCooldownEntry candidate = new WandCooldownEntry(
-                    protocolEntry.key(),
-                    stack,
-                    protocolEntry.name(),
-                    protocolEntry.startedAt(),
-                    protocolEntry.endsAt(),
-                    protocolEntry.durationMillis()
-            );
+        Map<Integer, WandCooldownEntry> renderedProtocol = new LinkedHashMap<>();
+        Map<WindStaffVariant, Integer> protocolWindIds = new LinkedHashMap<>();
 
-            // Two different protocol ids can briefly resolve to the same canonical name
-            // (e.g. an awakening reassigns the id mid-cooldown); keep whichever is fresher
-            // instead of letting iteration order decide, so the pair never renders as two entries.
-            WandCooldownEntry existing = merged.get(canonicalName);
-            if (existing == null || candidate.endsAt() > existing.endsAt()) {
-                merged.put(canonicalName, candidate);
+        for (Map.Entry<Integer, CooldownState> entry : protocolEntries.entrySet()) {
+            CooldownState window = entry.getValue();
+            if (!isVisibleStaffWindow(window, now)) {
+                continue;
+            }
+
+            StaffType type = staffTypes.get(entry.getKey());
+            if (type == null) {
+                continue;
+            }
+
+            WindStaffVariant variant = WindStaffVariant.fromName(type.name());
+            String key = "protocol|" + entry.getKey();
+            if (variant != null && !protocolWindIds.containsKey(variant)) {
+                protocolWindIds.put(variant, entry.getKey());
+                key = variant.entryKey();
+            }
+
+            renderedProtocol.put(entry.getKey(), new WandCooldownEntry(
+                    key,
+                    createStaffStack(type.modelId(), type.name()),
+                    type.name(),
+                    window.startedAt(),
+                    window.endsAt(),
+                    window.durationMillis()
+            ));
+        }
+
+        List<WandCooldownEntry> result = new ArrayList<>(renderedProtocol.values());
+        for (Map.Entry<WindStaffVariant, LocalWindCooldown> entry : localWindEntries.entrySet()) {
+            WindStaffVariant variant = entry.getKey();
+            LocalWindCooldown local = entry.getValue();
+            if (!isVisibleStaffWindow(local.window(), now)) {
+                continue;
+            }
+
+            Integer protocolId = protocolWindIds.get(variant);
+            if (protocolId == null) {
+                result.add(toLocalEntry(variant, local));
+                continue;
+            }
+
+            WandCooldownEntry protocol = renderedProtocol.get(protocolId);
+            if (protocol != null && local.window().endsAt() > protocol.endsAt()) {
+                int resultIndex = result.indexOf(protocol);
+                WandCooldownEntry merged = new WandCooldownEntry(
+                        variant.entryKey(),
+                        local.stack().copy(),
+                        protocol.name(),
+                        local.window().startedAt(),
+                        local.window().endsAt(),
+                        local.window().durationMillis()
+                );
+                if (resultIndex >= 0) {
+                    result.set(resultIndex, merged);
+                }
             }
         }
 
-        for (Map.Entry<String, WandCooldownEntry> entry : localEntries.entrySet()) {
-            WandCooldownEntry localEntry = entry.getValue();
-            WandCooldownEntry protocolEntry = merged.get(entry.getKey());
-            if (protocolEntry == null || localEntry.endsAt() > protocolEntry.endsAt()) {
-                merged.put(entry.getKey(), localEntry);
-            }
-        }
-
-        for (Map.Entry<String, WandCooldownEntry> entry : specialEntries.entrySet()) {
-            merged.put(entry.getKey(), entry.getValue());
-        }
-
-        List<WandCooldownEntry> result = new ArrayList<>(merged.values());
+        result.addAll(specialEntries.values());
         result.sort(Comparator.comparingLong(WandCooldownEntry::endsAt));
         return result;
     }
 
     public boolean hasActiveEntries() {
-        cleanup();
-        return !protocolEntries.isEmpty() || !localEntries.isEmpty() || !specialEntries.isEmpty();
+        long now = clock.getAsLong();
+        cleanupElapsed(now);
+
+        boolean hasProtocol = protocolEntries.entrySet().stream().anyMatch(entry ->
+                staffTypes.containsKey(entry.getKey()) && isVisibleStaffWindow(entry.getValue(), now)
+        );
+        boolean hasLocalWind = localWindEntries.values().stream().anyMatch(entry ->
+                isVisibleStaffWindow(entry.window(), now)
+        );
+        return hasProtocol || hasLocalWind || !specialEntries.isEmpty();
     }
 
     public static boolean isWindStaffName(String name) {
-        return WIND_CANONICAL_NAME.equals(normalizeStaffName(name));
+        return WindStaffVariant.fromName(name) != null;
     }
 
     public void clear() {
         protocolEntries.clear();
-        localEntries.clear();
+        localWindEntries.clear();
         specialEntries.clear();
-        staffNames.clear();
-        staffModelIds.clear();
-        observedStacks.clear();
+        staffTypes.clear();
     }
 
-    private void cleanup() {
-        long now = System.currentTimeMillis();
+    private void cleanupElapsed(long now) {
         protocolEntries.entrySet().removeIf(entry -> entry.getValue().endsAt() <= now);
-        localEntries.entrySet().removeIf(entry -> entry.getValue().endsAt() <= now);
+        localWindEntries.entrySet().removeIf(entry -> entry.getValue().window().endsAt() <= now);
         specialEntries.entrySet().removeIf(entry -> entry.getValue().endsAt() <= now);
     }
 
@@ -201,45 +238,45 @@ public final class WandCooldownTracker {
             Matcher matcher = COOLDOWN_PATTERN.matcher(text);
             if (matcher.find()) {
                 double seconds = Double.parseDouble(matcher.group(1).replace(',', '.'));
-                return Math.max(1L, Math.round(seconds * 1000.0d));
+                return Math.max(1L, Math.round(seconds * 1000.0D));
             }
         }
 
         return -1L;
     }
 
-    private ItemStack createStaffStack(int modelId, String name) {
+    private static CooldownState createWindow(CooldownState previous, long remainingMillis, long now) {
+        if (remainingMillis <= 0L) {
+            return null;
+        }
+
+        long duration = previous == null
+                ? remainingMillis
+                : Math.max(previous.durationMillis(), remainingMillis);
+        long startedAt = now - Math.max(0L, duration - remainingMillis);
+        return new CooldownState(startedAt, now + remainingMillis, duration);
+    }
+
+    private static boolean isVisibleStaffWindow(CooldownState window, long now) {
+        return window.endsAt() - now > READY_WINDOW_MILLIS;
+    }
+
+    private static WandCooldownEntry toLocalEntry(WindStaffVariant variant, LocalWindCooldown local) {
+        return new WandCooldownEntry(
+                variant.entryKey(),
+                local.stack().copy(),
+                local.name(),
+                local.window().startedAt(),
+                local.window().endsAt(),
+                local.window().durationMillis()
+        );
+    }
+
+    private static ItemStack createStaffStack(int modelId, String name) {
         ItemStack stack = new ItemStack(Items.WOODEN_HOE);
         stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(List.of((float) modelId), List.of(), List.of(), List.of()));
         stack.set(DataComponents.CUSTOM_NAME, Component.literal(name));
         return stack;
-    }
-
-    private <K> void upsertEntry(Map<K, WandCooldownEntry> entries, K entryKey, String key, ItemStack stack, String name, long remainingMillis) {
-        WandCooldownEntry previous = entries.get(entryKey);
-        CooldownWindow previousWindow = previous == null
-                ? null
-                : new CooldownWindow(previous.startedAt(), previous.endsAt(), previous.durationMillis());
-
-        CooldownWindow window = CooldownWindow.extend(previousWindow, remainingMillis);
-        if (window == null) {
-            entries.remove(entryKey);
-            return;
-        }
-
-        entries.put(entryKey, new WandCooldownEntry(
-                key,
-                stack,
-                name,
-                window.startedAt(),
-                window.endsAt(),
-                window.durationMillis()
-        ));
-    }
-
-    private String canonicalStaffName(String name) {
-        String normalized = normalizeStaffName(name);
-        return STAFF_NAME_ALIASES.getOrDefault(normalized, normalized);
     }
 
     private static String normalizeStaffName(String name) {
@@ -251,9 +288,45 @@ public final class WandCooldownTracker {
                 .trim()
                 .toLowerCase(Locale.ROOT);
         if (normalized.endsWith(" пробужденный")) {
-            normalized = normalized.substring(0, normalized.length() - " пробужденный".length());
+            normalized = normalized.substring(0, normalized.length() - " пробужденный".length()).trim();
         }
         return normalized;
+    }
+
+    private enum WindStaffVariant {
+        WIND(WIND_STAFF_NAME, "wind"),
+        AWAKENED(AWAKENED_WIND_STAFF_NAME, "awakened-wind");
+
+        private final String normalizedName;
+        private final String key;
+
+        WindStaffVariant(String displayName, String key) {
+            this.normalizedName = normalizeStaffName(displayName);
+            this.key = key;
+        }
+
+        static WindStaffVariant fromName(String name) {
+            String normalized = normalizeStaffName(name);
+            for (WindStaffVariant variant : values()) {
+                if (variant.normalizedName.equals(normalized)) {
+                    return variant;
+                }
+            }
+            return null;
+        }
+
+        String entryKey() {
+            return "wind|" + key;
+        }
+    }
+
+    private record StaffType(String name, int modelId) {
+    }
+
+    private record CooldownState(long startedAt, long endsAt, long durationMillis) {
+    }
+
+    private record LocalWindCooldown(ItemStack stack, String name, CooldownState window) {
     }
 
     public record WandCooldownEntry(
@@ -267,7 +340,7 @@ public final class WandCooldownTracker {
         public float progress() {
             long remaining = Math.max(0L, endsAt - System.currentTimeMillis());
             if (durationMillis <= 0L) {
-                return 0.0f;
+                return 0.0F;
             }
 
             return remaining / (float) durationMillis;

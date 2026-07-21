@@ -104,6 +104,32 @@ class DwProtocolDecodersTest {
         assertEquals(1.5D, entry.multiplier());
     }
 
+    @Test
+    void staffTypesUseModelIdAsRegistryKey() throws IOException {
+        ByteArrayOutputStream payload = new ByteArrayOutputStream();
+        writeVarInt(payload, 1);
+        writeString(payload, "Посох вихря");
+        writeVarInt(payload, 5_021);
+
+        DwStaffType type = DwStaffTypesDecoder.decode(payload.toByteArray()).types().get(5_021);
+
+        assertEquals(5_021, type.id());
+        assertEquals(5_021, type.modelId());
+        assertEquals("Посох вихря", type.name());
+    }
+
+    @Test
+    void staffTimersUseFixedMaskedIntAndLong() throws IOException {
+        ByteArrayOutputStream payload = new ByteArrayOutputStream();
+        writeVarInt(payload, 1);
+        writeInt(payload, 5_021);
+        writeLong(payload, 45_000L);
+
+        DwStaffTimersPacket packet = DwStaffTimersDecoder.decode(payload.toByteArray());
+
+        assertEquals(45_000L, packet.timers().get(5_021));
+    }
+
     private static void writeString(ByteArrayOutputStream output, String value) {
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
         writeVarInt(output, bytes.length);
