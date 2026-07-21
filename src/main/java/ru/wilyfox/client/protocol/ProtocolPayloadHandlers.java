@@ -6,11 +6,8 @@ import ru.wilyfox.client.boss.BossDamageInfo;
 import ru.wilyfox.client.miner.ActiveMinerInfo;
 import ru.wilyfox.client.pet.ActivePetInfo;
 import ru.wilyfox.client.rune.RuneSetCooldownStore;
-import ru.wilyfox.client.wand.WandCooldownTracker;
 
-import java.time.Instant;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -30,6 +27,7 @@ final class ProtocolPayloadHandlers {
     private static final int ACTIVE_PETS_PREVIEW_LIMIT = 6;
     private static final int ABILITY_PREVIEW_LIMIT = 6;
     private static final int STAFF_PREVIEW_LIMIT = 6;
+    private static final int POTION_PREVIEW_LIMIT = 6;
     private static final int BOOSTER_PREVIEW_LIMIT = 6;
     private static final int BOSSCOLLECT_GROUP_PREVIEW_LIMIT = 6;
     private static final int BOSSCOLLECT_VALUE_PREVIEW_LIMIT = 4;
@@ -39,7 +37,7 @@ final class ProtocolPayloadHandlers {
 
     static boolean handleBossTimers(ProtocolState state, byte[] data) {
         try {
-            DwBossTimersPacket packet = DwBossTimersDecoder.decode(data, state.bossTypes.keySet());
+            DwBossTimersPacket packet = DwBossTimersDecoder.decode(data);
             applyBossTimers(state, packet);
 
             if (packet.timers().isEmpty()) {
@@ -74,6 +72,10 @@ final class ProtocolPayloadHandlers {
         try {
             DwBossTypesPacket packet = DwBossTypesDecoder.decode(data);
             state.bossTypes = new LinkedHashMap<>(packet.types());
+            if (state.bossRepository != null) {
+                packet.types().forEach((id, type) ->
+                        state.bossRepository.updateProtocolMetadata(id, type.name(), type.level()));
+            }
 
             if (packet.types().isEmpty()) {
                 info(LOGGER, "DW protocol: bosstypes parsed successfully, entries=0");
@@ -156,6 +158,11 @@ final class ProtocolPayloadHandlers {
         try {
             DwPetTypesPacket packet = DwPetTypesDecoder.decode(data);
             state.petTypes = new LinkedHashMap<>(packet.types());
+            if (state.activePetsStore != null && !state.activePetsStore.isEmpty()) {
+                state.activePetsStore.replace(state.activePetsStore.getAll().stream()
+                        .map(pet -> ProtocolPayloadSupport.enrichActivePet(state, pet))
+                        .toList());
+            }
 
             if (packet.types().isEmpty()) {
                 info(LOGGER, "DW protocol: pettypes parsed successfully, entries=0");
@@ -338,9 +345,9 @@ final class ProtocolPayloadHandlers {
 
             if (state.levelProgressStore != null) {
                 state.levelProgressStore.updateCurrent(
-                        ProtocolPayloadSupport.getInt(packet.values(), "level"),
-                        ProtocolPayloadSupport.getInt(packet.values(), "blocks"),
-                        ProtocolPayloadSupport.getDouble(packet.values(), "balance")
+                        packet.values().containsKey("level") ? ProtocolPayloadSupport.getInt(packet.values(), "level") : null,
+                        packet.values().containsKey("blocks") ? ProtocolPayloadSupport.getInt(packet.values(), "blocks") : null,
+                        packet.values().containsKey("balance") ? ProtocolPayloadSupport.getDouble(packet.values(), "balance") : null
                 );
             }
 
@@ -475,10 +482,12 @@ final class ProtocolPayloadHandlers {
             DwStaffTypesPacket packet = DwStaffTypesDecoder.decode(data);
             state.staffTypes = new LinkedHashMap<>(packet.types());
 
-            WandCooldownTracker.getInstance().replaceTypes(
-                    packet.types().values().stream().collect(Collectors.toMap(DwStaffType::id, DwStaffType::name)),
-                    packet.types().values().stream().collect(Collectors.toMap(DwStaffType::id, DwStaffType::modelId))
-            );
+            if (state.wandCooldownTracker != null) {
+                state.wandCooldownTracker.replaceTypes(
+                        packet.types().values().stream().collect(Collectors.toMap(DwStaffType::id, DwStaffType::name)),
+                        packet.types().values().stream().collect(Collectors.toMap(DwStaffType::id, DwStaffType::modelId))
+                );
+            }
 
             String preview = packet.types().values().stream()
                     .limit(STAFF_PREVIEW_LIMIT)
@@ -501,7 +510,9 @@ final class ProtocolPayloadHandlers {
     static boolean handleStaffTimers(ProtocolState state, byte[] data) {
         try {
             DwStaffTimersPacket packet = DwStaffTimersDecoder.decode(data);
-            WandCooldownTracker.getInstance().replaceProtocol(packet.timers());
+            if (state.wandCooldownTracker != null) {
+                state.wandCooldownTracker.replaceProtocol(packet.timers());
+            }
 
             String preview = packet.timers().entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
@@ -555,8 +566,25 @@ final class ProtocolPayloadHandlers {
         try {
             DwAbilityTimersPacket packet = DwAbilityTimersDecoder.decode(data);
             long now = System.currentTimeMillis();
-            if (ProtocolPayloadSupport.shouldTriggerRuneSetCooldown(state, packet.timers(), now)) {
+            boolean swapTriggered = ProtocolPayloadSupport.shouldTriggerRuneSetCooldown(state, packet.timers(), now);
+            if (swapTriggered) {
                 RuneSetCooldownStore.update(10_000L);
+            }
+
+            // TEMP diagnostic (render.debug) for T5 "first wind-rune press doesn't start the swap cd":
+            // dumps each ability's decayed previous vs current remaining and the trigger decision, so we
+            // can see WHY the first press isn't detected as a fresh ability use.
+            if (ru.wilyfox.client.debug.DebugLogger.isEnabled()) {
+                long elapsed = state.lastAbilityTimersAt > 0L ? Math.max(0L, now - state.lastAbilityTimersAt) : 0L;
+                StringBuilder dump = new StringBuilder("\n=== ABILITYTIMERS (swap-cd trigger=")
+                        .append(swapTriggered).append(", elapsed=").append(elapsed).append("ms) ===");
+                for (Map.Entry<String, Long> entry : packet.timers().entrySet()) {
+                    long prev = Math.max(0L, state.lastAbilityTimers.getOrDefault(entry.getKey(), 0L));
+                    dump.append("\n  ").append(entry.getKey())
+                            .append(": prevDecayed=").append(Math.max(0L, prev - elapsed))
+                            .append(" current=").append(Math.max(0L, entry.getValue()));
+                }
+                info(LOGGER, "{}", dump.toString());
             }
 
             state.lastAbilityTimers = new LinkedHashMap<>(packet.timers());
@@ -689,17 +717,19 @@ final class ProtocolPayloadHandlers {
         }
     }
 
-    static boolean handleHarpoonCooldown(byte[] data) {
+    static boolean handleHarpoonCooldown(ProtocolState state, byte[] data) {
         try {
             DwCooldownValuePacket packet = DwCooldownValueDecoder.decode(data);
             long remaining = Math.max(0L, packet.remainingMillis());
 
-            WandCooldownTracker.getInstance().replaceSpecialCooldown(
-                    "harpooncd",
-                    new ItemStack(Items.TRIDENT),
-                    "Гарпун",
-                    remaining
-            );
+            if (state.wandCooldownTracker != null) {
+                state.wandCooldownTracker.replaceSpecialCooldown(
+                        "harpooncd",
+                        new ItemStack(Items.TRIDENT),
+                        "Гарпун",
+                        remaining
+                );
+            }
 
             info(
                     LOGGER,
@@ -710,6 +740,31 @@ final class ProtocolPayloadHandlers {
             return true;
         } catch (Exception exception) {
             warn(LOGGER, "DW protocol: failed to parse harpooncd payload", exception);
+            return false;
+        }
+    }
+
+    static boolean handlePotionCooldowns(ProtocolState state, byte[] data) {
+        try {
+            DwPotionCooldownsPacket packet = DwPotionCooldownsDecoder.decode(data);
+
+            if (state.potionStore != null) {
+                state.potionStore.applyCooldownUpdate(packet.cooldowns());
+            }
+
+            String preview = packet.cooldowns().entrySet().stream()
+                    .limit(POTION_PREVIEW_LIMIT)
+                    .map(entry -> entry.getKey() + "=" + ProtocolPayloadSupport.formatRemainingMillis(entry.getValue()))
+                    .collect(Collectors.joining(", "));
+            info(
+                    LOGGER,
+                    "DW protocol: potioncd parsed successfully, entries={}, first={}",
+                    packet.cooldowns().size(),
+                    preview
+            );
+            return true;
+        } catch (Exception exception) {
+            warn(LOGGER, "DW protocol: failed to parse potioncd payload", exception);
             return false;
         }
     }
@@ -796,8 +851,9 @@ final class ProtocolPayloadHandlers {
             DwBoostersPacket packet = DwBoostersDecoder.decode(data);
 
             if (state.boosterStore != null) {
-                state.boosterStore.replace(ru.wilyfox.client.booster.BoosterStore.Kind.MONEY, packet.boosters().get(ru.wilyfox.client.booster.BoosterStore.Kind.MONEY));
-                state.boosterStore.replace(ru.wilyfox.client.booster.BoosterStore.Kind.SHARDS, packet.boosters().get(ru.wilyfox.client.booster.BoosterStore.Kind.SHARDS));
+                for (ru.wilyfox.client.booster.BoosterStore.Kind kind : ru.wilyfox.client.booster.BoosterStore.Kind.values()) {
+                    state.boosterStore.replace(kind, packet.boosters().get(kind));
+                }
             }
 
             long totalEntries = packet.boosters().values().stream()
@@ -828,8 +884,7 @@ final class ProtocolPayloadHandlers {
             return;
         }
 
-        long now = Instant.now().toEpochMilli();
-        Map<String, ru.wilyfox.boss.BossInfo> snapshot = new HashMap<>();
+        long now = System.currentTimeMillis();
 
         for (Map.Entry<String, Long> entry : packet.timers().entrySet()) {
             String bossId = entry.getKey();
@@ -842,12 +897,7 @@ final class ProtocolPayloadHandlers {
                 level = type.level();
             }
 
-            long respawnAt = now + entry.getValue();
-            respawnAt = ((respawnAt + 999) / 1000) * 1000;
-            ru.wilyfox.boss.BossInfo bossInfo = new ru.wilyfox.boss.BossInfo(bossName, respawnAt, level);
-            snapshot.put(bossId, bossInfo);
+            state.bossRepository.upsertProtocol(bossId, bossName, now + entry.getValue(), level);
         }
-
-        state.bossRepository.replaceProtocol(snapshot);
     }
 }

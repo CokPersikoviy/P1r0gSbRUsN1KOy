@@ -5,7 +5,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomModelData;
@@ -13,10 +15,12 @@ import ru.wilyfox.client.miner.ActiveMinerInfo;
 import ru.wilyfox.client.pet.ActivePetInfo;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
 import static ru.wilyfox.client.debug.DebugLogger.info;
@@ -50,16 +54,15 @@ final class ProtocolPayloadSupport {
                 continue;
             }
 
-            DwPetType type = state.petTypes.get(id);
-            String name = type != null ? type.name() : prettifyId(id);
-
-            result.add(new ActivePetInfo(
+            ActivePetInfo pet = new ActivePetInfo(
                     id,
-                    name,
+                    prettifyId(id),
+                    new ItemStack(Items.BONE),
                     getInt(object, "level"),
                     getDouble(object, "exp"),
                     getDouble(object, "energy")
-            ));
+            );
+            result.add(enrichActivePet(state, pet));
         }
 
         return result;
@@ -102,11 +105,52 @@ final class ProtocolPayloadSupport {
                     level,
                     prettifyMinerResource(category),
                     getString(object, "status"),
-                    getLong(data, "homecoming")
+                    getInstantMillis(data, "homecoming")
             ));
         }
 
         return result;
+    }
+
+    // Abilities that DO NOT lock rune-set swapping when used (their runes read "не накладывает КД смены
+    // сета рун"). Matched by protocol id (confirmed from device logs) OR by a display-name fragment via
+    // abilityTypes, so abilities whose id we couldn't confirm still resolve by their in-game name.
+    private static final Set<String> SWAP_CD_EXEMPT_IDS =
+            Set.of("SERAPHIM", "ILLUSIONER", "TURTLE", "PHOENIX");
+    private static final Set<String> SWAP_CD_EXEMPT_NAME_FRAGMENTS =
+            Set.of("серафим", "иллюз", "черепах", "феникс", "титан", "божеств", "темпус");
+
+    private static boolean isSwapCdExempt(ProtocolState state, String abilityId) {
+        if (abilityId != null && SWAP_CD_EXEMPT_IDS.contains(abilityId)) {
+            return true;
+        }
+        String name = resolveAbilityName(state, abilityId);
+        if (name == null) {
+            return false;
+        }
+        String lower = name.toLowerCase(Locale.ROOT);
+        for (String fragment : SWAP_CD_EXEMPT_NAME_FRAGMENTS) {
+            if (lower.contains(fragment)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String resolveAbilityName(ProtocolState state, String abilityId) {
+        if (state == null || state.abilityTypes == null || abilityId == null) {
+            return null;
+        }
+        DwAbilityType type = state.abilityTypes.get(abilityId);
+        if (type != null) {
+            return type.name();
+        }
+        for (DwAbilityType candidate : state.abilityTypes.values()) {
+            if (abilityId.equals(candidate.id())) {
+                return candidate.name();
+            }
+        }
+        return null;
     }
 
     static boolean shouldTriggerRuneSetCooldown(ProtocolState state, Map<String, Long> timers, long now) {
@@ -122,6 +166,9 @@ final class ProtocolPayloadSupport {
             long previousRemaining = Math.max(0L, previousRaw - elapsed);
 
             if (previousRemaining <= 0L || current > previousRemaining + 1_500L) {
+                if (isSwapCdExempt(state, entry.getKey())) {
+                    continue; // this ability's use does not lock rune-set swapping
+                }
                 return true;
             }
         }
@@ -135,6 +182,22 @@ final class ProtocolPayloadSupport {
         }
 
         return String.format(Locale.US, "%.1f", energy);
+    }
+
+    static ActivePetInfo enrichActivePet(ProtocolState state, ActivePetInfo pet) {
+        DwPetType type = state.petTypes.get(pet.id());
+        if (type == null) {
+            return pet;
+        }
+
+        return new ActivePetInfo(
+                pet.id(),
+                type.name(),
+                createPetIcon(type),
+                pet.level(),
+                pet.exp(),
+                pet.energy()
+        );
     }
 
     static String prettifyId(String id) {
@@ -265,6 +328,17 @@ final class ProtocolPayloadSupport {
         return element != null && !element.isJsonNull() ? element.getAsLong() : 0L;
     }
 
+    static long getInstantMillis(JsonObject object, String key) {
+        JsonElement element = object.get(key);
+        if (element == null || element.isJsonNull()) {
+            return 0L;
+        }
+        if (element.getAsJsonPrimitive().isNumber()) {
+            return element.getAsLong();
+        }
+        return Instant.parse(element.getAsString()).toEpochMilli();
+    }
+
     static double getDouble(JsonObject object, String key) {
         JsonElement element = object.get(key);
         return element != null && !element.isJsonNull() ? element.getAsDouble() : 0.0D;
@@ -357,12 +431,39 @@ final class ProtocolPayloadSupport {
         while (remainingExp > nextLevelCost) {
             remainingExp -= nextLevelCost;
             level++;
-            nextLevelCost = (int) (nextLevelCost * 1.4D);
+            nextLevelCost = (int) (nextLevelCost * 1.5D);
             if (nextLevelCost <= 0) {
                 break;
             }
         }
 
         return Math.max(1, level);
+    }
+
+    private static ItemStack createPetIcon(DwPetType type) {
+        ResourceLocation location = resolveItemLocation(type.material());
+        ItemStack stack = location == null
+                ? new ItemStack(Items.BONE)
+                : new ItemStack(BuiltInRegistries.ITEM.getValue(location));
+        if (stack.isEmpty()) {
+            stack = new ItemStack(Items.BONE);
+        }
+        if (type.customModelData() > 0) {
+            stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(List.of((float) type.customModelData()), List.of(), List.of(), List.of()));
+        }
+        return stack;
+    }
+
+    private static ResourceLocation resolveItemLocation(String material) {
+        if (material == null || material.isBlank()) {
+            return null;
+        }
+
+        ResourceLocation direct = ResourceLocation.tryParse(material);
+        if (direct != null) {
+            return direct;
+        }
+
+        return ResourceLocation.tryParse(material.trim().toLowerCase(Locale.ROOT).replace(' ', '_'));
     }
 }

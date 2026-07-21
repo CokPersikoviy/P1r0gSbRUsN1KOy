@@ -10,6 +10,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TooltipFlag;
+import ru.wilyfox.client.hud.config.WidgetChrome;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.utils.Formatting;
 
@@ -21,11 +23,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class RuneSetEffectOverlay {
-    private static final String MENU_NAME = "\uE962";
+    private static final String MENU_NAME = "";
     private static final List<Integer> RUNE_BAG_SLOTS = List.of(11, 13, 15, 27, 35);
     private static final List<Integer> RUNE_SET_SLOTS = List.of(0, 1, 3, 4, 5, 6, 8);
+    // First lore line of the "Мешок для рун" item, which carries the whole set's already-aggregated
+    // effect. Unique to that item among everything in the bag/inventory, so it's a safe anchor.
+    private static final String BAG_MARKER = "используется для активации";
     private static final Pattern PROPERTY_LINE = Pattern.compile("(.*): (.*)");
-    private static OverlayData cachedOverlay;
+    private static final String ACTIVE_ABILITY_MARKER = "Активная способность";
+    private static final String PASSIVE_ABILITY_MARKER = "Пассивная способность";
 
     private RuneSetEffectOverlay() {
     }
@@ -34,46 +40,100 @@ public final class RuneSetEffectOverlay {
         return title != null && title.getString().contains(MENU_NAME);
     }
 
+    /**
+     * The active set's buff overlay: title = the selected set's name (e.g. "Сет рун №4"), lines = the
+     * whole set's aggregated effect. Prefer the game's pre-aggregated "Мешок для рун" item (accurate —
+     * includes set-level bonuses that aren't on individual runes); when that item isn't in the inventory
+     * (the case the overlay used to fail on), fall back to aggregating from the equipped rune papers.
+     */
     public static OverlayData collect(AbstractContainerMenu menu) {
         String setName = findSelectedSetName(menu);
-        Map<String, AggregatedProperty> properties = collectProperties(menu);
+        List<String> buffs = collectSetBuffLines(menu);
+        if (buffs.isEmpty()) {
+            buffs = collectSetBuffLinesFromRunes(menu); // fallback: aggregate the equipped rune papers ourselves
+        }
 
-        if (setName == null && properties.isEmpty()) {
+        if (setName == null && buffs.isEmpty()) {
             return null;
         }
 
-        List<String> lines = properties.values().stream()
-                .filter(property -> !property.isEmpty())
-                .sorted((a, b) -> Double.compare(Math.abs(b.value), Math.abs(a.value)))
-                .map(AggregatedProperty::format)
-                .toList();
-
-        return new OverlayData(setName == null ? "Set Effect" : setName, lines);
+        return new OverlayData(setName == null ? "Эффект сета рун" : setName, buffs);
     }
 
-    public static OverlayData collectFromInventory(AbstractContainerMenu menu) {
-        for (Slot slot : menu.slots) {
+    /**
+     * Whether the rune bag's contents are actually loaded (any set selector slot is populated). Guards
+     * the optimistic active-runes sync so it doesn't clear the HUD on the empty frames right after the
+     * screen opens, while still allowing a genuinely emptied set to clear it.
+     */
+    public static boolean isRuneBagLoaded(AbstractContainerMenu menu) {
+        for (int slotIndex : RUNE_SET_SLOTS) {
+            if (slotIndex >= 0 && slotIndex < menu.slots.size() && menu.getSlot(slotIndex).hasItem()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Active runes read directly from the rune-bag's rune slots (paper items). Reflects every in-bag
+     * change live — swapping a rune, filling an empty slot, removing one, or selecting a whole set — so
+     * the HUD updates the instant the bag refreshes, instead of waiting for the activerunes packet
+     * (which lags several seconds under server load).
+     */
+    public static List<String> collectActiveRuneNames(AbstractContainerMenu menu) {
+        List<String> runes = new ArrayList<>();
+        for (int slotIndex : RUNE_BAG_SLOTS) {
+            if (slotIndex < 0 || slotIndex >= menu.slots.size()) {
+                continue;
+            }
+
+            Slot slot = menu.getSlot(slotIndex);
             if (!slot.hasItem()) {
                 continue;
             }
 
-            OverlayData data = extractOverlayFromItem(slot.getItem());
-            if (data != null) {
-                return data;
+            ItemStack stack = slot.getItem();
+            if (!stack.is(Items.PAPER)) {
+                continue;
+            }
+
+            runes.add(stack.getHoverName().getString());
+        }
+        return runes;
+    }
+
+    /** Feeds {@link RuneSetCooldownStore} (used by the ActiveRunes bar) from the bag's set slots. */
+    public static void updateCooldownStore(AbstractContainerMenu menu) {
+        long longestCooldown = 0L;
+
+        for (int slotIndex : RUNE_SET_SLOTS) {
+            if (slotIndex < 0 || slotIndex >= menu.slots.size()) {
+                continue;
+            }
+
+            Slot slot = menu.getSlot(slotIndex);
+            if (!slot.hasItem()) {
+                continue;
+            }
+
+            for (String line : getLoreLines(slot.getItem())) {
+                long parsed = Formatting.parseTimeToMillis(line);
+                if (parsed > longestCooldown) {
+                    longestCooldown = parsed;
+                }
             }
         }
 
-        return null;
+        if (longestCooldown > 0L) {
+            // The bag lore shows the cooldown at whole-second (ceil'd) granularity, e.g. actual 8.3s reads
+            // "9 секунд". Treating that as exact makes the bar linger ~0.5-1s after the set is already
+            // swappable. Centre the estimate on the second it represents (V-1, V] -> V-0.5s.
+            RuneSetCooldownStore.update(Math.max(0L, longestCooldown - LORE_ROUNDING_BIAS_MS));
+        }
     }
 
-    public static void updateCache(AbstractContainerMenu menu) {
-        cachedOverlay = collect(menu);
-        updateCooldown(menu);
-    }
-
-    public static OverlayData getCached() {
-        return cachedOverlay;
-    }
+    /** Half a second — recenters the whole-second (ceil'd) bag-lore cooldown so the bar isn't ~1s late. */
+    private static final long LORE_ROUNDING_BIAS_MS = 500L;
 
     public static boolean isPlayerInventoryScreen(Object screen) {
         return screen instanceof InventoryScreen;
@@ -91,8 +151,7 @@ public final class RuneSetEffectOverlay {
         int width = maxWidth + 12;
         int height = 12 + lineHeight + Math.max(0, data.lines().size()) * lineHeight;
 
-        context.fill(x, y, x + width, y + height, WidgetTheme.PANEL_BG);
-        context.fill(x, y, x + width, y + 1, WidgetTheme.ACCENT_LINE);
+        HudSurface.drawPanel(context, x, y, width, height, WidgetChrome.FROST, HudSurface.nativeRenderer());
 
         int textY = y + 5;
         context.drawString(mc.font, data.title(), x + 6, textY, WidgetTheme.TITLE);
@@ -125,34 +184,57 @@ public final class RuneSetEffectOverlay {
         return null;
     }
 
-    private static void updateCooldown(AbstractContainerMenu menu) {
-        long longestCooldown = 0L;
-
-        for (int slotIndex : RUNE_SET_SLOTS) {
-            if (slotIndex < 0 || slotIndex >= menu.slots.size()) {
-                continue;
-            }
-
-            Slot slot = menu.getSlot(slotIndex);
+    /** Pulls the aggregated set effect from the "Мешок для рун" item's lore. */
+    private static List<String> collectSetBuffLines(AbstractContainerMenu menu) {
+        for (Slot slot : menu.slots) {
             if (!slot.hasItem()) {
                 continue;
             }
 
-            for (String line : getLoreLines(slot.getItem())) {
-                long parsed = Formatting.parseTimeToMillis(line);
-                if (parsed > longestCooldown) {
-                    longestCooldown = parsed;
-                }
+            List<String> lore = getLoreLines(slot.getItem());
+            if (!lore.isEmpty() && lore.get(0).toLowerCase().contains(BAG_MARKER)) {
+                return extractSetBuffLines(lore);
             }
         }
 
-        if (longestCooldown > 0L) {
-            RuneSetCooldownStore.update(longestCooldown);
-        }
+        return List.of();
     }
 
-    private static Map<String, AggregatedProperty> collectProperties(AbstractContainerMenu menu) {
-        Map<String, AggregatedProperty> properties = new LinkedHashMap<>();
+    private static List<String> extractSetBuffLines(List<String> lore) {
+        List<String> lines = new ArrayList<>();
+
+        for (String line : lore) {
+            String clean = line.trim();
+            if (clean.isEmpty()) {
+                continue;
+            }
+
+            String lower = clean.toLowerCase();
+            if (lower.contains(BAG_MARKER) || lower.contains("нельзя передать")) {
+                continue;
+            }
+
+            // Stat lines ("Сила: +95%"), the active/passive ability headers ("… способности:"), and the
+            // "● …" passive-ability bullets under them.
+            if (clean.contains(":") || clean.startsWith("●")) {
+                lines.add(clean);
+            }
+        }
+
+        return lines;
+    }
+
+    /**
+     * Aggregate the whole set's effect straight from the equipped rune papers (RUNE_BAG_SLOTS), the same
+     * way the game builds the "Мешок для рун" item — so it works without that item present. Numeric stats
+     * are summed per name (mirrors EvoPlus's RuneProperty); a line is treated as a stat only if its value
+     * matches a stat pattern (so "Тип: …", "Минимальный уровень: 455", "Длительность: 5 сек." are skipped).
+     * The active/passive ability runes are appended for parity with the item's display.
+     */
+    private static List<String> collectSetBuffLinesFromRunes(AbstractContainerMenu menu) {
+        Map<String, AggregatedProperty> stats = new LinkedHashMap<>();
+        String activeAbility = null;
+        List<String> passiveAbilities = new ArrayList<>();
 
         for (int slotIndex : RUNE_BAG_SLOTS) {
             if (slotIndex < 0 || slotIndex >= menu.slots.size()) {
@@ -169,86 +251,56 @@ public final class RuneSetEffectOverlay {
                 continue;
             }
 
-            for (Map.Entry<String, String> entry : extractRawProperties(stack).entrySet()) {
-                AggregatedProperty property = properties.computeIfAbsent(entry.getKey(), key -> new AggregatedProperty(key));
-                property.append(entry.getValue());
-            }
-        }
-
-        return properties;
-    }
-
-    private static Map<String, String> extractRawProperties(ItemStack stack) {
-        Map<String, String> result = new LinkedHashMap<>();
-        List<String> lore = getLoreLines(stack);
-
-        boolean afterDivider = false;
-        for (String line : lore) {
-            if (line.contains("-----")) {
-                afterDivider = true;
-                continue;
+            List<String> lore = getLoreLines(stack);
+            for (String line : lore) {
+                Matcher matcher = PROPERTY_LINE.matcher(line);
+                if (matcher.matches()) {
+                    stats.computeIfAbsent(matcher.group(1).trim(), AggregatedProperty::new)
+                            .append(matcher.group(2).trim());
+                }
             }
 
-            if (!afterDivider) {
-                continue;
+            if (lore.contains(ACTIVE_ABILITY_MARKER)) {
+                activeAbility = runeShortName(stack);
             }
-
-            Matcher matcher = PROPERTY_LINE.matcher(line);
-            if (matcher.matches()) {
-                result.put(matcher.group(1).trim(), matcher.group(2).trim());
+            if (lore.contains(PASSIVE_ABILITY_MARKER)) {
+                passiveAbilities.add(runeShortName(stack));
             }
-        }
-
-        return result;
-    }
-
-    private static OverlayData extractOverlayFromItem(ItemStack stack) {
-        String itemName = Formatting.stripMinecraftFormatting(stack.getHoverName().getString()).trim();
-        if (!itemName.toLowerCase().contains("рун")) {
-            return null;
-        }
-
-        List<String> lore = getLoreLines(stack);
-        if (lore.isEmpty()) {
-            return null;
         }
 
         List<String> lines = new ArrayList<>();
+        stats.values().stream()
+                .filter(property -> !property.isEmpty())
+                .sorted((a, b) -> Double.compare(Math.abs(b.value), Math.abs(a.value)))
+                .map(AggregatedProperty::format)
+                .forEach(lines::add);
 
-        for (String line : lore) {
-            String clean = line.trim();
-            if (clean.isEmpty()) {
-                continue;
+        if (activeAbility != null) {
+            lines.add("Активная способность: " + activeAbility);
+        }
+        if (!passiveAbilities.isEmpty()) {
+            lines.add("Пассивные способности:");
+            for (String passive : passiveAbilities) {
+                lines.add("● " + passive);
             }
-
-            String lower = clean.toLowerCase();
-            if (lower.contains("используется для активации")) {
-                continue;
-            }
-
-            if (lower.contains("нельзя передать")) {
-                continue;
-            }
-
-            if (!clean.contains(":")) {
-                continue;
-            }
-
-            lines.add(clean);
         }
 
-        if (lines.isEmpty()) {
-            return null;
-        }
+        return lines;
+    }
 
-        return new OverlayData("Эффект сета рун", lines);
+    /** Rune display name without its trailing level ("Садист III" -> "Садист"), as the set item shows it. */
+    private static String runeShortName(ItemStack stack) {
+        String name = Formatting.stripMinecraftFormatting(stack.getHoverName().getString()).trim();
+        return name.replaceAll("\\s+[IVXLCDM]+$", "").trim();
     }
 
     private static List<String> getLoreLines(ItemStack stack) {
+        // Always NORMAL: ADVANCED appends the registry-id line ("minecraft:paper"), durability, etc.,
+        // which the buff parser would otherwise pick up as a fake property line.
         List<Component> tooltip = stack.getTooltipLines(
                 Item.TooltipContext.of(Minecraft.getInstance().player.level()),
                 Minecraft.getInstance().player,
-                Minecraft.getInstance().options.advancedItemTooltips ? TooltipFlag.ADVANCED : TooltipFlag.NORMAL
+                TooltipFlag.NORMAL
         );
         List<String> lines = new ArrayList<>();
 
@@ -265,6 +317,7 @@ public final class RuneSetEffectOverlay {
     public record OverlayData(String title, List<String> lines) {
     }
 
+    /** One aggregated numeric stat across the set's runes. Mirrors EvoPlus's RuneProperty value types. */
     private static final class AggregatedProperty {
         private static final Pattern FLAT = Pattern.compile("^([-+][\\d.,]+)(?: \\(([-+][\\d.,]+)\\))?(?: \\| ([-+][\\d.,]+))?$");
         private static final Pattern PERCENT = Pattern.compile("^([-+][\\d.,]+)%(?: \\(([-+][\\d.,]+)%\\))?(?: \\| ([-+][\\d.,]+)%)?$");
@@ -280,39 +333,43 @@ public final class RuneSetEffectOverlay {
             this.name = name;
         }
 
-        private void append(String rawValue) {
+        /** Accumulate a raw value; returns whether it matched a known stat pattern (else it's not a stat). */
+        private boolean append(String rawValue) {
             if (rawValue.equals("+")) {
                 present = true;
                 kind = Kind.PRESENCE;
-                return;
+                return true;
             }
 
             Matcher percent = PERCENT.matcher(rawValue);
             if (percent.matches()) {
                 kind = Kind.PERCENT;
                 value += parseGroup(percent, 1) + parseGroup(percent, 2) + parseGroup(percent, 3);
-                return;
+                return true;
             }
 
             Matcher flat = FLAT.matcher(rawValue);
             if (flat.matches()) {
                 kind = Kind.FLAT;
                 value += parseGroup(flat, 1) + parseGroup(flat, 2) + parseGroup(flat, 3);
-                return;
+                return true;
             }
 
             Matcher multiply = MULTIPLY.matcher(rawValue);
             if (multiply.matches()) {
                 kind = Kind.MULTIPLY;
                 value += parseGroup(multiply, 1) + parseGroup(multiply, 2) - 1.0;
-                return;
+                return true;
             }
 
             Matcher miner = MINER.matcher(rawValue);
             if (miner.matches()) {
                 kind = Kind.MINER;
                 value += 1.0 / Double.parseDouble(miner.group(1));
+                return true;
             }
+
+            return false;
         }
 
         private boolean isEmpty() {
@@ -334,7 +391,6 @@ public final class RuneSetEffectOverlay {
             if (value == null || value.isBlank()) {
                 return 0.0;
             }
-
             return Double.parseDouble(value.replace(',', '.'));
         }
 
@@ -345,8 +401,7 @@ public final class RuneSetEffectOverlay {
 
         private static String trim(double value) {
             String formatted = String.format(java.util.Locale.US, "%.2f", value);
-            formatted = formatted.replaceAll("0+$", "").replaceAll("\\.$", "");
-            return formatted;
+            return formatted.replaceAll("0+$", "").replaceAll("\\.$", "");
         }
     }
 

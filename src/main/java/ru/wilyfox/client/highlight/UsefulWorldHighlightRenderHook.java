@@ -232,7 +232,10 @@ public final class UsefulWorldHighlightRenderHook {
                     || minChunkZ != lastMinChunkZ
                     || maxChunkZ != lastMaxChunkZ;
             boolean refreshExpired = gameTime - lastBlockRefreshTick >= BLOCK_SCAN_REFRESH_TICKS;
-            if (!chunkWindowChanged && !refreshExpired && !BLOCK_BOXES.isEmpty()) {
+            // PENDING_BLOCK_SCAN_KEYS empty means the current window has been fully scanned at
+            // least once - unlike BLOCK_BOXES.isEmpty(), this stays true even when the scan
+            // legitimately found nothing nearby, so the fast path doesn't get skipped every frame.
+            if (!chunkWindowChanged && !refreshExpired && PENDING_BLOCK_SCAN_KEYS.isEmpty()) {
                 count("refreshBlockCache/fastPathHits");
                 processDirtyChunks(mc, minChunkX, maxChunkX, minChunkZ, maxChunkZ);
                 return;

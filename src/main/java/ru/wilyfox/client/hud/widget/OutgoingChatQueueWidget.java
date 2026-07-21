@@ -41,8 +41,7 @@ public class OutgoingChatQueueWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, hasContent ? WidgetTheme.WIDGET_PANEL_BG : WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, width, height);
         context.drawString(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
         context.drawString(mc.font, preview, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, hasContent ? WidgetTheme.TEXT_PRIMARY : WidgetTheme.TEXT_MUTED);
 

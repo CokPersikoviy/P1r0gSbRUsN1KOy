@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import org.lwjgl.glfw.GLFW;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 import java.util.function.Consumer;
@@ -44,7 +45,7 @@ public class TextInputSettingsComponent extends SettingsComponent {
         int boxBg = focused ? WidgetTheme.PANEL_BG_SOFT : WidgetTheme.BAR_BG;
         int boxTop = focused ? WidgetTheme.ACCENT_LINE : WidgetTheme.PANEL_BG;
 
-        context.fill(x, y, x + width, y + height, rowBg);
+        HudSurface.fillRounded(context, x, y, width, height, 4, rowBg);
 
         int textY = y + (height - mc.font.lineHeight) / 2;
         context.drawString(mc.font, label, x + 8, textY, textColor);
@@ -54,8 +55,8 @@ public class TextInputSettingsComponent extends SettingsComponent {
         int boxHeight = height - 6;
         int boxY = y + 3;
 
-        context.fill(boxX, boxY, boxX + boxWidth, boxY + boxHeight, boxBg);
-        context.fill(boxX, boxY, boxX + boxWidth, boxY + 1, boxTop);
+        HudSurface.fillRounded(context, boxX, boxY, boxWidth, boxHeight, 3, boxBg);
+        context.fill(boxX + 3, boxY, boxX + boxWidth - 3, boxY + 1, boxTop);
 
         String value = getValue();
         DisplayText display = focused

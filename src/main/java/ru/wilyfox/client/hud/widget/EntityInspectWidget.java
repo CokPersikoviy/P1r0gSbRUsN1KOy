@@ -88,8 +88,7 @@ public final class EntityInspectWidget extends AbstractWidget {
     }
 
     private void renderCard(GuiGraphics context, Minecraft mc, InspectSnapshot snapshot) {
-        context.fill(0, 0, CARD_WIDTH, CARD_HEIGHT, WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, CARD_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, CARD_WIDTH, CARD_HEIGHT);
         context.fill(0, HEADER_HEIGHT, CARD_WIDTH, HEADER_HEIGHT + 1, WidgetTheme.BAR_BG);
 
         context.drawString(mc.font, "Entity Inspect", 8, 6, WidgetTheme.TITLE);

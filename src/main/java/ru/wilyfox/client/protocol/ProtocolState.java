@@ -11,6 +11,7 @@ import ru.wilyfox.client.pet.ActivePetsStore;
 import ru.wilyfox.client.potion.PotionStore;
 import ru.wilyfox.client.rune.ActiveRunesStore;
 import ru.wilyfox.client.seller.SellerCooldownStore;
+import ru.wilyfox.client.wand.WandCooldownTracker;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -46,6 +47,7 @@ final class ProtocolState {
     SellerCooldownStore sellerCooldownStore;
     ComboProgressStore comboProgressStore;
     BoosterStore boosterStore;
+    WandCooldownTracker wandCooldownTracker;
 
     CurrentServerInfo currentServerInfo = CurrentServerInfo.unknown();
     DwGameEvent currentGameEvent = DwGameEvent.NONE;

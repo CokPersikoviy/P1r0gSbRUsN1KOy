@@ -5,10 +5,9 @@ import net.minecraft.network.chat.Component;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.utils.Formatting;
 
-import java.util.regex.Pattern;
+import java.util.Locale;
 
 public final class AutoThanks {
-    private static final Pattern BOOSTER_MESSAGE_PATTERN = Pattern.compile("^[\\w\\s]+ \\u0430\\u043a\\u0442\\u0438\\u0432\\u0438\\u0440\\u043e\\u0432\\u0430\\u043b \\u0433\\u043b\\u043e\\u0431\\u0430\\u043b\\u044c\\u043d\\u044b\\u0439 \\u0431\\u0443\\u0441\\u0442\\u0435\\u0440");
     private static final long COMMAND_COOLDOWN_MS = 3_000L;
 
     private static long lastSentAt = 0L;
@@ -21,11 +20,7 @@ public final class AutoThanks {
             return;
         }
 
-        String text = Formatting.stripMinecraftFormatting(component.getString())
-                .replace('\u00A0', ' ')
-                .trim();
-
-        if (!BOOSTER_MESSAGE_PATTERN.matcher(text).find()) {
+        if (!isGlobalBoosterActivation(component)) {
             return;
         }
 
@@ -41,5 +36,29 @@ public final class AutoThanks {
 
         ChatDispatchQueue.enqueueCommand("thx", COMMAND_COOLDOWN_MS);
         lastSentAt = now;
+    }
+
+    private static boolean isGlobalBoosterActivation(Component component) {
+        String normalized = Formatting.stripMinecraftFormatting(component.getString())
+                .replace(' ', ' ')
+                .replaceAll("\\s+", " ")
+                .trim()
+                .toLowerCase(Locale.ROOT);
+
+        if (normalized.isEmpty()) {
+            return false;
+        }
+
+        // A server booster broadcast has no colon; player chat ("Nick: ...") does. This keeps us
+        // from thanking because someone typed the phrase in chat.
+        if (normalized.contains(":")) {
+            return false;
+        }
+
+        // Match tolerantly instead of anchoring on a bare ASCII nickname: real broadcasts carry
+        // rank/clan prefixes and Cyrillic that the previous "^[\\w\\s]+ ..." regex never accepted.
+        return normalized.contains("активирова") // активирова(л/ла)
+                && normalized.contains("глобальн")            // глобальн(ый/ого)
+                && normalized.contains("буст");                                   // буст(ер)
     }
 }

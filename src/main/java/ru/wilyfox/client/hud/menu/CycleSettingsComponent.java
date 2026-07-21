@@ -3,6 +3,7 @@ package ru.wilyfox.client.hud.menu;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 import java.util.function.Consumer;
@@ -35,7 +36,7 @@ public class CycleSettingsComponent<T> extends SettingsComponent {
         int rowBg = hovered ? WidgetTheme.PANEL_BG : WidgetTheme.PANEL_BG_SOFT;
         int textColor = hovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_PRIMARY;
 
-        context.fill(x, y, x + width, y + height, rowBg);
+        HudSurface.fillRounded(context, x, y, width, height, 4, rowBg);
 
         int textY = y + (height - mc.font.lineHeight) / 2;
         context.drawString(mc.font, label, x + 8, textY, textColor);
@@ -45,7 +46,7 @@ public class CycleSettingsComponent<T> extends SettingsComponent {
         int valueWidth = Math.max(52, Math.min(maxValueWidth, mc.font.width(valueText) + 16));
         int valueX = x + width - 8 - valueWidth;
 
-        context.fill(valueX, y + 3, valueX + valueWidth, y + height - 3, hovered ? WidgetTheme.PANEL_BG : WidgetTheme.BAR_BG);
+        HudSurface.fillRounded(context, valueX, y + 3, valueWidth, height - 6, 3, hovered ? WidgetTheme.PANEL_BG : WidgetTheme.BAR_BG);
         context.drawCenteredString(mc.font, valueText, valueX + valueWidth / 2, textY, WidgetTheme.TITLE);
     }
 

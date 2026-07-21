@@ -51,12 +51,13 @@ public class ActiveRunesWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, getUnscaledWidth(), getUnscaledHeight(), WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, getUnscaledWidth(), 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, getUnscaledWidth(), getUnscaledHeight());
 
         int y = PADDING_Y;
-        context.drawString(mc.font, "Active Runes", PADDING_X, y, WidgetTheme.TITLE);
-        y += lineStep + 2;
+        if (WidgetUtils.showWidgetTitles()) {
+            context.drawString(mc.font, "Active Runes", PADDING_X, y, WidgetTheme.TITLE);
+            y += lineStep + 2;
+        }
 
         for (int i = 0; i < runes.size(); i++) {
             int color = i < 3 ? WidgetTheme.TEXT_SOFT : WidgetTheme.TEXT_SECONDARY;
@@ -66,12 +67,7 @@ public class ActiveRunesWidget extends AbstractWidget {
 
         if (RuneSetCooldownStore.isActive()) {
             int barY = getUnscaledHeight() - BAR_HEIGHT;
-            context.fill(0, barY, getUnscaledWidth(), getUnscaledHeight(), WidgetTheme.BAR_BG);
-
-            int fillWidth = Math.max(0, Math.min(getUnscaledWidth(), Math.round(getUnscaledWidth() * RuneSetCooldownStore.getProgress())));
-            if (fillWidth > 0) {
-                context.fill(0, barY, fillWidth, getUnscaledHeight(), WidgetTheme.BAR_FILL);
-            }
+            HudSurface.drawBar(context, 0, barY, getUnscaledWidth(), BAR_HEIGHT, RuneSetCooldownStore.getProgress(), WidgetTheme.BAR_FILL);
         }
 
         context.pose().popPose();
@@ -104,7 +100,7 @@ public class ActiveRunesWidget extends AbstractWidget {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        int maxWidth = mc.font.width("Active Runes");
+        int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Active Runes") : 0;
 
         for (String rune : runes) {
             maxWidth = Math.max(maxWidth, mc.font.width(Formatting.stripMinecraftFormatting(rune)));
@@ -120,7 +116,8 @@ public class ActiveRunesWidget extends AbstractWidget {
         }
 
         int lineStep = Minecraft.getInstance().font.lineHeight + LINE_GAP;
-        return PADDING_Y * 2 + 2 + lineStep + 2 + count * lineStep + (RuneSetCooldownStore.isActive() ? BAR_HEIGHT : 0);
+        int titleBlock = WidgetUtils.showWidgetTitles() ? lineStep + 2 : 0;
+        return PADDING_Y * 2 + 2 + titleBlock + count * lineStep + (RuneSetCooldownStore.isActive() ? BAR_HEIGHT : 0);
     }
 
     private boolean isEditorPreview() {
@@ -132,8 +129,7 @@ public class ActiveRunesWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         context.drawString(mc.font, "Active Runes", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "No active set", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 

@@ -10,10 +10,11 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
-import ru.wilyfox.client.keybinds.KeyBinds;
+import org.lwjgl.glfw.GLFW;
+import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.RunesBagConfig;
 import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.utils.Formatting;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,15 +55,47 @@ public final class RuneSetSwitcher {
         }
     }
 
+    /** Mouse-button selectors (mouse4 / mouse5 / middle) from the same "Runes Bag Keybinds" binds. */
+    public static boolean handleScreenMouseClicked(Component title, AbstractContainerMenu menu, int button) {
+        try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("ui/RuneSetSwitcher/handleScreenMouseClicked")) {
+            if (!RuneSetEffectOverlay.isRuneBagScreen(title)) {
+                return false;
+            }
+
+            int directIndex = matchDirectSelectionMouse(button);
+            if (directIndex >= 0) {
+                return switchToSet(Minecraft.getInstance(), menu, directIndex);
+            }
+
+            return false;
+        }
+    }
+
     private static boolean matches(KeyMapping mapping, int keyCode, int scanCode) {
         return mapping.matches(keyCode, scanCode);
     }
 
     private static int matchDirectSelection(int keyCode, int scanCode) {
-        if (keyCode >= GLFW.GLFW_KEY_1 && keyCode <= GLFW.GLFW_KEY_7) {
-            return keyCode - GLFW.GLFW_KEY_1;
+        // Custom keys from the "Runes Bag Keybinds" settings tab (default 1-7). Read only here, inside
+        // the rune-bag screen, so they never collide with the vanilla hotbar keys during gameplay. A raw
+        // keyCode is always < MOUSE_CODE_OFFSET, so it never matches a slot bound to a mouse button.
+        int[] keys = ConfigManager.get().runesBag.setSelectorKeys;
+        for (int i = 0; i < keys.length; i++) {
+            if (keys[i] != GLFW.GLFW_KEY_UNKNOWN && keys[i] == keyCode) {
+                return i;
+            }
         }
+        return -1;
+    }
 
+    private static int matchDirectSelectionMouse(int button) {
+        int code = RunesBagConfig.MOUSE_CODE_OFFSET + button;
+        int[] keys = ConfigManager.get().runesBag.setSelectorKeys;
+        for (int i = 0; i < keys.length; i++) {
+            if (keys[i] == code) {
+                return i;
+            }
+        }
         return -1;
     }
 
@@ -147,10 +180,11 @@ public final class RuneSetSwitcher {
             return List.of();
         }
 
+        // NORMAL only — ADVANCED adds the registry-id/durability lines that pollute lore-marker matching.
         List<Component> tooltip = stack.getTooltipLines(
                 Item.TooltipContext.of(client.player.level()),
                 client.player,
-                client.options.advancedItemTooltips ? TooltipFlag.ADVANCED : TooltipFlag.NORMAL
+                TooltipFlag.NORMAL
         );
 
         List<String> lines = new ArrayList<>();

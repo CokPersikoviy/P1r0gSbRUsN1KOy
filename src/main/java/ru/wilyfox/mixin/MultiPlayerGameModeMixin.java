@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import ru.wilyfox.client.Client;
 import ru.wilyfox.client.wand.WandCooldownTracker;
 
 @Mixin(MultiPlayerGameMode.class)
@@ -41,6 +42,14 @@ public class MultiPlayerGameModeMixin {
             return;
         }
 
-        WandCooldownTracker.getInstance().trigger(player.getItemInHand(hand), player, hand);
+        Client client = Client.getInstance();
+        if (client == null) {
+            return;
+        }
+
+        WandCooldownTracker tracker = client.getWandCooldownTracker();
+        if (tracker != null) {
+            tracker.trigger(player.getItemInHand(hand), player, hand);
+        }
     }
 }

@@ -37,8 +37,7 @@ public class VisibilityStatusWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, width, height);
 
         if (ConfigManager.get().visibilityStatus.compact) {
             renderCompact(context, mc);

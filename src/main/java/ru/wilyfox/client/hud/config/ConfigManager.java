@@ -3,6 +3,7 @@ package ru.wilyfox.client.hud.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
 import ru.wilyfox.client.hud.widget.AbstractWidget;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.client.quickaccess.QuickAccessConfig;
@@ -74,6 +75,13 @@ public class ConfigManager {
         WidgetLayoutConfig layout = CONFIG.widgetLayouts.computeIfAbsent(widget.getConfigKey(), ignored -> new WidgetLayoutConfig());
         layout.x = widget.getStartX();
         layout.y = widget.getStartY();
+        // Persist the resolution-independent fraction (source of truth for free widgets on resize).
+        int screenW = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+        int screenH = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        if (screenW > 0 && screenH > 0) {
+            layout.xFraction = clampFraction(widget.getStartX() / (double) screenW);
+            layout.yFraction = clampFraction(widget.getStartY() / (double) screenH);
+        }
         layout.scale = widget.getScale();
         layout.anchor = widget.getScreenAnchor();
         layout.snapTarget = widget.getSnapTargetKey();
@@ -81,6 +89,10 @@ public class ConfigManager {
         layout.snapTargetCorner = widget.getSnapTargetCorner();
         layout.hiddenInGameplay = widget.isHiddenInGameplay();
         save();
+    }
+
+    private static double clampFraction(double value) {
+        return Math.max(0.0, Math.min(1.0, value));
     }
 
     private static HudConfig load() {
@@ -100,6 +112,7 @@ public class ConfigManager {
         HudConfig sanitized = config != null ? config : new HudConfig();
 
         if (sanitized.render == null) sanitized.render = new RenderConfig();
+        if (sanitized.render.widgetChrome == null) sanitized.render.widgetChrome = WidgetChrome.FROST;
         if (sanitized.autoMessages == null) sanitized.autoMessages = new AutoMessagesConfig();
         if (sanitized.bossWidget == null) sanitized.bossWidget = new BossWidgetConfig();
         if (sanitized.clicker == null) sanitized.clicker = new ClickerConfig();
@@ -158,7 +171,37 @@ public class ConfigManager {
         if (sanitized.discordRpc.largeImageText == null) sanitized.discordRpc.largeImageText = "FrogHelper";
         sanitized.discordRpc.updateIntervalSeconds = Math.max(1, Math.min(60, sanitized.discordRpc.updateIntervalSeconds));
         sanitized.render.extraChatHistoryLines = Math.max(0, Math.min(10000, sanitized.render.extraChatHistoryLines));
-        sanitized.theme.widgetBackgroundOpacityPercent = Math.max(0, Math.min(100, sanitized.theme.widgetBackgroundOpacityPercent));
+        sanitized.theme.widgetBackgroundOpacityPercent = Math.max(0, Math.min(50, sanitized.theme.widgetBackgroundOpacityPercent));
+        if (sanitized.bossWidget != null) {
+            sanitized.bossWidget.postSpawnShowSeconds = Math.max(0, Math.min(600, sanitized.bossWidget.postSpawnShowSeconds));
+        }
+        // Migrate legacy absolute widget positions to resolution-independent fractions, using the
+        // window size they were last saved at (correct reference, before any resize can chain-corrupt).
+        if (sanitized.widgetLayouts != null
+                && sanitized.lastWindowWidth != null && sanitized.lastWindowHeight != null
+                && sanitized.lastWindowWidth > 0 && sanitized.lastWindowHeight > 0) {
+            for (WidgetLayoutConfig layout : sanitized.widgetLayouts.values()) {
+                if (layout == null) {
+                    continue;
+                }
+                if (layout.xFraction == null && layout.x != null) {
+                    layout.xFraction = clampFraction(layout.x / (double) sanitized.lastWindowWidth);
+                }
+                if (layout.yFraction == null && layout.y != null) {
+                    layout.yFraction = clampFraction(layout.y / (double) sanitized.lastWindowHeight);
+                }
+            }
+        }
+        if (sanitized.runesBag == null) sanitized.runesBag = new RunesBagConfig();
+        if (sanitized.runesBag.setSelectorKeys == null || sanitized.runesBag.setSelectorKeys.length != 7) {
+            sanitized.runesBag.setSelectorKeys = RunesBagConfig.defaultSelectorKeys();
+        }
+        sanitized.theme.hardAccentRed = Math.max(0, Math.min(255, sanitized.theme.hardAccentRed));
+        sanitized.theme.hardAccentGreen = Math.max(0, Math.min(255, sanitized.theme.hardAccentGreen));
+        sanitized.theme.hardAccentBlue = Math.max(0, Math.min(255, sanitized.theme.hardAccentBlue));
+        sanitized.playerHealthBars.sizePercent = Math.max(50, Math.min(250, sanitized.playerHealthBars.sizePercent));
+        sanitized.playerHealthBars.hardAccentThresholdPercent = Math.max(0, Math.min(100, sanitized.playerHealthBars.hardAccentThresholdPercent));
+        sanitized.playerHealthBars.accentStrengthPercent = Math.max(0, Math.min(100, sanitized.playerHealthBars.accentStrengthPercent));
 
         WidgetTheme.syncConfiguredTheme();
         return sanitized;

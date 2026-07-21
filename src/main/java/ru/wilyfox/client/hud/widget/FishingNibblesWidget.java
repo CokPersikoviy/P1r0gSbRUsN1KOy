@@ -50,12 +50,13 @@ public final class FishingNibblesWidget extends AbstractWidget {
             return;
         }
 
-        context.fill(0, 0, getUnscaledWidth(lines, mc), getUnscaledHeight(lines, mc), WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, getUnscaledWidth(lines, mc), 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, getUnscaledWidth(lines, mc), getUnscaledHeight(lines, mc));
 
         int y = PADDING_Y;
-        context.drawString(mc.font, "Fishing Nibbles", PADDING_X, y, WidgetTheme.TITLE);
-        y += mc.font.lineHeight + LINE_GAP + 1;
+        if (WidgetUtils.showWidgetTitles()) {
+            context.drawString(mc.font, "Fishing Nibbles", PADDING_X, y, WidgetTheme.TITLE);
+            y += mc.font.lineHeight + LINE_GAP + 1;
+        }
 
         for (String line : lines) {
             context.drawString(mc.font, line, PADDING_X, y, WidgetTheme.TEXT_SOFT);
@@ -130,7 +131,7 @@ public final class FishingNibblesWidget extends AbstractWidget {
             return EMPTY_WIDTH;
         }
 
-        int maxWidth = mc.font.width("Fishing Nibbles");
+        int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Fishing Nibbles") : 0;
         for (String line : lines) {
             maxWidth = Math.max(maxWidth, mc.font.width(line));
         }
@@ -143,7 +144,8 @@ public final class FishingNibblesWidget extends AbstractWidget {
         }
 
         int lineHeight = mc.font.lineHeight + LINE_GAP;
-        return (lines.size() + 1) * lineHeight + PADDING_Y * 2 + 1;
+        int titleBlock = WidgetUtils.showWidgetTitles() ? lineHeight + 1 : 0;
+        return lines.size() * lineHeight + PADDING_Y * 2 + titleBlock;
     }
 
     private boolean isEditorPreview() {
@@ -151,8 +153,7 @@ public final class FishingNibblesWidget extends AbstractWidget {
     }
 
     private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         context.drawString(mc.font, "Fishing Nibbles", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "No fishing data", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
     }

@@ -30,12 +30,17 @@ import java.util.concurrent.atomic.AtomicReference;
 import static ru.wilyfox.FrogHelper.LOGGER;
 import static ru.wilyfox.client.debug.DebugLogger.debug;
 import static ru.wilyfox.client.debug.DebugLogger.error;
+import static ru.wilyfox.client.debug.DebugLogger.warn;
 
 public final class DiscordRpcService {
     private static final String APPLICATION_ID = "1490415144134770830";
     private static final int CAPACITY_RETRY_ATTEMPTS = 3;
     private static final long CAPACITY_RETRY_DELAY_MS = 1500L;
     private static final long DEFAULT_UPDATE_INTERVAL_MS = 5000L;
+    // Discord may not be running, still starting, or its IPC pipe may be briefly busy. Rather than
+    // re-attempting the full pipe scan every client tick (which floods the log with stack traces),
+    // wait this long between connection attempts while disconnected.
+    private static final long CONNECT_BACKOFF_MS = 10_000L;
     private static final long BOSS_ACTIVITY_TIMEOUT_MS = 20_000L;
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "froghelper-discord-rpc");
@@ -51,6 +56,8 @@ public final class DiscordRpcService {
     private static String activeClientId = "";
     private static long startedAtMillis;
     private static long lastAutoUpdateAt;
+    private static long lastConnectAttemptAt;
+    private static boolean connectFailureLogged;
     private static String lastPresenceSignature = "";
     private static boolean registered;
     private static volatile String status = "Stopped";
@@ -164,12 +171,26 @@ public final class DiscordRpcService {
         try {
             synchronized (LOCK) {
                 if (client == null || !APPLICATION_ID.equals(activeClientId)) {
+                    if (now - lastConnectAttemptAt < CONNECT_BACKOFF_MS) {
+                        // Recently failed to connect; stay quiet until the backoff window elapses.
+                        return;
+                    }
+                    lastConnectAttemptAt = now;
                     stopSessionLocked();
 
-                    client = connectWithRetry(APPLICATION_ID);
+                    DiscordIpcClient connected;
+                    try {
+                        connected = connectWithRetry(APPLICATION_ID);
+                    } catch (IOException connectFailure) {
+                        noteConnectFailureLocked(connectFailure);
+                        return;
+                    }
+
+                    client = connected;
                     activeClientId = APPLICATION_ID;
                     startedAtMillis = now;
                     lastPresenceSignature = "";
+                    noteConnectSuccessLocked();
                 } else if (startedAtMillis <= 0L) {
                     startedAtMillis = now;
                 }
@@ -648,6 +669,8 @@ public final class DiscordRpcService {
 
     private static void stopAutoInternal() {
         PENDING_AUTO_PRESENCE.set(null);
+        lastConnectAttemptAt = 0L;
+        connectFailureLogged = false;
         if (mode != Mode.AUTO) {
             return;
         }
@@ -713,6 +736,29 @@ public final class DiscordRpcService {
         error(LOGGER, "{}: {}", logMessage, summary, throwable);
         synchronized (LOCK) {
             stopSessionLocked();
+        }
+    }
+
+    // Connect failures (Discord not running / still starting / pipe busy) are expected and transient.
+    // Log the first one of a streak concisely, then stay quiet — the backoff keeps retrying — so a
+    // player without Discord doesn't get their log flooded with stack traces. Caller holds LOCK.
+    private static void noteConnectFailureLocked(IOException failure) {
+        String summary = formatThrowable(failure);
+        status = "Discord unavailable: " + summary;
+        stopSessionLocked();
+
+        if (!connectFailureLogged) {
+            connectFailureLogged = true;
+            warn(LOGGER, "Discord RPC not reachable, will keep retrying quietly ({})", summary);
+        } else {
+            debug(LOGGER, "Discord RPC still not reachable ({})", summary);
+        }
+    }
+
+    private static void noteConnectSuccessLocked() {
+        if (connectFailureLogged) {
+            connectFailureLogged = false;
+            LOGGER.info("Discord RPC connected after being unreachable");
         }
     }
 

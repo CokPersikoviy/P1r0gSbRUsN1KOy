@@ -47,12 +47,17 @@ public class EstimatedTpsWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
-        context.drawString(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
-        context.drawString(mc.font, currentLine, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, getMetricColor(snapshot.currentTps()));
-        context.drawString(mc.font, onePercentLine, PADDING_X, PADDING_Y + (mc.font.lineHeight + 2) * 2, getMetricColor(snapshot.onePercentLow()));
-        context.drawString(mc.font, pointOnePercentLine, PADDING_X, PADDING_Y + (mc.font.lineHeight + 2) * 3, getMetricColor(snapshot.pointOnePercentLow()));
+        HudSurface.drawPanel(context, width, height);
+        int lineY = PADDING_Y;
+        if (WidgetUtils.showWidgetTitles()) {
+            context.drawString(mc.font, title, PADDING_X, lineY, WidgetTheme.TITLE);
+            lineY += mc.font.lineHeight + 2;
+        }
+        context.drawString(mc.font, currentLine, PADDING_X, lineY, getMetricColor(snapshot.currentTps()));
+        lineY += mc.font.lineHeight + 2;
+        context.drawString(mc.font, onePercentLine, PADDING_X, lineY, getMetricColor(snapshot.onePercentLow()));
+        lineY += mc.font.lineHeight + 2;
+        context.drawString(mc.font, pointOnePercentLine, PADDING_X, lineY, getMetricColor(snapshot.pointOnePercentLow()));
 
         context.pose().popPose();
     }
@@ -96,7 +101,8 @@ public class EstimatedTpsWidget extends AbstractWidget {
     }
 
     private int getUnscaledHeight(Minecraft mc) {
-        return Math.max(EMPTY_HEIGHT, PADDING_Y * 2 + mc.font.lineHeight * 4 + 6);
+        int lines = WidgetUtils.showWidgetTitles() ? 4 : 3;
+        return Math.max(EMPTY_HEIGHT, PADDING_Y * 2 + mc.font.lineHeight * lines + 6);
     }
 
     private void renderPlaceholder(GuiGraphics context, Minecraft mc, String subtitle) {
@@ -104,8 +110,7 @@ public class EstimatedTpsWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         context.drawString(mc.font, "Estimated TPS", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, subtitle, PADDING_X, 18, WidgetTheme.TEXT_MUTED);
         context.drawString(mc.font, "Packet timing heuristic", PADDING_X, 29, WidgetTheme.TEXT_MUTED);

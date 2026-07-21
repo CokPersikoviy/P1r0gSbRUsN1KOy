@@ -47,7 +47,7 @@ public final class ProtocolGraphTelemetry {
         registerRoute("harpooncd", "DwCooldownValueDecoder", "handleHarpoonCooldown", outputs(store("WandCooldownTracker"), widget("WandCooldownWidget")));
         registerRoute("marketcd", "DwCooldownValueDecoder", "handleNamedCooldown", outputs(state("externalCooldowns")));
         registerRoute("gourmetcd", "DwCooldownValueDecoder", "handleGourmetCooldown", outputs(store("abilityCooldownStore"), widget("AbilityCooldownWidget")));
-        registerRoute("potioncd", "DwCooldownValueDecoder", "handleNamedCooldown", outputs(state("externalCooldowns")));
+        registerRoute("potioncd", "DwPotionCooldownsDecoder", "handlePotionCooldowns", outputs(store("potionStore")));
         registerRoute("token", "DwTokenDecoder", "handleToken", outputs(state("token")));
         registerRoute("boosters", "DwBoostersDecoder", "handleBoosters", outputs(store("boosterStore"), widget("BoostersWidget")));
         registerRoute("gameevent", "DwGameEventDecoder", "handleGameEvent", outputs(state("currentGameEvent")));

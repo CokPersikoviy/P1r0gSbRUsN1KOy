@@ -1,6 +1,7 @@
 package ru.wilyfox.client.hud.internal;
 
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.WidgetLayoutConfig;
 import ru.wilyfox.client.hud.indicators.CornerSnapIndicator;
 import ru.wilyfox.client.hud.indicators.ScreenAnchor;
 import ru.wilyfox.client.hud.snap.SnapCandidate;
@@ -290,6 +291,19 @@ public final class HudSnapLayoutEngine {
             return;
         }
 
+        // Resolution-independent: place the widget at its stored screen fraction, computed straight
+        // from the CURRENT size — no chaining through intermediate sizes, so no round-trip drift. The
+        // clamp is display-only; the stored fraction is the source of truth and is never touched here.
+        WidgetLayoutConfig layout = widget instanceof AbstractWidget aw ? ConfigManager.getWidgetLayout(aw.getConfigKey()) : null;
+        if (layout != null && layout.xFraction != null && layout.yFraction != null) {
+            int maxX = Math.max(0, newScreenWidth - widget.getWidth());
+            int maxY = Math.max(0, newScreenHeight - widget.getHeight());
+            widget.setStartX(clamp((int) Math.round(layout.xFraction * newScreenWidth), 0, maxX));
+            widget.setStartY(clamp((int) Math.round(layout.yFraction * newScreenHeight), 0, maxY));
+            return;
+        }
+
+        // Fallback for widgets without a stored fraction (never moved): the legacy ratio scaling.
         int oldAvailableWidth = Math.max(0, host.getLastScreenWidth() - widget.getWidth());
         int oldAvailableHeight = Math.max(0, host.getLastScreenHeight() - widget.getHeight());
 

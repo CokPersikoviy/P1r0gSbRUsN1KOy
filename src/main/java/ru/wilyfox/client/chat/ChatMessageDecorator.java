@@ -2,7 +2,11 @@ package ru.wilyfox.client.chat;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import ru.wilyfox.client.clan.PlayerClanChatParser;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.moduser.ModUserBadge;
+import ru.wilyfox.client.moduser.ModUserMarker;
+import ru.wilyfox.client.moduser.ModUserStorage;
 
 import java.time.Instant;
 
@@ -30,7 +34,14 @@ public final class ChatMessageDecorator {
             return Component.empty();
         }
 
-        Component result = component;
+        // Detect the mod beacon on the RAW line (before we strip it below); this also seeds the mesh.
+        ModUserStorage.captureFromChat(component);
+
+        // Decide the badge from the RAW line's sender (before we prepend a timestamp etc.).
+        boolean modUserBadge = ConfigManager.get().render.modUserBadge && isKnownSender(component);
+
+        // Strip the visible Ⓕ beacon out of what actually gets displayed.
+        Component result = ModUserMarker.strip(component);
         if (ConfigManager.get().render.toneDownChat) {
             result = ChatToneDownFormatter.format(result);
         }
@@ -39,7 +50,16 @@ public final class ChatMessageDecorator {
             result = prependTimestamp(result);
         }
 
+        if (modUserBadge) {
+            result = ModUserBadge.prefix(result);
+        }
+
         return result;
+    }
+
+    private static boolean isKnownSender(Component component) {
+        String sender = PlayerClanChatParser.senderNameLenient(component);
+        return sender != null && ModUserStorage.isKnown(sender);
     }
 
     private static Component prependTimestamp(Component component) {

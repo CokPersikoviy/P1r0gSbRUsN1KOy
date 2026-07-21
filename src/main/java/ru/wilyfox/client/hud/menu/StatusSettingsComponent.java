@@ -2,6 +2,7 @@ package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 import java.util.function.Supplier;
@@ -23,7 +24,7 @@ public class StatusSettingsComponent extends SettingsComponent {
             value = "-";
         }
 
-        context.fill(x, y, x + width, y + height, WidgetTheme.PANEL_BG_SOFT);
+        HudSurface.fillRounded(context, x, y, width, height, 4, WidgetTheme.PANEL_BG_SOFT);
         context.drawString(mc.font, label, x + 8, y + 6, WidgetTheme.TEXT_MUTED, false);
         context.drawString(mc.font, value, x + 8, y + height - mc.font.lineHeight - 6, getStatusColor(value), false);
     }

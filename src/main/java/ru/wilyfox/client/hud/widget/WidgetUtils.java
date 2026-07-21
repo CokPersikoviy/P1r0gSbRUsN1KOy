@@ -1,10 +1,20 @@
 package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.gui.GuiGraphics;
+import ru.wilyfox.client.hud.config.ConfigManager;
 
 public final class WidgetUtils {
 
     private WidgetUtils() {}
+
+    /**
+     * Single source of truth for the "UnClutter" toggle: when off, widgets skip drawing their
+     * descriptive name/title header (and reclaim its layout space). Applies in both gameplay and
+     * the HUD editor so the two stay visually consistent. Panel background/accent line are kept.
+     */
+    public static boolean showWidgetTitles() {
+        return !ConfigManager.get().render.unclutterWidgets;
+    }
 
     public static void drawCorners(GuiGraphics context, int x, int y, int width, int height, int color) {
         int cornerLength = 4;

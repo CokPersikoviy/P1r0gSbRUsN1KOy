@@ -1,0 +1,11 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "froghelper:font/mod_badge.png",
+      "ascent": 7,
+      "height": 8,
+      "chars": ["\uF8FF"]
+    }
+  ]
+}

@@ -27,6 +27,7 @@ public class HudConfig {
     public WandCooldownConfig wandCooldown = new WandCooldownConfig();
     public AbilityCooldownConfig abilityCooldown = new AbilityCooldownConfig();
     public ActiveRunesConfig activeRunes = new ActiveRunesConfig();
+    public RunesBagConfig runesBag = new RunesBagConfig();
     public ActivePetsConfig activePets = new ActivePetsConfig();
     public ActiveMinersConfig activeMiners = new ActiveMinersConfig();
     public BossDamageConfig bossDamage = new BossDamageConfig();
@@ -42,6 +43,7 @@ public class HudConfig {
     public DiscordRpcConfig discordRpc = new DiscordRpcConfig();
     public WayPointsConfig wayPoints = new WayPointsConfig();
     public QuickAccessConfig quickAccess = new QuickAccessConfig();
+    public SocialConfig social = new SocialConfig();
     public TargetListConfig targets = new TargetListConfig();
     public ThemeConfig theme = new ThemeConfig();
     public Map<String, WidgetLayoutConfig> widgetLayouts = new LinkedHashMap<>();

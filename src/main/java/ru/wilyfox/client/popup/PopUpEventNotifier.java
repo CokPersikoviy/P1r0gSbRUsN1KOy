@@ -40,6 +40,7 @@ public final class PopUpEventNotifier {
     private SellerCooldownStore sellerCooldownStore;
     private PotionStore potionStore;
     private BoosterStore boosterStore;
+    private WandCooldownTracker wandCooldownTracker;
 
     private boolean registered;
     private boolean primed;
@@ -74,6 +75,10 @@ public final class PopUpEventNotifier {
 
     public void bindBoosterStore(BoosterStore store) {
         this.boosterStore = store;
+    }
+
+    public void bindWandCooldownTracker(WandCooldownTracker tracker) {
+        this.wandCooldownTracker = tracker;
     }
 
     public void register() {
@@ -118,8 +123,10 @@ public final class PopUpEventNotifier {
         }
 
         previousWandNames.clear();
-        for (WandCooldownTracker.WandCooldownEntry entry : WandCooldownTracker.getInstance().getActiveEntries()) {
-            previousWandNames.put(entry.key(), entry.name());
+        if (wandCooldownTracker != null) {
+            for (WandCooldownTracker.WandCooldownEntry entry : wandCooldownTracker.getActiveEntries()) {
+                previousWandNames.put(entry.key(), entry.name());
+            }
         }
 
         previousSellerEntries.clear();
@@ -208,8 +215,12 @@ public final class PopUpEventNotifier {
     }
 
     private void checkWandReady() {
+        if (wandCooldownTracker == null) {
+            return;
+        }
+
         Map<String, String> current = new LinkedHashMap<>();
-        for (WandCooldownTracker.WandCooldownEntry entry : WandCooldownTracker.getInstance().getActiveEntries()) {
+        for (WandCooldownTracker.WandCooldownEntry entry : wandCooldownTracker.getActiveEntries()) {
             current.put(entry.key(), entry.name());
         }
 
@@ -370,7 +381,11 @@ public final class PopUpEventNotifier {
         }
 
         String key = kind.name() + "|" + index;
-        String kindLabel = kind == BoosterStore.Kind.SHARDS ? "Shards" : "Money";
+        String kindLabel = switch (kind) {
+            case SHARD -> "Shards";
+            case MONEY -> "Money";
+            case SHAFT -> "Shaft";
+        };
         String label = kindLabel + " Booster x" + entry.multiplier();
         target.put(key, new BoosterStateSnapshot(label));
     }

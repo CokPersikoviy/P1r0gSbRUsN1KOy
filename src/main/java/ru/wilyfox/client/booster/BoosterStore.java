@@ -7,8 +7,9 @@ import java.util.Map;
 
 public final class BoosterStore {
     public enum Kind {
+        SHARD,
         MONEY,
-        SHARDS
+        SHAFT
     }
 
     private final Map<Kind, List<Entry>> entries = new EnumMap<>(Kind.class);
@@ -35,6 +36,7 @@ public final class BoosterStore {
                 mapped.add(new Entry(entry.multiplier(), now, now + entry.remainingMillis(), entry.remainingMillis()));
             }
         }
+        mapped.sort(java.util.Comparator.comparingLong(Entry::endsAt));
 
         entries.put(kind, mapped);
     }
@@ -83,22 +85,21 @@ public final class BoosterStore {
             return !entries.isEmpty();
         }
 
-        public Entry nearest() {
-            Entry nearest = null;
+        public Entry latest() {
+            Entry latest = null;
             for (Entry entry : entries) {
-                if (nearest == null || entry.endsAt() < nearest.endsAt()) {
-                    nearest = entry;
+                if (latest == null || entry.endsAt() > latest.endsAt()) {
+                    latest = entry;
                 }
             }
-            return nearest;
+            return latest;
         }
 
-        public double totalMultiplier(double baseMultiplier) {
-            double total = Math.max(0.1D, baseMultiplier);
-            for (Entry entry : entries) {
-                total *= entry.multiplier();
+        public double totalMultiplier() {
+            if (entries.isEmpty()) {
+                return 1.0D;
             }
-            return total;
+            return entries.stream().mapToDouble(Entry::multiplier).sum() - (entries.size() - 1);
         }
     }
 

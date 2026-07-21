@@ -30,7 +30,10 @@ import java.util.regex.Pattern;
 
 public final class AutoBossAnnouncer {
     private static final Pattern BOSS_CURSED_PATTERN = Pattern.compile("Босс проклят! Особенность: ([А-Яа-яЁё ]+)");
-    private static final Pattern BOSS_HEALTH_PATTERN = Pattern.compile("^(.+?)\\s+(\\d+(?:\\.\\d+)?)(?:\\s+.*)?$");
+    // DW boss-bar title is "<name> <number>❤" (heart U+2764, no space before it). Trailing \D* tolerates
+    // the heart and any other non-digit suffix (e.g. cursed markers) — the old "(?:\s+.*)?" needed a space
+    // before the trailing text, so "<number>❤" failed to match and both HP and name detection broke.
+    private static final Pattern BOSS_HEALTH_PATTERN = Pattern.compile("^(.+?)\\s+(\\d+(?:\\.\\d+)?)\\D*$");
     private static final long SPAWN_ANNOUNCE_WINDOW_MS = 2_000L;
     private static final long RESPAWN_RESET_GRACE_MS = 5_000L;
     private static final DecimalFormat HEALTH_FORMAT = new DecimalFormat("0.##", DecimalFormatSymbols.getInstance(Locale.US));
@@ -143,15 +146,12 @@ public final class AutoBossAnnouncer {
             return;
         }
 
-        showLocalMessage(
-                formatServerPrefix()
-                        + formatBossLabel(snapshot.name(), snapshot.level())
-                        + " осталось "
-                        + HEALTH_FORMAT.format(snapshot.health())
-                        + " HP ("
-                        + Math.round(snapshot.percent())
-                        + "%)"
-        );
+        // The absolute HP number is best-effort; when the title didn't yield one, report the percent only.
+        String healthText = snapshot.health() >= 0.0d
+                ? " осталось " + HEALTH_FORMAT.format(snapshot.health()) + " HP (" + Math.round(snapshot.percent()) + "%)"
+                : " осталось " + Math.round(snapshot.percent()) + "% HP";
+
+        showLocalMessage(formatServerPrefix() + formatBossLabel(snapshot.name(), snapshot.level()) + healthText);
         lowHealthAnnouncements.put(bossKey, now);
     }
 
@@ -168,17 +168,26 @@ public final class AutoBossAnnouncer {
 
         List<LerpingBossEvent> events = accessor.froghelper$getEvents();
         for (int index = 0; index < events.size(); index++) {
+            // Index 0 is always reserved by the server for a status line (player info etc.), never a boss.
             if (index == 0) {
                 continue;
             }
 
             LerpingBossEvent event = events.get(index);
-            Matcher matcher = BOSS_HEALTH_PATTERN.matcher(event.getName().getString().trim());
-            if (!matcher.find()) {
-                continue;
+            String rawTitle = event.getName().getString().trim();
+
+            // The absolute HP number is best-effort: if the title format doesn't yield one we still
+            // proceed. Detection relies on the bar fill (getProgress) below, so a title that doesn't
+            // match this pattern must not suppress the low-health alert (it did before).
+            String nameCandidate = rawTitle;
+            double health = -1.0d;
+            Matcher matcher = BOSS_HEALTH_PATTERN.matcher(rawTitle);
+            if (matcher.find()) {
+                nameCandidate = matcher.group(1);
+                health = parseDouble(matcher.group(2));
             }
 
-            String bossName = normalizeBossBarName(matcher.group(1));
+            String bossName = normalizeBossBarName(nameCandidate);
             Integer level = BossLevel.getBossLevel(bossName);
             if (level == null) {
                 String normalizedBossName = BossName.getBossName(bossName.toUpperCase(Locale.ROOT));
@@ -191,17 +200,8 @@ public final class AutoBossAnnouncer {
                 continue;
             }
 
-            double health = parseDouble(matcher.group(2));
-            if (health < 0.0d) {
-                continue;
-            }
-
-            return new BossBarSnapshot(
-                    bossName,
-                    level,
-                    health,
-                    Math.max(0.0d, Math.min(100.0d, event.getProgress() * 100.0d))
-            );
+            double percent = Math.max(0.0d, Math.min(100.0d, event.getProgress() * 100.0d));
+            return new BossBarSnapshot(bossName, level, health, percent);
         }
 
         return null;

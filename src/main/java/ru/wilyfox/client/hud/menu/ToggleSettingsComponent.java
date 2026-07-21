@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 import java.util.function.Consumer;
@@ -37,7 +38,7 @@ public class ToggleSettingsComponent extends SettingsComponent {
         int rowBg = hovered ? WidgetTheme.PANEL_BG : WidgetTheme.PANEL_BG_SOFT;
         int textColor = hovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_PRIMARY;
 
-        context.fill(x, y, x + width, y + height, rowBg);
+        HudSurface.fillRounded(context, x, y, width, height, 4, rowBg);
 
         int textY = y + (height - mc.font.lineHeight) / 2;
         context.drawString(mc.font, label, x + 8, textY, textColor);
@@ -55,13 +56,15 @@ public class ToggleSettingsComponent extends SettingsComponent {
         if (value) {
             pillBg = hovered ? WidgetTheme.PANEL_BG : WidgetTheme.PANEL_BG_SOFT;
             pillTextColor = WidgetTheme.TITLE;
-            context.fill(pillX, pillY, pillX + pillWidth, pillY + 1, WidgetTheme.ACCENT_LINE);
         } else {
             pillBg = hovered ? WidgetTheme.BAR_BG : WidgetTheme.PANEL_BG_SOFT;
             pillTextColor = WidgetTheme.TEXT_SECONDARY;
         }
 
-        context.fill(pillX, pillY, pillX + pillWidth, pillY + pillHeight, pillBg);
+        HudSurface.fillRounded(context, pillX, pillY, pillWidth, pillHeight, 3, pillBg);
+        if (value) {
+            context.fill(pillX + 3, pillY, pillX + pillWidth - 3, pillY + 1, WidgetTheme.ACCENT_LINE);
+        }
         context.drawCenteredString(mc.font, stateText, pillX + pillWidth / 2, pillY + 2, pillTextColor);
     }
 

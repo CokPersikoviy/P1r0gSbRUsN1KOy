@@ -16,6 +16,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.wilyfox.client.recipe.PotionRecipeTracker;
 import ru.wilyfox.client.recipe.CraftRecipeTracker;
 import ru.wilyfox.client.boss.BossMenuIconCollector;
+import ru.wilyfox.client.hud.widget.HudBlur;
+import ru.wilyfox.client.profiler.ModProfiler;
+import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import ru.wilyfox.client.rune.PetExperienceOverlay;
 import ru.wilyfox.client.rune.RuneSetEffectOverlay;
 import ru.wilyfox.client.rune.RuneSetSwitcher;
@@ -59,44 +62,61 @@ public abstract class AbstractContainerScreenMixin {
         }
     }
 
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
+    private void froghelper$handleRuneSetMouseSwitch(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+        Screen screen = (Screen) (Object) this;
+        if (RuneSetSwitcher.handleScreenMouseClicked(screen.getTitle(), menu, button)) {
+            cir.setReturnValue(true);
+        }
+    }
+
     @Inject(method = "render", at = @At("TAIL"))
     private void froghelper$renderRuneSetEffect(GuiGraphics context, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+        try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("ui/containerOverlay/render")) {
+            froghelper$renderContainerOverlays(context);
+        }
+    }
+
+    private void froghelper$renderContainerOverlays(GuiGraphics context) {
         Screen screen = (Screen) (Object) this;
         BossMenuIconCollector.inspect(screen.getTitle(), menu);
 
+        // Rune-set buff info now lives in the rune-bag window itself (moved off the player inventory).
         if (RuneSetEffectOverlay.isRuneBagScreen(screen.getTitle())) {
-            RuneSetEffectOverlay.updateCache(menu);
+            RuneSetEffectOverlay.updateCooldownStore(menu); // feeds RuneSetCooldownStore (ActiveRunes bar)
+            // Optimistic HUD update: sync active runes straight from the bag (swap / add / remove /
+            // set-select) so changes show immediately, without waiting for the load-delayed packet.
+            // Gated on a loaded bag so it doesn't clear the HUD on the empty frames right after opening.
+            if (RuneSetEffectOverlay.isRuneBagLoaded(menu)) {
+                DiamondWorldProtocolClient.updateActiveRunesFromBag(RuneSetEffectOverlay.collectActiveRuneNames(menu));
+            }
+            RuneSetEffectOverlay.OverlayData data = RuneSetEffectOverlay.collect(menu);
+            if (data != null) {
+                int panelX = leftPos - 8;
+                int widestLine = Minecraft.getInstance().font.width(data.title());
+                for (String line : data.lines()) {
+                    widestLine = Math.max(widestLine, Minecraft.getInstance().font.width(line));
+                }
+                panelX -= widestLine + 12;
+                int panelY = topPos + 8;
+
+                HudBlur.beginFrame(context); // container screen: capture here for the frosted plate's blur
+                RuneSetEffectOverlay.render(context, panelX, panelY, data);
+            }
             return;
         }
 
+        // Player inventory: only the pet-experience plate (rune buffs moved to the rune bag).
         if (!RuneSetEffectOverlay.isPlayerInventoryScreen(screen)) {
             return;
         }
-
-        RuneSetEffectOverlay.OverlayData data = RuneSetEffectOverlay.collectFromInventory(menu);
-        if (data == null) {
-            data = RuneSetEffectOverlay.getCached();
-        }
-        if (data == null) {
-            return;
-        }
-
-        int panelX = leftPos - 8;
-        int widestLine = Minecraft.getInstance().font.width(data.title());
-        for (String line : data.lines()) {
-            widestLine = Math.max(widestLine, Minecraft.getInstance().font.width(line));
-        }
-
-        panelX -= widestLine + 12;
-        int panelY = topPos + 8;
-
-        RuneSetEffectOverlay.render(context, panelX, panelY, data);
 
         PetExperienceOverlay.OverlayData petExpData = PetExperienceOverlay.collect(menu);
         if (petExpData == null) {
             return;
         }
 
+        HudBlur.beginFrame(context);
         int rightPanelX = leftPos + 176 + 8;
         int rightPanelY = topPos + 8;
         PetExperienceOverlay.render(context, rightPanelX, rightPanelY, petExpData);

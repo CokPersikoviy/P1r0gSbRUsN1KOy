@@ -3,6 +3,7 @@ package ru.wilyfox.client.hud.menu;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 import java.util.function.IntConsumer;
@@ -12,13 +13,20 @@ public class StepperSettingsComponent extends SettingsComponent {
     private final IntSupplier getter;
     private final IntConsumer setter;
     private final int min;
-    private final int max;
+    private final IntSupplier max;
     private final int step;
 
     public StepperSettingsComponent(int x, int y, int width, int height, String label,
                                     IntSupplier getter,
                                     IntConsumer setter,
                                     int min, int max, int step) {
+        this(x, y, width, height, label, getter, setter, min, () -> max, step);
+    }
+
+    public StepperSettingsComponent(int x, int y, int width, int height, String label,
+                                    IntSupplier getter,
+                                    IntConsumer setter,
+                                    int min, IntSupplier max, int step) {
         super(x, y, width, height, label);
         this.getter = getter;
         this.setter = setter;
@@ -37,7 +45,7 @@ public class StepperSettingsComponent extends SettingsComponent {
         int textColor = hovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_PRIMARY;
         int valueColor = WidgetTheme.TEXT_SOFT;
 
-        context.fill(x, y, x + width, y + height, rowBg);
+        HudSurface.fillRounded(context, x, y, width, height, 4, rowBg);
 
         int textY = y + (height - mc.font.lineHeight) / 2;
         context.drawString(mc.font, label, x + 8, textY, textColor);
@@ -54,15 +62,13 @@ public class StepperSettingsComponent extends SettingsComponent {
         boolean hoverMinus = mouseX >= minusX && mouseX <= minusX + buttonWidth
                 && mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
         boolean hoverPlus = mouseX >= plusX && mouseX <= plusX + buttonWidth
-                && mouseY >= buttonY && mouseY <= plusX + buttonHeight + (mouseY - mouseY); // harmless no-op replacement avoided? better fix below
-        hoverPlus = mouseX >= plusX && mouseX <= plusX + buttonWidth
                 && mouseY >= buttonY && mouseY <= buttonY + buttonHeight;
 
         int buttonBg = WidgetTheme.BAR_BG;
         int buttonHoverBg = WidgetTheme.PANEL_BG;
 
-        context.fill(minusX, buttonY, minusX + buttonWidth, buttonY + buttonHeight, hoverMinus ? buttonHoverBg : buttonBg);
-        context.fill(plusX, buttonY, plusX + buttonWidth, buttonY + buttonHeight, hoverPlus ? buttonHoverBg : buttonBg);
+        HudSurface.fillRounded(context, minusX, buttonY, buttonWidth, buttonHeight, 3, hoverMinus ? buttonHoverBg : buttonBg);
+        HudSurface.fillRounded(context, plusX, buttonY, buttonWidth, buttonHeight, 3, hoverPlus ? buttonHoverBg : buttonBg);
 
         context.drawCenteredString(mc.font, "-", minusX + buttonWidth / 2, textY, WidgetTheme.TITLE);
         context.drawCenteredString(mc.font, "+", plusX + buttonWidth / 2, textY, WidgetTheme.TITLE);
@@ -95,7 +101,7 @@ public class StepperSettingsComponent extends SettingsComponent {
 
         if (mouseX >= plusX && mouseX <= plusX + buttonWidth
                 && mouseY >= buttonY && mouseY <= buttonY + buttonHeight) {
-            setter.accept(Math.min(max, getter.getAsInt() + step));
+            setter.accept(Math.min(max.getAsInt(), getter.getAsInt() + step));
             ConfigManager.save();
             return true;
         }

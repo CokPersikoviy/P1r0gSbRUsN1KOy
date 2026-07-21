@@ -3,6 +3,7 @@ package ru.wilyfox.client.hud.widget;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.item.ItemStack;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
@@ -10,6 +11,9 @@ import ru.wilyfox.client.pet.ActivePetInfo;
 import ru.wilyfox.client.pet.ActivePetsStore;
 
 import java.util.List;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.Locale;
 
 public class ActivePetsWidget extends AbstractWidget {
     private static final int PADDING_X = 6;
@@ -17,6 +21,9 @@ public class ActivePetsWidget extends AbstractWidget {
     private static final int LINE_GAP = 1;
     private static final int EMPTY_WIDTH = 112;
     private static final int EMPTY_HEIGHT = 28;
+    private static final int ICON_SIZE = 16;
+    private static final int ICON_TEXT_GAP = 4;
+    private static final DecimalFormat ENERGY_FORMAT = new DecimalFormat("###", DecimalFormatSymbols.getInstance(Locale.US));
 
     private final ActivePetsStore store;
 
@@ -43,21 +50,32 @@ public class ActivePetsWidget extends AbstractWidget {
             return;
         }
 
-        int lineStep = mc.font.lineHeight + LINE_GAP;
+        int lineStep = Math.max(ICON_SIZE, mc.font.lineHeight) + LINE_GAP;
 
         context.pose().pushPose();
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, getUnscaledWidth(), getUnscaledHeight(), WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, getUnscaledWidth(), 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, getUnscaledWidth(), getUnscaledHeight());
 
         int y = PADDING_Y;
-        context.drawString(mc.font, "Active Pets", PADDING_X, y, WidgetTheme.TITLE);
-        y += lineStep + 2;
+        if (WidgetUtils.showWidgetTitles()) {
+            context.drawString(mc.font, "Active Pets", PADDING_X, y, WidgetTheme.TITLE);
+            y += lineStep + 2;
+        }
 
         for (ActivePetInfo pet : pets) {
-            context.drawString(mc.font, formatPetLine(pet), PADDING_X, y, WidgetTheme.TEXT_SOFT);
+            ItemStack icon = pet.icon();
+            if (!icon.isEmpty()) {
+                context.renderItem(icon, PADDING_X, y);
+            }
+            context.drawString(
+                    mc.font,
+                    formatPetLine(pet),
+                    PADDING_X + ICON_SIZE + ICON_TEXT_GAP,
+                    y + Math.max(0, (ICON_SIZE - mc.font.lineHeight) / 2),
+                    WidgetTheme.TEXT_SOFT
+            );
             y += lineStep;
         }
 
@@ -91,10 +109,10 @@ public class ActivePetsWidget extends AbstractWidget {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        int maxWidth = mc.font.width("Active Pets");
+        int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Active Pets") : 0;
 
         for (ActivePetInfo pet : pets) {
-            maxWidth = Math.max(maxWidth, mc.font.width(formatPetLine(pet)));
+            maxWidth = Math.max(maxWidth, ICON_SIZE + ICON_TEXT_GAP + mc.font.width(formatPetLine(pet)));
         }
 
         return maxWidth + PADDING_X * 2;
@@ -106,8 +124,9 @@ public class ActivePetsWidget extends AbstractWidget {
             return EMPTY_HEIGHT;
         }
 
-        int lineStep = Minecraft.getInstance().font.lineHeight + LINE_GAP;
-        return PADDING_Y * 2 + 2 + lineStep + 2 + count * lineStep;
+        int lineStep = Math.max(ICON_SIZE, Minecraft.getInstance().font.lineHeight) + LINE_GAP;
+        int titleBlock = WidgetUtils.showWidgetTitles() ? lineStep + 2 : 0;
+        return PADDING_Y * 2 + 2 + titleBlock + count * lineStep;
     }
 
     private boolean isEditorPreview() {
@@ -119,8 +138,7 @@ public class ActivePetsWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         context.drawString(mc.font, "Active Pets", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "No active pets", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
@@ -132,11 +150,6 @@ public class ActivePetsWidget extends AbstractWidget {
     }
 
     private String formatEnergy(double energy) {
-        if (Math.floor(energy) == energy) {
-            return Integer.toString((int) energy);
-        }
-
-        return String.format(java.util.Locale.US, "%.1f", energy);
+        return ENERGY_FORMAT.format(energy);
     }
 }
-

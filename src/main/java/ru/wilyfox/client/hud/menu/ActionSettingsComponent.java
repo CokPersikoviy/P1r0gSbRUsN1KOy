@@ -2,6 +2,7 @@ package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 public class ActionSettingsComponent extends SettingsComponent {
@@ -17,7 +18,7 @@ public class ActionSettingsComponent extends SettingsComponent {
         Minecraft mc = Minecraft.getInstance();
         boolean hovered = isHovered(mouseX, mouseY);
 
-        context.fill(x, y, x + width, y + height, hovered ? WidgetTheme.PANEL_BG : WidgetTheme.PANEL_BG_SOFT);
+        HudSurface.fillRounded(context, x, y, width, height, 4, hovered ? WidgetTheme.PANEL_BG : WidgetTheme.PANEL_BG_SOFT);
         if (hovered) {
             context.fill(x, y, x + width, y + 1, WidgetTheme.ACCENT_LINE);
         }

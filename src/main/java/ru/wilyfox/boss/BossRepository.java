@@ -1,6 +1,8 @@
 package ru.wilyfox.boss;
 
 import net.minecraft.world.item.ItemStack;
+import ru.wilyfox.client.hud.config.BossWidgetConfig;
+import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.utils.BossLevel;
 
 import java.util.Collection;
@@ -24,6 +26,11 @@ public class BossRepository {
         upsert(protocolBosses, bossId, bossName, respawnAtMillis, level);
     }
 
+    public void updateProtocolMetadata(String bossId, String bossName, int level) {
+        protocolBosses.computeIfPresent(bossId, (ignored, boss) ->
+                new BossInfo(bossName, boss.getRespawnAt(), level));
+    }
+
     public void clearProtocol() {
         protocolBosses.clear();
         discoveredBossIcons.clear();
@@ -40,12 +47,14 @@ public class BossRepository {
     }
 
     public Collection<BossInfo> getAllProtocol() {
+        cleanupProtocol();
         return protocolBosses.values().stream()
                 .sorted(Comparator.comparingLong(BossInfo::getRespawnAt))
                 .collect(Collectors.toList());
     }
 
     public Collection<BossInfo> getAllMerged() {
+        cleanupProtocol();
         Map<String, BossInfo> merged = new LinkedHashMap<>();
 
         for (BossInfo boss : protocolBosses.values()) {
@@ -62,8 +71,50 @@ public class BossRepository {
     }
 
     public void replaceProtocol(Map<String, BossInfo> bosses) {
+        long now = System.currentTimeMillis();
+        // The server drops a boss from `bosstimers` the moment it spawns (remaining reaches 0). A
+        // plain clear+replace would evict it instantly, so it would vanish at 0 instead of briefly
+        // counting into the negative. Keep a just-spawned boss (respawn time only recently passed
+        // and no longer present in the new snapshot) for a short grace window that matches
+        // BossHudWidget's SPAWNED_VISIBLE_MS. World bosses already persist and behave this way.
+        Map<String, BossInfo> retained = new LinkedHashMap<>();
+        for (Map.Entry<String, BossInfo> entry : protocolBosses.entrySet()) {
+            if (bosses.containsKey(entry.getKey())) {
+                continue;
+            }
+
+            long grace = spawnGraceMs();
+            long sinceRespawn = now - entry.getValue().getRespawnAt();
+            if (sinceRespawn >= 0L && (grace < 0L || sinceRespawn < grace)) {
+                retained.put(entry.getKey(), entry.getValue());
+            }
+        }
+
         protocolBosses.clear();
         protocolBosses.putAll(bosses);
+        for (Map.Entry<String, BossInfo> entry : retained.entrySet()) {
+            protocolBosses.putIfAbsent(entry.getKey(), entry.getValue());
+        }
+    }
+
+    // How long a just-spawned boss (dropped from the new snapshot) is retained, matching the boss
+    // widget's post-spawn settings. -1 = keep until it respawns (a new future timer arrives).
+    private static long spawnGraceMs() {
+        BossWidgetConfig config = ConfigManager.get().bossWidget;
+        if (config.showSpawnedUntilKilled) {
+            return -1L;
+        }
+        return Math.max(0, config.postSpawnShowSeconds) * 1000L;
+    }
+
+    private void cleanupProtocol() {
+        long grace = spawnGraceMs();
+        if (grace < 0L) {
+            return;
+        }
+
+        long cutoff = System.currentTimeMillis() - grace;
+        protocolBosses.entrySet().removeIf(entry -> entry.getValue().getRespawnAt() < cutoff);
     }
 
     public ItemStack getDiscoveredIcon(BossInfo boss) {
@@ -113,7 +164,7 @@ public class BossRepository {
 
     private void upsert(Map<String, BossInfo> storage, String key, String bossName, long respawnAtMillis, int level) {
         storage.compute(key, (ignored, oldBoss) -> {
-            if (oldBoss == null) {
+            if (oldBoss == null || oldBoss.getLevel() != level || !Objects.equals(oldBoss.getName(), bossName)) {
                 return new BossInfo(bossName, respawnAtMillis, level);
             }
 

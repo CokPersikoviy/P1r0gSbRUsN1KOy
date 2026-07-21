@@ -15,6 +15,9 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomModelData;
 import org.lwjgl.glfw.GLFW;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.WidgetChrome;
+import ru.wilyfox.client.hud.widget.HudBlur;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.client.profiler.ModProfiler;
 
@@ -126,6 +129,7 @@ public class QuickAccessScreen extends Screen {
             sectionLayouts.clear();
 
             graphics.fill(0, 0, this.width, this.height, isEditorMode() ? 0x00000000 : backdropColor());
+            HudBlur.beginFrame(graphics); // capture the screen for the frosted panels' blur backdrop
             renderSelectorPanel(graphics, mouseX, mouseY);
 
             if (isEditorMode()) {
@@ -204,14 +208,8 @@ public class QuickAccessScreen extends Screen {
         Minecraft minecraft = Minecraft.getInstance();
         List<QuickAccessSectionConfig> sections = ConfigManager.get().quickAccess.sections;
 
-        graphics.fill(
-                selectorPanelX,
-                selectorPanelY,
-                selectorPanelX + selectorPanelWidth,
-                selectorPanelY + selectorPanelHeight,
-                isEditorMode() ? solidPanelColor() : WidgetTheme.PANEL_BG
-        );
-        graphics.fill(selectorPanelX, selectorPanelY, selectorPanelX + selectorPanelWidth, selectorPanelY + 1, WidgetTheme.ACCENT_LINE);
+        HudSurface.drawPanel(graphics, selectorPanelX, selectorPanelY, selectorPanelWidth, selectorPanelHeight,
+                WidgetChrome.FROST, HudSurface.nativeRenderer());
 
         String label;
         int labelColor;
@@ -274,8 +272,8 @@ public class QuickAccessScreen extends Screen {
                 : (hovered ? solidSoftPanelColor() : (isEditorMode() ? solidBarColor() : WidgetTheme.BAR_BG));
         int top = executable ? (selected || hovered ? WidgetTheme.ACCENT_LINE : solidPanelColor()) : disabledLineColor();
 
-        graphics.fill(x, y, x + ITEM_SIZE, y + ITEM_SIZE, bg);
-        graphics.fill(x, y, x + ITEM_SIZE, y + 1, top);
+        HudSurface.fillRounded(graphics, x, y, ITEM_SIZE, ITEM_SIZE, 4, bg);
+        graphics.fill(x + 4, y, x + ITEM_SIZE - 4, y + 1, top);
 
         if (!executable) {
             graphics.fill(x, y, x + ITEM_SIZE, y + ITEM_SIZE, disabledOverlayColor());
@@ -347,8 +345,8 @@ public class QuickAccessScreen extends Screen {
 
         int x = dragMouseX - ITEM_SIZE / 2;
         int y = dragMouseY - ITEM_SIZE / 2;
-        graphics.fill(x, y, x + ITEM_SIZE, y + ITEM_SIZE, dragPreviewColor());
-        graphics.fill(x, y, x + ITEM_SIZE, y + 1, WidgetTheme.ACCENT_LINE);
+        HudSurface.fillRounded(graphics, x, y, ITEM_SIZE, ITEM_SIZE, 4, dragPreviewColor());
+        graphics.fill(x + 4, y, x + ITEM_SIZE - 4, y + 1, WidgetTheme.ACCENT_LINE);
         graphics.renderItem(getDisplayStack(item), x + (ITEM_SIZE - 16) / 2, y + (ITEM_SIZE - 16) / 2);
     }
 

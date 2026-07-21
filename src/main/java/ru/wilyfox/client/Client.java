@@ -73,6 +73,7 @@ import ru.wilyfox.client.utility.HudInputHandler;
 import ru.wilyfox.client.utility.MouseInputHandler;
 import ru.wilyfox.client.utility.MousePingInputHandler;
 import ru.wilyfox.client.visibility.VisibilityStatusStore;
+import ru.wilyfox.client.wand.WandCooldownTracker;
 
 import static ru.wilyfox.FrogHelper.MOD_ID;
 
@@ -92,6 +93,7 @@ public class Client {
     private final PotionStore potionStore = new PotionStore();
     private final SellerCooldownStore sellerCooldownStore = new SellerCooldownStore();
     private final ComboProgressStore comboProgressStore = new ComboProgressStore();
+    private final WandCooldownTracker wandCooldownTracker = new WandCooldownTracker();
     private final HudSettingsPanel settingsPanel = new HudSettingsPanel();
     private final HudRenderer hudRenderer = new HudRenderer(settingsPanel);
 
@@ -107,7 +109,12 @@ public class Client {
         return hudRenderer;
     }
 
+    public WandCooldownTracker getWandCooldownTracker() {
+        return wandCooldownTracker;
+    }
+
     public void init() {
+        ru.wilyfox.client.command.FhCommands.register();
         new ClientEntityEventHandler(this.bossTracker).register();
         new HudInputHandler(hudRenderer).register();
         new MouseInputHandler(hudRenderer).register();
@@ -130,12 +137,15 @@ public class Client {
         AutoBossAnnouncer.bindRepository(repository);
         AutoBossAnnouncer.register();
         PlayerClanStorage.init();
+        ru.wilyfox.client.moduser.ModUserStorage.init();
+        ru.wilyfox.client.moduser.ModUserProtocol.init();
         PopUpEventNotifier.getInstance().bindBossRepository(repository);
         PopUpEventNotifier.getInstance().bindAbilityCooldownStore(abilityCooldownStore);
         PopUpEventNotifier.getInstance().bindActiveMinersStore(activeMinersStore);
         PopUpEventNotifier.getInstance().bindSellerCooldownStore(sellerCooldownStore);
         PopUpEventNotifier.getInstance().bindPotionStore(potionStore);
         PopUpEventNotifier.getInstance().bindBoosterStore(boosterStore);
+        PopUpEventNotifier.getInstance().bindWandCooldownTracker(wandCooldownTracker);
         PopUpEventNotifier.getInstance().register();
         BossShareService.bindRepository(repository);
         VisibilityStatusTracker.bindStore(visibilityStatusStore);
@@ -152,18 +162,28 @@ public class Client {
         DiamondWorldProtocolClient.bindSellerCooldownStore(sellerCooldownStore);
         DiamondWorldProtocolClient.bindComboProgressStore(comboProgressStore);
         DiamondWorldProtocolClient.bindBoosterStore(boosterStore);
+        DiamondWorldProtocolClient.bindWandCooldownTracker(wandCooldownTracker);
         DiamondWorldProtocolClient.init();
         DiscordRpcService.bindLevelProgressStore(levelProgressStore);
         DiscordRpcService.bindComboProgressStore(comboProgressStore);
         DiscordRpcService.bindBossDamageStore(bossDamageStore);
         DiscordRpcService.register();
         final ResourceLocation FrogHelperLayer = ResourceLocation.fromNamespaceAndPath(MOD_ID, "hud-froghelper-layer");
+        final ResourceLocation FrogHelperSettingsLayer = ResourceLocation.fromNamespaceAndPath(MOD_ID, "hud-froghelper-settings-layer");
 
-        HudLayerRegistrationCallback.EVENT.register(layeredDrawer -> layeredDrawer.attachLayerBefore(IdentifiedLayer.CHAT, FrogHelperLayer, this.hudRenderer::render));
+        HudLayerRegistrationCallback.EVENT.register(layeredDrawer -> {
+            // Widgets + editor overlay render before chat; the settings panel renders after chat (above it).
+            layeredDrawer.attachLayerBefore(IdentifiedLayer.CHAT, FrogHelperLayer, this.hudRenderer::render);
+            layeredDrawer.attachLayerAfter(IdentifiedLayer.CHAT, FrogHelperSettingsLayer, this.hudRenderer::renderSettingsOverlay);
+        });
 
         hudRenderer.registerWidget(
                 new BossHudWidget(5, 5, HudLayer.CONTENT, repository),
                 ScreenAnchor.TOP_LEFT
+        );
+        hudRenderer.registerWidget(
+                new ru.wilyfox.client.hud.widget.GroupHudWidget(60, 60, HudLayer.CONTENT),
+                ScreenAnchor.TOP_RIGHT
         );
         hudRenderer.registerWidget(
                 new BlocksPerSecondWidget(100, 100, HudLayer.CONTENT),
@@ -206,7 +226,7 @@ public class Client {
                 ScreenAnchor.RIGHT_CENTER
         );
         hudRenderer.registerWidget(
-                new WandCooldownWidget(20, 60, HudLayer.CONTENT),
+                new WandCooldownWidget(20, 60, HudLayer.CONTENT, wandCooldownTracker),
                 ScreenAnchor.HOTBAR_RIGHT
         );
         hudRenderer.registerWidget(
@@ -262,6 +282,7 @@ public class Client {
                 ScreenAnchor.TOP_RIGHT
         );
 
+        hudRenderer.finalizeWidgetRegistration();
         ConfigManager.save();
     }
 }

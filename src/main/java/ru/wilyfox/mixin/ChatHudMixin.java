@@ -20,6 +20,7 @@ import ru.wilyfox.client.chat.FrogChatProtocol;
 import ru.wilyfox.client.chat.PrivateMessagePopUpNotifier;
 import ru.wilyfox.client.chat.VisibilityStatusTracker;
 import ru.wilyfox.client.clan.PlayerClanStorage;
+import ru.wilyfox.client.moduser.ModUserProtocol;
 
 @Mixin(ChatComponent.class)
 public class ChatHudMixin {
@@ -37,6 +38,8 @@ public class ChatHudMixin {
         PrivateMessagePopUpNotifier.onIncomingMessage(component);
         VisibilityStatusTracker.onIncomingMessage(component);
         PlayerClanStorage.captureFromChat(component);
+        // ModUserStorage.captureFromChat runs in ChatMessageDecorator.decorate (before the Ⓕ beacon is
+        // stripped for display) so detection still sees the raw marker.
 
         if (BossShareService.handleIncomingShare(component)) {
             ci.cancel();
@@ -45,6 +48,11 @@ public class ChatHudMixin {
 
         if (FrogChatProtocol.handleIncomingProtocol(component)) {
             ci.cancel();
+            return;
+        }
+
+        if (ModUserProtocol.handleIncoming(component)) {
+            ci.cancel(); // silent mesh sync PM — hide from chat
             return;
         }
 

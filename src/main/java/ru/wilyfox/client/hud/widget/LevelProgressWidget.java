@@ -58,16 +58,14 @@ public class LevelProgressWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, width, height);
         context.drawString(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
         context.drawString(mc.font, blocksLine, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, blocksColor);
         context.drawString(mc.font, moneyLine, PADDING_X, PADDING_Y + (mc.font.lineHeight + 2) * 2, moneyColor);
 
         int barY = height - PADDING_Y - BAR_HEIGHT;
-        context.fill(PADDING_X, barY, width - PADDING_X, barY + BAR_HEIGHT, WidgetTheme.BAR_BG);
-        int fillWidth = (int) Math.round((width - PADDING_X * 2) * snapshot.progress());
-        context.fill(PADDING_X, barY, PADDING_X + fillWidth, barY + BAR_HEIGHT, WidgetTheme.BAR_FILL);
+        HudSurface.drawBar(context, PADDING_X, barY, width - PADDING_X * 2, BAR_HEIGHT,
+                (float) snapshot.progress(), WidgetTheme.BAR_FILL);
 
         context.pose().popPose();
     }
@@ -121,8 +119,7 @@ public class LevelProgressWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         context.drawString(mc.font, "Level Progress", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "Waiting for levelinfo", PADDING_X, 16, WidgetTheme.TEXT_MUTED);
 

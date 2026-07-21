@@ -4,6 +4,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomModelData;
+import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.protocol.DwPotionTimerEntry;
 import ru.wilyfox.client.protocol.DwPotionTypeEntry;
 import ru.wilyfox.utils.Formatting;
@@ -21,6 +22,7 @@ public final class PotionStore {
 
     private final Map<Integer, PotionType> types = new LinkedHashMap<>();
     private final Map<Integer, PotionState> states = new LinkedHashMap<>();
+    private final Map<Integer, Long> cooldownEndsAt = new LinkedHashMap<>();
     private final Map<Integer, ItemStack> iconCache = new LinkedHashMap<>();
 
     public void replaceTypes(List<DwPotionTypeEntry> entries) {
@@ -37,16 +39,41 @@ public final class PotionStore {
         cleanup(now);
 
         for (DwPotionTimerEntry entry : entries) {
-            long remaining = Math.max(0L, entry.remainedMillis());
+            long remaining = entry.remainedMillis();
             int quality = entry.quality();
 
-            if (quality <= 0 || remaining <= 0L) {
+            if (quality <= 0) {
                 states.remove(entry.id());
+                continue;
+            }
+            if (remaining <= 0L) {
+                // Keep the previous deadline during the configured negative-countdown grace period.
                 continue;
             }
 
             states.put(entry.id(), new PotionState(entry.id(), quality, now + remaining));
         }
+    }
+
+    public void applyCooldownUpdate(Map<Integer, Long> cooldowns) {
+        long now = System.currentTimeMillis();
+        cleanupCooldowns(now);
+
+        for (Map.Entry<Integer, Long> entry : cooldowns.entrySet()) {
+            long remainingMillis = entry.getValue();
+            if (remainingMillis > 0L) {
+                cooldownEndsAt.put(entry.getKey(), now + remainingMillis);
+            }
+        }
+    }
+
+    public Map<Integer, Long> getCooldownsRemaining() {
+        long now = System.currentTimeMillis();
+        cleanupCooldowns(now);
+
+        Map<Integer, Long> remaining = new LinkedHashMap<>();
+        cooldownEndsAt.forEach((id, endsAt) -> remaining.put(id, Math.max(0L, endsAt - now)));
+        return Map.copyOf(remaining);
     }
 
     public List<ActivePotionEntry> getActiveEntries() {
@@ -65,7 +92,7 @@ public final class PotionStore {
                     state.id(),
                     name,
                     state.quality(),
-                    Math.max(0L, state.endsAt() - now),
+                    state.endsAt() - now,
                     icon
             ));
         }
@@ -84,11 +111,21 @@ public final class PotionStore {
     public void clear() {
         types.clear();
         states.clear();
+        cooldownEndsAt.clear();
         iconCache.clear();
     }
 
     private void cleanup(long now) {
-        states.entrySet().removeIf(entry -> entry.getValue().endsAt() <= now);
+        long grace = graceMs();
+        states.entrySet().removeIf(entry -> now - entry.getValue().endsAt() >= grace);
+    }
+
+    private void cleanupCooldowns(long now) {
+        cooldownEndsAt.entrySet().removeIf(entry -> entry.getValue() <= now);
+    }
+
+    private static long graceMs() {
+        return Math.max(0, ConfigManager.get().potionTimers.belowZeroSeconds) * 1000L;
     }
 
     private PotionType resolveType(int id) {

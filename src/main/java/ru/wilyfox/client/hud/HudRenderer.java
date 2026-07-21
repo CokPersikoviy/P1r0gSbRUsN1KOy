@@ -8,6 +8,7 @@ import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.WidgetLayoutConfig;
 import ru.wilyfox.client.hud.fishing.FishingSpotOverlayRenderer;
 import ru.wilyfox.client.alchemy.AlchemyIngredientOverlayRenderer;
+import ru.wilyfox.client.hud.internal.HudFrameClock;
 import ru.wilyfox.client.hud.internal.HudEditorOverlayHost;
 import ru.wilyfox.client.hud.internal.HudEditorOverlayRenderer;
 import ru.wilyfox.client.hud.internal.HudGroupDragController;
@@ -23,6 +24,8 @@ import ru.wilyfox.client.hud.menu.HudSettingsPanel;
 import ru.wilyfox.client.ping.PingMarkerOverlayRenderer;
 import ru.wilyfox.client.hud.widget.AbstractWidget;
 import ru.wilyfox.client.hud.widget.BossHudWidget;
+import ru.wilyfox.client.hud.widget.HudBlur;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.Widget;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.client.profiler.ModProfiler;
@@ -274,6 +277,7 @@ public class HudRenderer {
 
     public void render(GuiGraphics context, DeltaTracker tickCounter) {
         try (ModProfiler.Scope renderScope = ModProfiler.getInstance().scope("hud/render")) {
+            HudFrameClock.advance(); // one tick per HUD frame; widgets key per-frame caches off this
             int screenWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
             int screenHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
             double mouseX = MouseUtils.getMouseX();
@@ -299,6 +303,13 @@ public class HudRenderer {
                 }
             }
 
+            // While the mod's settings menu is open, hide all widgets — only the panel shows.
+            if (!settingsOpen) {
+            // Capture + blur the screen once, before any widget composites its frosted backdrop.
+            try (ModProfiler.Scope blurScope = ModProfiler.getInstance().scope("hud/blurCapture")) {
+                HudBlur.beginFrame(context);
+            }
+
             int renderedWidgets = 0;
             int skippedWidgets = 0;
             try (ModProfiler.Scope widgetLoopScope = ModProfiler.getInstance().scope("hud/widgetLoop")) {
@@ -316,6 +327,7 @@ public class HudRenderer {
             }
             ModProfiler.getInstance().incrementCounter("hud/widgetLoop/renderedWidgets", renderedWidgets);
             ModProfiler.getInstance().incrementCounter("hud/widgetLoop/skippedWidgets", skippedWidgets);
+            }
 
             if (editing) {
                 try (ModProfiler.Scope editorScope = ModProfiler.getInstance().scope("hud/editorOverlay")) {
@@ -341,11 +353,7 @@ public class HudRenderer {
                 }
             }
 
-            if (settingsOpen) {
-                try (ModProfiler.Scope settingsScope = ModProfiler.getInstance().scope("hud/settingsPanel")) {
-                    settingsPanel.render(context, MouseUtils.getMouseX(), MouseUtils.getMouseY());
-                }
-            }
+            // The settings panel renders in a separate layer above vanilla chat (renderSettingsOverlay).
 
             if (ConfigManager.get().fishing.showFishingMarkers) {
                 try (ModProfiler.Scope fishingOverlayScope = ModProfiler.getInstance().scope("hud/FishingSpotOverlayRenderer")) {
@@ -362,6 +370,20 @@ public class HudRenderer {
             // try (ModProfiler.Scope pingOverlayScope = ModProfiler.getInstance().scope("hud/PingMarkerOverlayRenderer")) {
             //     PingMarkerOverlayRenderer.render(context, tickCounter.getGameTimeDeltaPartialTick(true));
             // }
+        }
+    }
+
+    /**
+     * The settings panel, drawn in its own HUD layer AFTER vanilla chat so it sits above it. Captures
+     * the screen here (this layer runs after chat) so the frosted panel blurs the game + chat behind it.
+     */
+    public void renderSettingsOverlay(GuiGraphics context, DeltaTracker tickCounter) {
+        if (!settingsOpen) {
+            return;
+        }
+        try (ModProfiler.Scope settingsScope = ModProfiler.getInstance().scope("hud/settingsPanel")) {
+            HudBlur.beginFrame(context);
+            settingsPanel.render(context, MouseUtils.getMouseX(), MouseUtils.getMouseY());
         }
     }
 
@@ -408,6 +430,13 @@ public class HudRenderer {
             if (Screen.hasAltDown()) {
                 beginGroupDrag(abstractWidget);
             } else {
+                // beginGroupDrag() always resets this state itself; a plain single-widget
+                // drag must do it too, otherwise a group-drag left dangling by a missed
+                // mouseReleased (e.g. consumed by the settings panel) leaks into this drag
+                // and drags unrelated leftover group members along with it.
+                draggingWidgetGroup = false;
+                draggedGroupWidgets.clear();
+                draggedGroupStates.clear();
                 detachSnappedDescendants(abstractWidget);
             }
         }
@@ -629,6 +658,13 @@ public class HudRenderer {
         HudSnapGraphNormalizer.normalize(getAbstractWidgetMap());
     }
 
+    public void finalizeWidgetRegistration() {
+        // Config-loaded snap data skips the cycle checks that live edits go through
+        // (see persistWidgetSnap/HudSnapGraphNormalizer); a stale or hand-edited config
+        // could otherwise leave a cyclic snap graph in place until the first manual drag.
+        normalizeWidgetSnapParents();
+    }
+
     private void beginGroupDrag(AbstractWidget rootWidget) {
         List<AbstractWidget> descendants = getSnappedDescendants(rootWidget);
         draggingWidgetGroup = HudGroupDragController.beginGroupDrag(
@@ -848,8 +884,8 @@ public class HudRenderer {
             x = 2;
         }
 
-        context.fill(x, y, x + width, y + height, WidgetTheme.TOOLTIP_BG);
-        context.fill(x, y, x + width, y + 1, WidgetTheme.ACCENT_LINE);
+        HudSurface.fillRounded(context, x, y, width, height, 3, WidgetTheme.TOOLTIP_BG);
+        context.fill(x + 3, y, x + width - 3, y + 1, WidgetTheme.ACCENT_LINE);
 
         context.pose().pushPose();
         context.pose().translate(x + paddingX, y + (height - Minecraft.getInstance().font.lineHeight * labelScale) / 2.0f, 0);
@@ -896,8 +932,8 @@ public class HudRenderer {
             x = 2;
         }
 
-        context.fill(x, y, x + width, y + height, WidgetTheme.TOOLTIP_BG);
-        context.fill(x, y, x + width, y + 1, WidgetTheme.ACCENT_LINE);
+        HudSurface.fillRounded(context, x, y, width, height, 3, WidgetTheme.TOOLTIP_BG);
+        context.fill(x + 3, y, x + width - 3, y + 1, WidgetTheme.ACCENT_LINE);
 
         context.pose().pushPose();
         context.pose().translate(x + paddingX, y + (height - Minecraft.getInstance().font.lineHeight * labelScale) / 2.0f, 0);

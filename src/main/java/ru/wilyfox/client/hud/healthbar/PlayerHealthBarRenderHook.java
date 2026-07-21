@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
 import ru.wilyfox.client.profiler.ModProfiler;
 
 public final class PlayerHealthBarRenderHook {
@@ -36,7 +37,10 @@ public final class PlayerHealthBarRenderHook {
                 );
             }
             try (ModProfiler.Scope batchScope = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderHook/endBatch")) {
-                bufferSource.endBatch();
+                // Flush only our own render type. The no-arg endBatch() walks and flushes the entire
+                // shared buffer registry every frame, which was ~90% of this feature's cost — the
+                // health bars only ever use RenderType.debugQuads().
+                bufferSource.endBatch(RenderType.debugQuads());
             }
         }
     }

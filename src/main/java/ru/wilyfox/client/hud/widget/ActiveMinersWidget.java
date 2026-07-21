@@ -12,7 +12,6 @@ import ru.wilyfox.client.miner.ActiveMinersStore;
 import ru.wilyfox.utils.Formatting;
 
 import java.util.List;
-import java.util.Locale;
 
 public class ActiveMinersWidget extends AbstractWidget {
     private static final int PADDING_X = 6;
@@ -56,12 +55,13 @@ public class ActiveMinersWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, width, height);
 
         int y = PADDING_Y;
-        context.drawString(mc.font, "Miners", PADDING_X, y, WidgetTheme.TITLE);
-        y += mc.font.lineHeight + 4;
+        if (WidgetUtils.showWidgetTitles()) {
+            context.drawString(mc.font, "Miners", PADDING_X, y, WidgetTheme.TITLE);
+            y += mc.font.lineHeight + 4;
+        }
 
         for (ActiveMinerInfo miner : miners) {
             renderMinerRow(context, mc, miner, width, y, rowHeight);
@@ -98,7 +98,7 @@ public class ActiveMinersWidget extends AbstractWidget {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        int maxWidth = mc.font.width("Miners");
+        int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Miners") : 0;
 
         for (ActiveMinerInfo miner : miners) {
             int rowWidth = ICON_SIZE + ICON_TEXT_GAP
@@ -120,9 +120,9 @@ public class ActiveMinersWidget extends AbstractWidget {
         }
 
         int rowHeight = Math.max(ICON_SIZE, Minecraft.getInstance().font.lineHeight);
+        int titleBlock = WidgetUtils.showWidgetTitles() ? Minecraft.getInstance().font.lineHeight + 4 : 0;
         return PADDING_Y * 2
-                + Minecraft.getInstance().font.lineHeight
-                + 4
+                + titleBlock
                 + count * rowHeight
                 + Math.max(0, count - 1) * ROW_GAP;
     }
@@ -136,8 +136,7 @@ public class ActiveMinersWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         context.drawString(mc.font, "Miners", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "No active miners", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
@@ -174,41 +173,32 @@ public class ActiveMinersWidget extends AbstractWidget {
     }
 
     private String formatState(ActiveMinerInfo miner) {
-        if (isDead(miner.status())) {
+        long now = System.currentTimeMillis();
+        if (miner.isDead()) {
             return "\u041f\u043e\u0433\u0438\u0431";
         }
 
-        if (isComplete(miner.status())) {
+        if (miner.isComplete(now)) {
             return "\u0412\u0435\u0440\u043d\u0443\u043b\u0441\u044f";
         }
 
-        long remaining = miner.homecomingAt() - System.currentTimeMillis();
-        if (remaining > 0L) {
-            return Formatting.formatMillis(System.currentTimeMillis() + remaining);
+        if (miner.isInTravel()) {
+            return Formatting.formatMillis(miner.homecomingAt());
         }
 
         return prettifyStatus(miner.status());
     }
 
     private int getLineColor(ActiveMinerInfo miner) {
-        if (isDead(miner.status())) {
+        if (miner.isDead()) {
             return WidgetTheme.TEXT_SECONDARY;
         }
 
-        if (isComplete(miner.status())) {
+        if (miner.isComplete(System.currentTimeMillis())) {
             return WidgetTheme.TEXT_PRIMARY;
         }
 
         return WidgetTheme.TEXT_SOFT;
-    }
-
-    private boolean isDead(String status) {
-        String normalized = status == null ? "" : status.toUpperCase(Locale.ROOT);
-        return normalized.contains("DEAD") || normalized.contains("DIED") || normalized.contains("KILLED");
-    }
-
-    private boolean isComplete(String status) {
-        return "COMPLETE_TRAVEL".equalsIgnoreCase(status);
     }
 
     private String prettifyStatus(String status) {
@@ -217,7 +207,7 @@ public class ActiveMinersWidget extends AbstractWidget {
             return "-";
         }
 
-        String[] parts = normalized.toLowerCase(Locale.ROOT).split("_");
+        String[] parts = normalized.toLowerCase(java.util.Locale.ROOT).split("_");
         StringBuilder builder = new StringBuilder();
 
         for (String part : parts) {
@@ -238,4 +228,3 @@ public class ActiveMinersWidget extends AbstractWidget {
         return builder.isEmpty() ? normalized : builder.toString();
     }
 }
-

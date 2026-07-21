@@ -51,11 +51,12 @@ public final class SellerCooldownWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, width, height);
 
-        context.drawString(mc.font, "Sellers", PADDING_X, y, WidgetTheme.TITLE);
-        y += mc.font.lineHeight + 3;
+        if (WidgetUtils.showWidgetTitles()) {
+            context.drawString(mc.font, "Sellers", PADDING_X, y, WidgetTheme.TITLE);
+            y += mc.font.lineHeight + 3;
+        }
 
         for (SellerCooldownStore.Entry entry : entries) {
             String state = entry.ready() ? "Ready" : Formatting.formatMillis(System.currentTimeMillis() + entry.remainingMillis());
@@ -95,7 +96,7 @@ public final class SellerCooldownWidget extends AbstractWidget {
             return EMPTY_WIDTH;
         }
 
-        int maxWidth = mc.font.width("Sellers");
+        int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Sellers") : 0;
         for (SellerCooldownStore.Entry entry : entries) {
             String state = entry.ready() ? "Ready" : Formatting.formatMillis(System.currentTimeMillis() + entry.remainingMillis());
             maxWidth = Math.max(maxWidth, mc.font.width(entry.name() + ": " + state));
@@ -108,7 +109,8 @@ public final class SellerCooldownWidget extends AbstractWidget {
             return EMPTY_HEIGHT;
         }
 
-        return PADDING_Y * 2 + mc.font.lineHeight + 3 + count * (mc.font.lineHeight + LINE_GAP);
+        int titleBlock = WidgetUtils.showWidgetTitles() ? mc.font.lineHeight + 3 : 0;
+        return PADDING_Y * 2 + titleBlock + count * (mc.font.lineHeight + LINE_GAP);
     }
 
     private boolean isEditorPreview() {
@@ -120,8 +122,7 @@ public final class SellerCooldownWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         context.drawString(mc.font, "Sellers", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "No sellers", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 

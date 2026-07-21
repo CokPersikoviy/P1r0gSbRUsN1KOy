@@ -13,6 +13,7 @@ public enum SettingsCategory {
     THEME("Theme"),
     RENDER("Render"),
     WIDGET("Widget"),
+    RUNES_BAG_KEYBINDS("Runes Bag Keybinds"),
     CLICKER("Clicker");
 
     private final String title;

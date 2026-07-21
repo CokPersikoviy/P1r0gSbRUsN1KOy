@@ -3,6 +3,7 @@ package ru.wilyfox.client.hud.menu;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 import java.util.function.IntConsumer;
@@ -15,6 +16,7 @@ public class SliderSettingsComponent extends SettingsComponent{
     private final int max;
     private boolean dragging = false;
     private boolean dirty = false;
+    private boolean labelTruncated = false;
 
     public SliderSettingsComponent(int x, int y, int width, int height, String label,
                                    IntSupplier getter,
@@ -37,10 +39,18 @@ public class SliderSettingsComponent extends SettingsComponent{
         int textColor = hovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_PRIMARY;
         int valueColor = WidgetTheme.TEXT_SOFT;
 
-        context.fill(x, y, x + width, y + height, rowBg);
+        HudSurface.fillRounded(context, x, y, width, height, 4, rowBg);
 
         int textY = y + (height - mc.font.lineHeight) / 2;
-        context.drawString(mc.font, label, x + 8, textY, textColor);
+
+        int sliderX = x + 92;
+        // Clip the label to the space before the slider; a truncated one gets a hover tooltip.
+        int labelMaxWidth = sliderX - (x + 8) - 4;
+        labelTruncated = mc.font.width(label) > labelMaxWidth;
+        String displayLabel = labelTruncated
+                ? mc.font.plainSubstrByWidth(label, Math.max(0, labelMaxWidth - mc.font.width("…"))) + "…"
+                : label;
+        context.drawString(mc.font, displayLabel, x + 8, textY, textColor);
 
         int valueWidth = 24;
         int valueX = x + width - 8 - valueWidth;
@@ -48,7 +58,6 @@ public class SliderSettingsComponent extends SettingsComponent{
         String valueText = String.valueOf(getter.getAsInt());
         context.drawCenteredString(mc.font, valueText, valueX + valueWidth / 2, textY, valueColor);
 
-        int sliderX = x + 92;
         int sliderWidth = valueX - sliderX - 10;
         int sliderY = y + height / 2 - 1;
 
@@ -61,7 +70,12 @@ public class SliderSettingsComponent extends SettingsComponent{
         context.fill(sliderX, sliderY, sliderX + fillWidth, sliderY + 2, WidgetTheme.BAR_FILL);
 
         int knobColor = dragging ? WidgetTheme.TITLE : (hovered ? WidgetTheme.TEXT_SOFT : WidgetTheme.TEXT_PRIMARY);
-        context.fill(knobX - 2, sliderY - 3, knobX + 2, sliderY + 5, knobColor);
+        HudSurface.fillRounded(context, knobX - 2, sliderY - 3, 4, 8, 2, knobColor);
+    }
+
+    @Override
+    public String getTooltip(int mouseX, int mouseY) {
+        return labelTruncated && isHovered(mouseX, mouseY) ? label : null;
     }
 
     @Override

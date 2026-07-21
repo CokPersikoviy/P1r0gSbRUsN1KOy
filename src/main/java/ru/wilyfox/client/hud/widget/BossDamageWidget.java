@@ -54,8 +54,7 @@ public class BossDamageWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, width, height);
         context.drawString(mc.font, bossText, PADDING_X, PADDING_Y, WidgetTheme.TEXT_PRIMARY);
         context.drawString(mc.font, damageText, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, WidgetTheme.TEXT_ACCENT);
 
@@ -118,8 +117,7 @@ public class BossDamageWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         context.drawString(mc.font, "Boss Damage", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "No recent hit", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 

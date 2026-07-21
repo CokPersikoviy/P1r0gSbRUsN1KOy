@@ -21,6 +21,7 @@ public final class WidgetTheme {
     public static int STATUS_SUCCESS = 0xFFD6E6D6;
     public static int STATUS_WARNING = 0xFFE6DCC8;
     public static int STATUS_ERROR = 0xFFE3C7C7;
+    public static int HARD_ACCENT = 0xFFEB4242;
     public static int BAR_BG = 0x66000000;
     public static int BAR_FILL = 0xD8D6D6D6;
     public static int OUTLINE_ACTIVE = 0xFFFFFFFF;
@@ -111,6 +112,11 @@ public final class WidgetTheme {
                     0x000000,
                     0xD6D6D6
             );
+        }
+
+        // Hard accent is preset-independent (a user-set critical colour), applied after the palette.
+        if (config != null) {
+            HARD_ACCENT = 0xFF000000 | rgb(config.hardAccentRed, config.hardAccentGreen, config.hardAccentBlue);
         }
     }
 

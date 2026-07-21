@@ -31,6 +31,16 @@ public final class PlayerHealthBarRenderer {
     private static final double FADE_START_DISTANCE = 8.0;
     private static final double FADE_END_DISTANCE = 20.0;
     private static final float MIN_DISTANCE_ALPHA = 0.12f;
+
+    // Occlusion cache: isVisibleToCamera() raycasts the world (Level.clip) per player, and doing it every
+    // frame for every nearby player scales badly on crowded bosses (~22 raycasts/frame here). Occlusion
+    // changes slowly, so cache the result per player (entity id) for a short TTL and re-raycast only when
+    // it goes stale — a ~150 ms lag on a health bar appearing/hiding is imperceptible.
+    private static final long VISIBILITY_TTL_MS = 150L;
+    private static final long VISIBILITY_STALE_MS = 3000L; // evict players not queried this long (they left)
+    private static final java.util.Map<Integer, long[]> VISIBILITY_CACHE = new java.util.HashMap<>();
+    private static long lastVisibilityPruneMs;
+
     private PlayerHealthBarRenderer() {
     }
 
@@ -55,6 +65,7 @@ public final class PlayerHealthBarRenderer {
         }
 
         Vec3 cameraPos = camera.getPosition();
+        pruneVisibilityCache(System.currentTimeMillis());
         int candidates = 0;
         int rendered = 0;
         int skippedSelf = 0;
@@ -82,7 +93,7 @@ public final class PlayerHealthBarRenderer {
 
                 boolean visibleToCamera;
                 try (ModProfiler.Scope visibilityScope = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderer/visibilityCheck")) {
-                    visibleToCamera = isVisibleToCamera(target);
+                    visibleToCamera = isVisibleToCameraCached(target);
                 }
                 if (!visibleToCamera) {
                     skippedOccluded++;
@@ -127,33 +138,50 @@ public final class PlayerHealthBarRenderer {
 
     private static void renderHealthBar(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, Player target, float distanceAlpha) {
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderer/renderHealthBar")) {
+        var config = ConfigManager.get().playerHealthBars;
         float health = target.getHealth();
         float maxHealth = target.getMaxHealth();
         float progress = maxHealth <= 0.0f ? 0.0f : Mth.clamp(health / maxHealth, 0.0f, 1.0f);
-        boolean lowHealth = progress < 0.5f;
-        float opacityMultiplier = ConfigManager.get().playerHealthBars.opacityPercent / 100.0f;
-        int verticalOffset = ConfigManager.get().playerHealthBars.verticalOffset;
 
-        int x1 = -BAR_WIDTH / 2;
+        // "In the red": below the configurable threshold the colour shifts toward the hard accent.
+        // The strength slider controls how forcefully it snaps, so the transition reads clearly
+        // instead of the previous barely-visible fade.
+        float threshold = Mth.clamp(config.hardAccentThresholdPercent / 100.0f, 0.0f, 1.0f);
+        float strength = Mth.clamp(config.accentStrengthPercent / 100.0f, 0.0f, 1.0f);
+        float criticalBlend = threshold <= 0.0f
+                ? 0.0f
+                : Mth.clamp((threshold - progress) / threshold, 0.0f, 1.0f) * strength;
+        boolean critical = progress < threshold;
+
+        float sizeScale = Math.max(1, config.sizePercent) / 100.0f;
+        int barWidth = Math.max(1, Math.round(BAR_WIDTH * sizeScale));
+        int barHeight = Math.max(1, Math.round(BAR_HEIGHT * sizeScale));
+        int bgPadding = Math.max(1, Math.round(BG_PADDING * sizeScale));
+        int accentHeight = Math.max(1, Math.round(ACCENT_HEIGHT * sizeScale));
+
+        float opacityMultiplier = config.opacityPercent / 100.0f;
+        int verticalOffset = config.verticalOffset;
+
+        int x1 = -barWidth / 2;
         int y1 = verticalOffset;
-        int x2 = x1 + BAR_WIDTH;
-        int y2 = y1 + BAR_HEIGHT;
-        int fillWidth = Math.round(BAR_WIDTH * progress);
+        int x2 = x1 + barWidth;
+        int y2 = y1 + barHeight;
+        int fillWidth = Math.round(barWidth * progress);
         int fillStartX = x2 - fillWidth;
 
         Matrix4f matrix = poseStack.last().pose();
         VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.debugQuads());
 
         float finalAlpha = distanceAlpha * opacityMultiplier;
-        int panelBaseColor = lowHealth
+        int panelBaseColor = critical
                 ? WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0x9E)
                 : WidgetTheme.withAlpha(WidgetTheme.PANEL_BG_SOFT, 0x82);
         int panelColor = applyAlpha(panelBaseColor, finalAlpha);
-        int accentColor = applyAlpha(getAccentColor(progress), finalAlpha);
-        int fillColor = applyAlpha(getFillColor(progress), finalAlpha);
+        int accentColor = applyAlpha(getAccentColor(criticalBlend), finalAlpha);
+        int fillColor = applyAlpha(getFillColor(criticalBlend), finalAlpha);
 
-        fillQuad(vertexConsumer, matrix, x1 - BG_PADDING, y1 - BG_PADDING, x2 + BG_PADDING, y2 + BG_PADDING, PANEL_Z, panelColor);
-        fillQuad(vertexConsumer, matrix, x1 - BG_PADDING, y1 - BG_PADDING, x2 + BG_PADDING, y1 - BG_PADDING + ACCENT_HEIGHT, ACCENT_Z, accentColor);
+        fillQuad(vertexConsumer, matrix, x1 - bgPadding, y1 - bgPadding, x2 + bgPadding, y2 + bgPadding, PANEL_Z, panelColor);
+        fillQuad(vertexConsumer, matrix, x1 - bgPadding, y1 - bgPadding, x2 + bgPadding, y1 - bgPadding + accentHeight, ACCENT_Z, accentColor);
 
         if (fillWidth > 0) {
             fillQuad(vertexConsumer, matrix, fillStartX, y1, x2, y2, FILL_Z, fillColor);
@@ -179,21 +207,19 @@ public final class PlayerHealthBarRenderer {
         return (scaledAlpha << 24) | (argb & 0x00FFFFFF);
     }
 
-    private static int getFillColor(float progress) {
-        float lowHealthBlend = Mth.clamp((0.50f - progress) / 0.35f, 0.0f, 1.0f);
+    private static int getFillColor(float criticalBlend) {
         return lerpArgb(
-                WidgetTheme.withAlpha(WidgetTheme.BAR_FILL, 0xB8),
-                WidgetTheme.withAlpha(WidgetTheme.STATUS_ERROR, 0xD8),
-                lowHealthBlend
+                WidgetTheme.withAlpha(WidgetTheme.BAR_FILL, 0xC4),
+                WidgetTheme.withAlpha(WidgetTheme.HARD_ACCENT, 0xF0),
+                criticalBlend
         );
     }
 
-    private static int getAccentColor(float progress) {
-        float lowHealthBlend = Mth.clamp((0.40f - progress) / 0.20f, 0.0f, 1.0f);
+    private static int getAccentColor(float criticalBlend) {
         return lerpArgb(
                 WidgetTheme.withAlpha(WidgetTheme.ACCENT_LINE, 0xAA),
-                WidgetTheme.withAlpha(WidgetTheme.STATUS_ERROR, 0xF0),
-                lowHealthBlend
+                WidgetTheme.withAlpha(WidgetTheme.HARD_ACCENT, 0xF6),
+                criticalBlend
         );
     }
 
@@ -227,6 +253,35 @@ public final class PlayerHealthBarRenderer {
 
         float progress = (float) ((distance - FADE_START_DISTANCE) / (FADE_END_DISTANCE - FADE_START_DISTANCE));
         return 1.0f - (1.0f - MIN_DISTANCE_ALPHA) * progress;
+    }
+
+    /** {@link #isVisibleToCamera} with a short-TTL per-player cache to avoid raycasting every frame. */
+    private static boolean isVisibleToCameraCached(Player target) {
+        long now = System.currentTimeMillis();
+        int id = target.getId();
+        long[] cached = VISIBILITY_CACHE.get(id);
+        if (cached != null && now - cached[0] < VISIBILITY_TTL_MS) {
+            return cached[1] != 0L;
+        }
+
+        boolean visible = isVisibleToCamera(target);
+        if (cached == null) {
+            VISIBILITY_CACHE.put(id, new long[]{now, visible ? 1L : 0L});
+        } else {
+            cached[0] = now;
+            cached[1] = visible ? 1L : 0L;
+        }
+        return visible;
+    }
+
+    /** Drop cache entries for players that haven't been queried recently (left the area). Runs at most
+     *  once per {@link #VISIBILITY_STALE_MS}. */
+    private static void pruneVisibilityCache(long now) {
+        if (now - lastVisibilityPruneMs < VISIBILITY_STALE_MS) {
+            return;
+        }
+        lastVisibilityPruneMs = now;
+        VISIBILITY_CACHE.values().removeIf(entry -> now - entry[0] > VISIBILITY_STALE_MS);
     }
 
     public static boolean isVisibleToCamera(Player target) {

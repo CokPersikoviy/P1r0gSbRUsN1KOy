@@ -39,12 +39,10 @@ public final class DwBoostersDecoder {
 
                 BoosterStore.Kind kind = switch (remoteKind) {
                     case MONEY -> BoosterStore.Kind.MONEY;
-                    case SHARD -> BoosterStore.Kind.SHARDS;
-                    case SHAFT -> null;
+                    case SHARD -> BoosterStore.Kind.SHARD;
+                    case SHAFT -> BoosterStore.Kind.SHAFT;
                 };
-                if (kind != null) {
-                    boosters.put(kind, entries);
-                }
+                boosters.put(kind, entries);
             }
 
             return new DwBoostersPacket(boosters);

@@ -8,6 +8,8 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import ru.wilyfox.client.hud.config.WidgetChrome;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.utils.Formatting;
 
@@ -52,8 +54,7 @@ public final class PetExperienceOverlay {
         int width = maxWidth + 12;
         int height = 12 + lineHeight + Math.max(0, data.lines().size()) * lineHeight;
 
-        context.fill(x, y, x + width, y + height, WidgetTheme.PANEL_BG);
-        context.fill(x, y, x + width, y + 1, WidgetTheme.ACCENT_LINE);
+        HudSurface.drawPanel(context, x, y, width, height, WidgetChrome.FROST, HudSurface.nativeRenderer());
 
         int textY = y + 5;
         context.drawString(mc.font, data.title(), x + 6, textY, WidgetTheme.TITLE);

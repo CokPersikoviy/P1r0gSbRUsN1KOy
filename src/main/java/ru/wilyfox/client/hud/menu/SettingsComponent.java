@@ -79,6 +79,11 @@ public abstract class SettingsComponent implements MenuElement {
         return visibleWhen.getAsBoolean();
     }
 
+    /** Full-text tooltip to show when hovered (e.g. a label truncated to fit). Null = none. */
+    public String getTooltip(int mouseX, int mouseY) {
+        return null;
+    }
+
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         return false;

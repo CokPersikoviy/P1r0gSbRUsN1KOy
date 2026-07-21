@@ -5,8 +5,8 @@ public record DwBossType(
         String name,
         String material,
         int level,
-        int capturePoints,
         int customModelData,
+        int capturePoints,
         boolean raid
 ) {
 }

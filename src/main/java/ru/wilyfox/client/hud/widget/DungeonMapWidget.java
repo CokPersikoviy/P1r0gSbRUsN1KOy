@@ -51,11 +51,7 @@ public final class DungeonMapWidget extends AbstractWidget {
 
         ResourceLocation texture = mc.getMapTextureManager().prepareMapTexture(mapId, mapData);
 
-        context.fill(0, 0, OUTER_SIZE, OUTER_SIZE, WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, OUTER_SIZE, 1, WidgetTheme.WIDGET_ACCENT_LINE);
-        context.fill(0, OUTER_SIZE - 1, OUTER_SIZE, OUTER_SIZE, WidgetTheme.WIDGET_ACCENT_LINE);
-        context.fill(0, 0, 1, OUTER_SIZE, WidgetTheme.WIDGET_ACCENT_LINE);
-        context.fill(OUTER_SIZE - 1, 0, OUTER_SIZE, OUTER_SIZE, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, OUTER_SIZE, OUTER_SIZE);
 
         context.blit(
                 RenderType::guiTextured,
@@ -104,11 +100,7 @@ public final class DungeonMapWidget extends AbstractWidget {
     }
 
     private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.fill(0, 0, OUTER_SIZE, OUTER_SIZE, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, OUTER_SIZE, 1, WidgetTheme.WIDGET_ACCENT_LINE);
-        context.fill(0, OUTER_SIZE - 1, OUTER_SIZE, OUTER_SIZE, WidgetTheme.WIDGET_ACCENT_LINE);
-        context.fill(0, 0, 1, OUTER_SIZE, WidgetTheme.WIDGET_ACCENT_LINE);
-        context.fill(OUTER_SIZE - 1, 0, OUTER_SIZE, OUTER_SIZE, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPlaceholderPanel(context, OUTER_SIZE, OUTER_SIZE);
 
         int gridColor = WidgetTheme.GRID_LINE;
         for (int offset = 18; offset < OUTER_SIZE - 18; offset += 18) {

@@ -7,6 +7,7 @@ import ru.wilyfox.client.ability.AbilityCooldownStore;
 import ru.wilyfox.client.ability.AbilityCooldownStore.Entry;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.internal.HudFrameClock;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.utils.Formatting;
 
@@ -23,9 +24,23 @@ public class AbilityCooldownWidget extends AbstractWidget {
 
     private final AbilityCooldownStore store;
 
+    // Per-frame cache: render()/getWidth()/getHeight() each call getActiveEntries() (which rebuilds a
+    // list) every frame; compute once per HUD frame, keyed on HudFrameClock.
+    private long cachedFrameId = Long.MIN_VALUE;
+    private List<Entry> cachedEntries;
+
     public AbilityCooldownWidget(int x, int y, HudLayer layer, AbilityCooldownStore store) {
         super(x, y, layer);
         this.store = store;
+    }
+
+    private List<Entry> entries() {
+        long frame = HudFrameClock.current();
+        if (frame != cachedFrameId || cachedEntries == null) {
+            cachedEntries = store.getActiveEntries();
+            cachedFrameId = frame;
+        }
+        return cachedEntries;
     }
 
     @Override
@@ -35,7 +50,7 @@ public class AbilityCooldownWidget extends AbstractWidget {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        List<Entry> entries = store.getActiveEntries();
+        List<Entry> entries = entries();
 
         if (entries.isEmpty()) {
             if (!isEditorPreview()) {
@@ -54,12 +69,13 @@ public class AbilityCooldownWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, width, height, WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, width, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, width, height);
 
         int y = PADDING_Y;
-        context.drawString(mc.font, "Ability Cooldowns", PADDING_X, y, WidgetTheme.TITLE);
-        y += mc.font.lineHeight + 3;
+        if (WidgetUtils.showWidgetTitles()) {
+            context.drawString(mc.font, "Ability Cooldowns", PADDING_X, y, WidgetTheme.TITLE);
+            y += mc.font.lineHeight + 3;
+        }
 
         for (Entry entry : entries) {
             String remaining = formatSeconds(entry.remainingMillis());
@@ -86,12 +102,12 @@ public class AbilityCooldownWidget extends AbstractWidget {
 
     @Override
     public int getWidth() {
-        return Math.round(getUnscaledWidth(store.getActiveEntries()) * getScale());
+        return Math.round(getUnscaledWidth(entries()) * getScale());
     }
 
     @Override
     public int getHeight() {
-        return Math.round(getUnscaledHeight(store.getActiveEntries().size()) * getScale());
+        return Math.round(getUnscaledHeight(entries().size()) * getScale());
     }
 
     @Override
@@ -110,7 +126,7 @@ public class AbilityCooldownWidget extends AbstractWidget {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        int maxWidth = mc.font.width("Ability Cooldowns");
+        int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Ability Cooldowns") : 0;
 
         for (Entry entry : entries) {
             String line = entry.name() + " " + formatSeconds(entry.remainingMillis());
@@ -126,7 +142,8 @@ public class AbilityCooldownWidget extends AbstractWidget {
         }
 
         int rowHeight = Minecraft.getInstance().font.lineHeight + BAR_HEIGHT + LINE_GAP;
-        return PADDING_Y * 2 + Minecraft.getInstance().font.lineHeight + 3 + count * rowHeight + Math.max(0, count - 1) * ROW_GAP;
+        int titleBlock = WidgetUtils.showWidgetTitles() ? Minecraft.getInstance().font.lineHeight + 3 : 0;
+        return PADDING_Y * 2 + titleBlock + count * rowHeight + Math.max(0, count - 1) * ROW_GAP;
     }
 
     private String formatSeconds(long remainingMillis) {
@@ -142,8 +159,7 @@ public class AbilityCooldownWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         context.drawString(mc.font, "Ability Cooldowns", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "No active abilities", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 

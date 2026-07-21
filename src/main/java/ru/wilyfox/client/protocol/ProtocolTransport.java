@@ -8,7 +8,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
 import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.rune.RuneSetCooldownStore;
-import ru.wilyfox.client.wand.WandCooldownTracker;
 
 import java.util.Locale;
 
@@ -96,9 +95,14 @@ final class ProtocolTransport {
         if (state.comboProgressStore != null) {
             state.comboProgressStore.clear();
         }
+        if (state.boosterStore != null) {
+            state.boosterStore.clear();
+        }
+        if (state.wandCooldownTracker != null) {
+            state.wandCooldownTracker.clear();
+        }
 
         RuneSetCooldownStore.clear();
-        WandCooldownTracker.getInstance().clear();
     }
 
     private static boolean isDiamondWorldConnection(Minecraft client) {

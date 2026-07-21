@@ -17,6 +17,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.clan.PlayerClanNameFormatter;
+import ru.wilyfox.client.moduser.ModUserBadge;
+import ru.wilyfox.client.moduser.ModUserStorage;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import ru.wilyfox.client.target.TargetListStore;
 import ru.wilyfox.utils.Formatting;
@@ -46,21 +48,27 @@ public abstract class PlayerTabOverlayMixin {
 
     @Inject(method = "getNameForDisplay", at = @At("RETURN"), cancellable = true)
     private void froghelper$highlightTargetTabName(PlayerInfo playerInfo, CallbackInfoReturnable<Component> cir) {
-        Component base = cir.getReturnValue();
-        if (base == null && playerInfo != null) {
-            base = Component.literal(playerInfo.getProfile().getName());
-        }
-
-        if (playerInfo != null) {
-            base = PlayerClanNameFormatter.apply(base, playerInfo.getProfile().getName());
-        }
-
-        if (playerInfo == null || !TargetListStore.isTarget(playerInfo.getProfile().getName())) {
-            cir.setReturnValue(base);
+        if (playerInfo == null) {
             return;
         }
 
-        cir.setReturnValue(base.copy().withStyle(style -> style.withColor(0xFF3030).withBold(true)));
+        String name = playerInfo.getProfile().getName();
+        Component base = cir.getReturnValue();
+        if (base == null) {
+            base = Component.literal(name);
+        }
+
+        base = PlayerClanNameFormatter.apply(base, name);
+
+        if (TargetListStore.isTarget(name)) {
+            base = base.copy().withStyle(style -> style.withColor(0xFF3030).withBold(true));
+        }
+
+        if (ConfigManager.get().render.modUserBadge && ModUserStorage.isKnown(name)) {
+            base = ModUserBadge.prefix(base);
+        }
+
+        cir.setReturnValue(base);
     }
 
     @Inject(method = "render", at = @At("TAIL"))

@@ -22,11 +22,11 @@ public final class DwBossTypesDecoder {
                 String name = DwProtocolCodec.readString(buf);
                 String material = DwProtocolCodec.readString(buf);
                 int level = DwProtocolCodec.readVarInt(buf);
-                int capturePoints = DwProtocolCodec.readVarInt(buf);
                 int customModelData = DwProtocolCodec.readVarInt(buf);
+                int capturePoints = DwProtocolCodec.readVarInt(buf);
                 boolean raid = DwProtocolCodec.readBoolean(buf);
 
-                types.put(id, new DwBossType(id, name, material, level, capturePoints, customModelData, raid));
+                types.put(id, new DwBossType(id, name, material, level, customModelData, capturePoints, raid));
             }
 
             return new DwBossTypesPacket(types);

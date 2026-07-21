@@ -1,5 +1,7 @@
 package ru.wilyfox.client.ability;
 
+import ru.wilyfox.utils.CooldownWindow;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,23 +33,23 @@ public class AbilityCooldownStore {
     }
 
     private void upsertCooldown(String id, String name, long remainingMillis) {
-        long remaining = Math.max(0L, remainingMillis);
-        if (remaining <= 0L) {
+        Entry previous = entries.get(id);
+        CooldownWindow previousWindow = previous == null
+                ? null
+                : new CooldownWindow(previous.startedAt(), previous.endsAt(), previous.durationMillis());
+
+        CooldownWindow window = CooldownWindow.extend(previousWindow, remainingMillis);
+        if (window == null) {
             entries.remove(id);
             return;
         }
 
-        long now = System.currentTimeMillis();
-        Entry previous = entries.get(id);
-        long duration = previous != null ? Math.max(previous.durationMillis(), remaining) : remaining;
-        long startedAt = now - Math.max(0L, duration - remaining);
-
         entries.put(id, new Entry(
                 id,
                 name != null && !name.isBlank() ? name : id,
-                startedAt,
-                now + duration,
-                duration
+                window.startedAt(),
+                window.endsAt(),
+                window.durationMillis()
         ));
     }
 

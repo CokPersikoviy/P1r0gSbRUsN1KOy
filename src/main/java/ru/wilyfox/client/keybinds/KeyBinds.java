@@ -75,23 +75,26 @@ public final class KeyBinds {
             )
     );
 
+    public static final KeyMapping SOCIAL = KeyBindingHelper.registerKeyBinding(
+            new KeyMapping(
+                    "Social",
+                    InputConstants.Type.KEYSYM,
+                    GLFW.GLFW_KEY_C,
+                    CATEGORY
+            )
+    );
+
+    // NOTE: rune-set selection (number row 1-7) is intentionally NOT a registered KeyMapping.
+    // MC keeps a single KeyMapping per key, so binding 1-7 here would shadow the vanilla hotbar keys
+    // globally (and can't be "only in the rune bag"). Instead RuneSetSwitcher reads raw 1-7 directly
+    // inside the rune-bag screen, so the hotbar keeps working everywhere.
+
     private KeyBinds() {
 
     }
 
     public static void register() {
         ClientTickEvents.END_CLIENT_TICK.register(KeyBinds::handleCommandKeybinds);
-    }
-
-    private static KeyMapping registerRuneSetSelect(String name, int keyCode) {
-        return KeyBindingHelper.registerKeyBinding(
-                new KeyMapping(
-                        name,
-                        InputConstants.Type.KEYSYM,
-                        keyCode,
-                        CATEGORY
-                )
-        );
     }
 
     private static void handleCommandKeybinds(Minecraft client) {
@@ -106,6 +109,10 @@ public final class KeyBinds {
 
             while (RUNES_BAG.consumeClick()) {
                 client.player.connection.sendCommand("runesbag");
+            }
+
+            while (SOCIAL.consumeClick()) {
+                client.setScreen(new ru.wilyfox.client.moduser.SocialScreen());
             }
         }
     }

@@ -9,6 +9,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.CustomModelData;
+import ru.wilyfox.utils.CooldownWindow;
 import ru.wilyfox.utils.Formatting;
 
 import java.util.ArrayList;
@@ -21,7 +22,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class WandCooldownTracker {
-    private static final WandCooldownTracker INSTANCE = new WandCooldownTracker();
     private static final Pattern COOLDOWN_PATTERN = Pattern.compile("Перезарядка:\\s*(\\d+(?:[.,]\\d+)?)с\\.?");
     private static final String WAND_PREFIX = "Посох ";
     private static final Map<String, String> STAFF_NAME_ALIASES = Map.ofEntries(
@@ -43,13 +43,6 @@ public final class WandCooldownTracker {
     private final Map<Integer, Integer> staffModelIds = new LinkedHashMap<>();
     private final Map<String, ItemStack> observedStacks = new LinkedHashMap<>();
 
-    private WandCooldownTracker() {
-    }
-
-    public static WandCooldownTracker getInstance() {
-        return INSTANCE;
-    }
-
     public void replaceTypes(Map<Integer, String> namesById, Map<Integer, Integer> modelIdsById) {
         staffNames.clear();
         staffNames.putAll(namesById);
@@ -59,11 +52,22 @@ public final class WandCooldownTracker {
 
     public void replaceProtocol(Map<Integer, Long> remainingMillisById) {
         cleanup();
-
+        // stafftimers arrives incrementally (only the staff whose cooldown just changed), NOT as a
+        // full snapshot — so ids absent from this packet are still on cooldown and must be kept.
+        // Duplicates from re-awakening (a staff getting a new id mid-cooldown) are collapsed by the
+        // canonical-name merge in getActiveEntries(); stale ids fall off via time-based cleanup().
         for (Map.Entry<Integer, Long> entry : remainingMillisById.entrySet()) {
             String name = staffNames.getOrDefault(entry.getKey(), "Staff " + entry.getKey());
             int modelId = staffModelIds.getOrDefault(entry.getKey(), entry.getKey());
             upsertEntry(protocolEntries, entry.getKey(), "protocol|" + entry.getKey(), createStaffStack(modelId, name), name, entry.getValue());
+
+            // Protocol-preferred: the server's value is authoritative, so drop the optimistic local bridge
+            // for this staff the moment its FIRST packet arrives — the shown value corrects immediately.
+            // The wind staff stays local-driven (its protocol lags) and keeps its local window.
+            String canonical = canonicalStaffName(name);
+            if (!WIND_CANONICAL_NAME.equals(canonical)) {
+                localEntries.remove(canonical);
+            }
         }
     }
 
@@ -101,14 +105,14 @@ public final class WandCooldownTracker {
         String canonicalName = canonicalStaffName(itemName);
         observedStacks.put(canonicalName, stack.copy());
 
-        if (!WIND_CANONICAL_NAME.equals(canonicalName)) {
-            return;
-        }
-
+        // Start an OPTIMISTIC local cooldown for EVERY staff on use (was wind-only). The `stafftimers`
+        // protocol packet is incremental/server-timed and can lag or drop, so a non-wind staff's bar
+        // "sometimes doesn't start" until the packet arrives; the local entry starts it instantly, and
+        // getActiveEntries() still merges the protocol value on top (keeps the fresher/longer window).
         long now = System.currentTimeMillis();
         WandCooldownEntry existing = localEntries.get(canonicalName);
         if (existing != null && existing.endsAt() > now) {
-            return;
+            return; // already on a local cooldown — don't restart it
         }
 
         localEntries.put(canonicalName, new WandCooldownEntry(
@@ -129,14 +133,22 @@ public final class WandCooldownTracker {
             String canonicalName = canonicalStaffName(protocolEntry.name());
             ItemStack observed = observedStacks.get(canonicalName);
             ItemStack stack = observed != null ? observed.copy() : protocolEntry.stack();
-            merged.put(canonicalName, new WandCooldownEntry(
+            WandCooldownEntry candidate = new WandCooldownEntry(
                     protocolEntry.key(),
                     stack,
                     protocolEntry.name(),
                     protocolEntry.startedAt(),
                     protocolEntry.endsAt(),
                     protocolEntry.durationMillis()
-            ));
+            );
+
+            // Two different protocol ids can briefly resolve to the same canonical name
+            // (e.g. an awakening reassigns the id mid-cooldown); keep whichever is fresher
+            // instead of letting iteration order decide, so the pair never renders as two entries.
+            WandCooldownEntry existing = merged.get(canonicalName);
+            if (existing == null || candidate.endsAt() > existing.endsAt()) {
+                merged.put(canonicalName, candidate);
+            }
         }
 
         for (Map.Entry<String, WandCooldownEntry> entry : localEntries.entrySet()) {
@@ -204,24 +216,24 @@ public final class WandCooldownTracker {
     }
 
     private <K> void upsertEntry(Map<K, WandCooldownEntry> entries, K entryKey, String key, ItemStack stack, String name, long remainingMillis) {
-        long remaining = Math.max(0L, remainingMillis);
-        if (remaining <= 0L) {
+        WandCooldownEntry previous = entries.get(entryKey);
+        CooldownWindow previousWindow = previous == null
+                ? null
+                : new CooldownWindow(previous.startedAt(), previous.endsAt(), previous.durationMillis());
+
+        CooldownWindow window = CooldownWindow.extend(previousWindow, remainingMillis);
+        if (window == null) {
             entries.remove(entryKey);
             return;
         }
-
-        long now = System.currentTimeMillis();
-        WandCooldownEntry previous = entries.get(entryKey);
-        long duration = previous != null ? Math.max(previous.durationMillis(), remaining) : remaining;
-        long startedAt = now - Math.max(0L, duration - remaining);
 
         entries.put(entryKey, new WandCooldownEntry(
                 key,
                 stack,
                 name,
-                startedAt,
-                now + remaining,
-                duration
+                window.startedAt(),
+                window.endsAt(),
+                window.durationMillis()
         ));
     }
 

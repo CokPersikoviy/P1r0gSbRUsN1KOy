@@ -7,7 +7,7 @@ import ru.wilyfox.utils.Formatting;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-final class PlayerClanChatParser {
+public final class PlayerClanChatParser {
     private static final Pattern TRAILING_LEVEL_PATTERN = Pattern.compile("\\[(\\d{1,3})]$");
     private static final Pattern TRAILING_BRACKET_PATTERN = Pattern.compile("\\[([^\\]]+)]$");
     private static final Pattern PLAYER_NAME_PATTERN = Pattern.compile("^[A-Za-z0-9_]{3,16}$");
@@ -23,6 +23,35 @@ final class PlayerClanChatParser {
         }
 
         return parse(component.getString());
+    }
+
+    /** The sender player name of a DW chat line, or null if it isn't a parseable player message. */
+    public static String senderName(Component component) {
+        ParsedClanChatEntry entry = parse(component);
+        return entry == null ? null : entry.playerName();
+    }
+
+    /**
+     * Lenient sender extraction: like {@link #senderName} but also handles plain global chat with no
+     * clan/level brackets (e.g. "WilyFox: 1111"). Strips timestamps + any [..] brackets from the header
+     * before the first colon, then takes the player-name token. Used for mod-user detection, which must
+     * see EVERY player message, not just clan/local chat.
+     */
+    public static String senderNameLenient(Component component) {
+        if (component == null) {
+            return null;
+        }
+
+        String text = Formatting.stripMinecraftFormatting(component.getString()).replace(' ', ' ').trim();
+        text = stripAllTimestampPrefixes(text);
+
+        int colonIndex = text.indexOf(':');
+        if (colonIndex < 0) {
+            return null;
+        }
+
+        String header = text.substring(0, colonIndex).replaceAll("\\[[^\\]]*]", " ").trim();
+        return extractPlayerName(header);
     }
 
     static ParsedClanChatEntry parse(String rawText) {

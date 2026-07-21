@@ -7,6 +7,9 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.WidgetChrome;
+import ru.wilyfox.client.hud.widget.HudBlur;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.client.profiler.ModProfiler;
 
@@ -74,8 +77,9 @@ public class QuickAccessEditorScreen extends Screen {
             panelX = (this.width - PANEL_WIDTH) / 2;
             panelY = (this.height - PANEL_HEIGHT) / 2;
 
-            graphics.fill(panelX, panelY, panelX + PANEL_WIDTH, panelY + PANEL_HEIGHT, WidgetTheme.PANEL_BG);
-            graphics.fill(panelX, panelY, panelX + PANEL_WIDTH, panelY + 1, WidgetTheme.ACCENT_LINE);
+            // Not the in-game HUD, so capture the screen here for the frosted panel's blur backdrop.
+            HudBlur.beginFrame(graphics);
+            HudSurface.drawPanel(graphics, panelX, panelY, PANEL_WIDTH, PANEL_HEIGHT, WidgetChrome.FROST, HudSurface.nativeRenderer());
             graphics.fill(panelX + LIST_WIDTH, panelY + HEADER_HEIGHT, panelX + LIST_WIDTH + 1, panelY + PANEL_HEIGHT - 8, WidgetTheme.BAR_BG);
 
             graphics.drawString(this.font, "Quick Access", panelX + 10, panelY + 8, WidgetTheme.TITLE);

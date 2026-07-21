@@ -5,10 +5,13 @@ import net.minecraft.client.gui.GuiGraphics;
 import ru.wilyfox.client.discord.DiscordRpcService;
 import ru.wilyfox.client.hud.config.AutoMessageEntryConfig;
 import ru.wilyfox.client.hud.config.BossTimerSourceMode;
+import ru.wilyfox.client.hud.config.BossWidgetConfig;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.ThemePreset;
-import ru.wilyfox.client.hud.widget.BoostersWidget;
+import ru.wilyfox.client.hud.config.WidgetChrome;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
+import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import ru.wilyfox.client.quickaccess.QuickAccessScreen;
 
 import java.util.ArrayList;
@@ -44,6 +47,12 @@ public class HudSettingsPanel {
     private int categoryScrollbarDragOffset = 0;
     private final List<Boolean> autoMessageSlotExpanded = new ArrayList<>();
 
+    // Upper bound for the boss min/max level steppers: the shipped ceiling, auto-extended once the
+    // server reports higher-level bosses so the sliders can always reach the newest content.
+    private static int bossLevelCeiling() {
+        return Math.max(BossWidgetConfig.MAX_LEVEL_CEILING, DiamondWorldProtocolClient.getHighestKnownBossLevel());
+    }
+
     public void render(GuiGraphics context, double mouseX, double mouseY) {
         ensureInitialized();
 
@@ -61,17 +70,9 @@ public class HudSettingsPanel {
     }
 
     private void renderPanelBackground(GuiGraphics context) {
-        // Мягкая внешняя рамка
-        context.fill(x, y, x + width, y + height, WidgetTheme.PANEL_BG);
-
-        // Внутренний полупрозрачный фон
-        context.fill(x + 1, y + 1, x + width - 1, y + height - 1, WidgetTheme.PANEL_BG_SOFT);
-
-        // Тонкий верхний акцент
-        context.fill(x + 1, y + 1, x + width - 1, y + 2, WidgetTheme.ACCENT_LINE);
-
-        // Лёгкая нижняя тень
-        context.fill(x + 1, y + height - 2, x + width - 1, y + height - 1, WidgetTheme.BAR_BG);
+        // The whole window is one frosted-glass panel (Frost surface language) — blur + rounded + the
+        // theme accent. The sidebar/content areas below add their own tint so the busy text stays legible.
+        HudSurface.drawPanel(context, x, y, width, height, WidgetChrome.FROST, HudSurface.nativeRenderer());
     }
 
     private void renderHeader(GuiGraphics context) {
@@ -92,7 +93,7 @@ public class HudSettingsPanel {
         int listWidth = sidebarWidth - 12;
         int listHeight = sidebarHeight - 8;
 
-        context.fill(sidebarX, sidebarY, sidebarX + sidebarWidth, sidebarY + sidebarHeight, WidgetTheme.PANEL_BG_SOFT);
+        HudSurface.fillRounded(context, sidebarX, sidebarY, sidebarWidth, sidebarHeight, 4, WidgetTheme.PANEL_BG_SOFT);
 
         updateCategoryScrollBounds(sidebarHeight);
 
@@ -123,11 +124,11 @@ public class HudSettingsPanel {
                 textColor = WidgetTheme.TEXT_SECONDARY;
             }
 
-            context.fill(sidebarX + 4, tabY, sidebarX + sidebarWidth - 4, tabY + 20, bg);
+            HudSurface.fillRounded(context, sidebarX + 4, tabY, sidebarWidth - 8, 20, 4, bg);
 
             // Верхний акцент только у активной категории
             if (active) {
-                context.fill(sidebarX + 4, tabY, sidebarX + sidebarWidth - 4, tabY + 1, WidgetTheme.ACCENT_LINE);
+                context.fill(sidebarX + 8, tabY, sidebarX + sidebarWidth - 8, tabY + 1, WidgetTheme.ACCENT_LINE);
             }
 
             context.drawString(mc.font, category.getTitle(), sidebarX + 10, tabY + 6, textColor);
@@ -144,7 +145,7 @@ public class HudSettingsPanel {
         int contentWidth = getContentWidth();
         int contentHeight = getContentHeight();
 
-        context.fill(contentX, contentY, contentX + contentWidth, contentY + contentHeight, WidgetTheme.PANEL_BG_SOFT);
+        HudSurface.fillRounded(context, contentX, contentY, contentWidth, contentHeight, 4, WidgetTheme.PANEL_BG_SOFT);
 
         List<SettingsComponent> activeComponents = componentsByCategory.getOrDefault(activeCategory, List.of());
         activeComponents = activeComponents.stream()
@@ -177,6 +178,15 @@ public class HudSettingsPanel {
         context.disableScissor();
 
         renderScrollbar(context, contentX, contentY, contentWidth, contentHeight, mouseX, mouseY);
+
+        // Tooltip for a hovered component whose label was truncated — after scissor so it isn't clipped.
+        for (SettingsComponent component : activeComponents) {
+            String tooltip = component.getTooltip((int) mouseX, (int) mouseY);
+            if (tooltip != null) {
+                context.renderTooltip(Minecraft.getInstance().font, net.minecraft.network.chat.Component.literal(tooltip), (int) mouseX, (int) mouseY);
+                break;
+            }
+        }
     }
 
     private void renderScrollbar(GuiGraphics context, int contentX, int contentY, int contentWidth, int contentHeight, double mouseX, double mouseY) {
@@ -186,13 +196,8 @@ public class HudSettingsPanel {
 
         boolean hovered = isOverScrollbar(mouseX, mouseY);
 
-        context.fill(
-                barX,
-                barY,
-                barX + 2,
-                barY + barHeight,
-                hovered || scrollbarDragging ? WidgetTheme.TEXT_MUTED : WidgetTheme.BAR_BG
-        );
+        HudSurface.fillRounded(context, barX, barY, 2, barHeight, 1,
+                hovered || scrollbarDragging ? WidgetTheme.TEXT_MUTED : WidgetTheme.BAR_BG);
 
         if (maxScroll <= 0) {
             return;
@@ -201,13 +206,8 @@ public class HudSettingsPanel {
         int thumbHeight = getScrollbarThumbHeight(contentHeight);
         int thumbY = getScrollbarThumbY(contentY, contentHeight);
 
-        context.fill(
-                barX - 1,
-                thumbY,
-                barX + 3,
-                thumbY + thumbHeight,
-                scrollbarDragging ? WidgetTheme.TEXT_PRIMARY : (hovered ? WidgetTheme.TEXT_SOFT : WidgetTheme.TEXT_SECONDARY)
-        );
+        HudSurface.fillRounded(context, barX - 1, thumbY, 4, thumbHeight, 2,
+                scrollbarDragging ? WidgetTheme.TEXT_PRIMARY : (hovered ? WidgetTheme.TEXT_SOFT : WidgetTheme.TEXT_SECONDARY));
     }
 
     private void renderCategoryScrollbar(GuiGraphics context, int sidebarX, int sidebarY, int sidebarHeight, double mouseX, double mouseY) {
@@ -217,13 +217,8 @@ public class HudSettingsPanel {
 
         boolean hovered = isOverCategoryScrollbar(mouseX, mouseY);
 
-        context.fill(
-                barX,
-                barY,
-                barX + 2,
-                barY + barHeight,
-                hovered || categoryScrollbarDragging ? WidgetTheme.TEXT_MUTED : WidgetTheme.BAR_BG
-        );
+        HudSurface.fillRounded(context, barX, barY, 2, barHeight, 1,
+                hovered || categoryScrollbarDragging ? WidgetTheme.TEXT_MUTED : WidgetTheme.BAR_BG);
 
         if (maxCategoryScroll <= 0) {
             return;
@@ -232,13 +227,8 @@ public class HudSettingsPanel {
         int thumbHeight = getCategoryScrollbarThumbHeight(sidebarHeight);
         int thumbY = getCategoryScrollbarThumbY(sidebarY, sidebarHeight);
 
-        context.fill(
-                barX - 1,
-                thumbY,
-                barX + 3,
-                thumbY + thumbHeight,
-                categoryScrollbarDragging ? WidgetTheme.TEXT_PRIMARY : (hovered ? WidgetTheme.TEXT_SOFT : WidgetTheme.TEXT_SECONDARY)
-        );
+        HudSurface.fillRounded(context, barX - 1, thumbY, 4, thumbHeight, 2,
+                categoryScrollbarDragging ? WidgetTheme.TEXT_PRIMARY : (hovered ? WidgetTheme.TEXT_SOFT : WidgetTheme.TEXT_SECONDARY));
     }
 
     private void ensureInitialized() {
@@ -248,6 +238,18 @@ public class HudSettingsPanel {
 
         for (SettingsCategory category : SettingsCategory.values()) {
             componentsByCategory.put(category, new ArrayList<>());
+        }
+
+        for (int i = 0; i < 7; i++) {
+            final int index = i;
+            componentsByCategory.get(SettingsCategory.RUNES_BAG_KEYBINDS).add(
+                    new KeybindSettingsComponent(
+                            0, 0, 0, 0,
+                            "Select Rune Set " + (i + 1),
+                            () -> ConfigManager.get().runesBag.setSelectorKeys[index],
+                            key -> ConfigManager.get().runesBag.setSelectorKeys[index] = key
+                    )
+            );
         }
 
         componentsByCategory.get(SettingsCategory.QUICK_ACCESS).add(
@@ -281,6 +283,24 @@ public class HudSettingsPanel {
         );
 
         componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Keep Spawned Until Killed",
+                        () -> ConfigManager.get().bossWidget.showSpawnedUntilKilled,
+                        value -> ConfigManager.get().bossWidget.showSpawnedUntilKilled = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
+                new SliderSettingsComponent(
+                        0, 0, 0, 0,
+                        "Keep After Spawn (s)",
+                        () -> ConfigManager.get().bossWidget.postSpawnShowSeconds,
+                        value -> ConfigManager.get().bossWidget.postSpawnShowSeconds = value,
+                        0, 600
+                ).withVisibility(() -> !ConfigManager.get().bossWidget.showSpawnedUntilKilled)
+        );
+
+        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
                 new CycleSettingsComponent<>(
                         0, 0, 0, 0,
                         "Timer source",
@@ -307,7 +327,7 @@ public class HudSettingsPanel {
                         "Min level",
                         () -> ConfigManager.get().bossWidget.minLevel,
                         value -> ConfigManager.get().bossWidget.minLevel = value,
-                        15, 520, 5
+                        15, HudSettingsPanel::bossLevelCeiling, 5
                 )
         );
 
@@ -317,7 +337,7 @@ public class HudSettingsPanel {
                         "Max level",
                         () -> ConfigManager.get().bossWidget.maxLevel,
                         value -> ConfigManager.get().bossWidget.maxLevel = value,
-                        15, 520, 5
+                        15, HudSettingsPanel::bossLevelCeiling, 5
                 )
         );
 
@@ -470,6 +490,36 @@ public class HudSettingsPanel {
                 )
         );
 
+        componentsByCategory.get(SettingsCategory.PLAYER_HEALTH_BARS).add(
+                new SliderSettingsComponent(
+                        0, 0, 0, 0,
+                        "Bar size %",
+                        () -> ConfigManager.get().playerHealthBars.sizePercent,
+                        value -> ConfigManager.get().playerHealthBars.sizePercent = value,
+                        50, 250
+                )
+        );
+
+        componentsByCategory.get(SettingsCategory.PLAYER_HEALTH_BARS).add(
+                new SliderSettingsComponent(
+                        0, 0, 0, 0,
+                        "Hard accent threshold %",
+                        () -> ConfigManager.get().playerHealthBars.hardAccentThresholdPercent,
+                        value -> ConfigManager.get().playerHealthBars.hardAccentThresholdPercent = value,
+                        0, 100
+                )
+        );
+
+        componentsByCategory.get(SettingsCategory.PLAYER_HEALTH_BARS).add(
+                new SliderSettingsComponent(
+                        0, 0, 0, 0,
+                        "Accent strength %",
+                        () -> ConfigManager.get().playerHealthBars.accentStrengthPercent,
+                        value -> ConfigManager.get().playerHealthBars.accentStrengthPercent = value,
+                        0, 100
+                )
+        );
+
         componentsByCategory.get(SettingsCategory.CLICKER).add(
                 new SliderSettingsComponent(
                         0, 0, 0, 0,
@@ -567,6 +617,35 @@ public class HudSettingsPanel {
                         "Custom blue",
                         () -> ConfigManager.get().theme.customAccentBlue,
                         value -> ConfigManager.get().theme.customAccentBlue = value,
+                        0, 255
+                )
+        );
+
+        componentsByCategory.get(SettingsCategory.THEME).add(new BreakLineSettingsComponent("Hard Accent"));
+        componentsByCategory.get(SettingsCategory.THEME).add(
+                new SliderSettingsComponent(
+                        0, 0, 0, 0,
+                        "Hard accent red",
+                        () -> ConfigManager.get().theme.hardAccentRed,
+                        value -> ConfigManager.get().theme.hardAccentRed = value,
+                        0, 255
+                )
+        );
+        componentsByCategory.get(SettingsCategory.THEME).add(
+                new SliderSettingsComponent(
+                        0, 0, 0, 0,
+                        "Hard accent green",
+                        () -> ConfigManager.get().theme.hardAccentGreen,
+                        value -> ConfigManager.get().theme.hardAccentGreen = value,
+                        0, 255
+                )
+        );
+        componentsByCategory.get(SettingsCategory.THEME).add(
+                new SliderSettingsComponent(
+                        0, 0, 0, 0,
+                        "Hard accent blue",
+                        () -> ConfigManager.get().theme.hardAccentBlue,
+                        value -> ConfigManager.get().theme.hardAccentBlue = value,
                         0, 255
                 )
         );
@@ -865,6 +944,38 @@ public class HudSettingsPanel {
         componentsByCategory.get(SettingsCategory.RENDER).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
+                        "Hide Cosmetics (First Person)",
+                        () -> ConfigManager.get().render.hideFirstPersonCosmetics,
+                        value -> ConfigManager.get().render.hideFirstPersonCosmetics = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.RENDER).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "FrogHelper Badge On Nametags",
+                        () -> ConfigManager.get().render.modUserBadge,
+                        value -> ConfigManager.get().render.modUserBadge = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.RENDER).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "FrogHelper Mesh Sync (PM)",
+                        () -> ConfigManager.get().render.modUserMesh,
+                        value -> ConfigManager.get().render.modUserMesh = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.RENDER).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "FrogHelper Group Widget",
+                        () -> ConfigManager.get().social.widgetActive,
+                        value -> ConfigManager.get().social.widgetActive = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.RENDER).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
                         "Hide block particles",
                         () -> ConfigManager.get().render.hideBlockBreakParticles,
                         value -> ConfigManager.get().render.hideBlockBreakParticles = value
@@ -986,6 +1097,32 @@ public class HudSettingsPanel {
         componentsByCategory.get(SettingsCategory.WIDGET).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
+                        "UnClutter (hide widget titles)",
+                        () -> ConfigManager.get().render.unclutterWidgets,
+                        value -> ConfigManager.get().render.unclutterWidgets = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new CycleSettingsComponent<>(
+                        0, 0, 0, 0,
+                        "Background",
+                        () -> ConfigManager.get().render.widgetChrome,
+                        value -> ConfigManager.get().render.widgetChrome = value,
+                        WidgetChrome.values(),
+                        WidgetChrome::label
+                )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Native Renderer (no blur, if glass lags)",
+                        () -> ConfigManager.get().render.nativeRenderer,
+                        value -> ConfigManager.get().render.nativeRenderer = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
                         "Render BossBar as Widget",
                         () -> ConfigManager.get().bossBar.active,
                         value -> ConfigManager.get().bossBar.active = value
@@ -1092,32 +1229,12 @@ public class HudSettingsPanel {
                 )
         );
         componentsByCategory.get(SettingsCategory.WIDGET).add(
-                new CycleSettingsComponent<>(
-                        0, 0, 0, 0,
-                        "Money base",
-                        () -> ConfigManager.get().boosters.moneyBaseTenths,
-                        value -> ConfigManager.get().boosters.moneyBaseTenths = value,
-                        BoostersWidget.baseValues(),
-                        value -> "x" + String.format(java.util.Locale.US, "%.1f", value / 10.0)
-                )
-        );
-        componentsByCategory.get(SettingsCategory.WIDGET).add(
-                new CycleSettingsComponent<>(
-                        0, 0, 0, 0,
-                        "Shards base",
-                        () -> ConfigManager.get().boosters.shardsBaseTenths,
-                        value -> ConfigManager.get().boosters.shardsBaseTenths = value,
-                        BoostersWidget.baseValues(),
-                        value -> "x" + String.format(java.util.Locale.US, "%.1f", value / 10.0)
-                )
-        );
-        componentsByCategory.get(SettingsCategory.WIDGET).add(
                 new SliderSettingsComponent(
                         0, 0, 0, 0,
                         "BG Opacity",
                         () -> ConfigManager.get().theme.widgetBackgroundOpacityPercent,
                         value -> ConfigManager.get().theme.widgetBackgroundOpacityPercent = value,
-                        0, 100
+                        0, 50
                 )
         );
         componentsByCategory.get(SettingsCategory.WIDGET).add(
@@ -1130,6 +1247,15 @@ public class HudSettingsPanel {
                         () -> ConfigManager.get().potionTimers.active,
                         value -> ConfigManager.get().potionTimers.active = value
                 )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new SliderSettingsComponent(
+                        0, 0, 0, 0,
+                        "Potion Keep After Expiry (s)",
+                        () -> ConfigManager.get().potionTimers.belowZeroSeconds,
+                        value -> ConfigManager.get().potionTimers.belowZeroSeconds = value,
+                        0, 60
+                ).withVisibility(() -> ConfigManager.get().potionTimers.active)
         );
         componentsByCategory.get(SettingsCategory.WIDGET).add(
                 new ToggleSettingsComponent(

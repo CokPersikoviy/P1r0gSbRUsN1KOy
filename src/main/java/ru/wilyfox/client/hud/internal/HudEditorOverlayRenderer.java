@@ -6,6 +6,7 @@ import net.minecraft.client.gui.screens.Screen;
 import ru.wilyfox.client.hud.indicators.CornerSnapIndicator;
 import ru.wilyfox.client.hud.indicators.ScreenAnchor;
 import ru.wilyfox.client.hud.widget.AbstractWidget;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.Widget;
 import ru.wilyfox.client.hud.widget.WidgetCorner;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
@@ -142,8 +143,8 @@ public final class HudEditorOverlayRenderer {
             x = 2;
         }
 
-        context.fill(x, y, x + width, y + height, WidgetTheme.TOOLTIP_BG);
-        context.fill(x, y, x + width, y + 1, WidgetTheme.ACCENT_LINE);
+        HudSurface.fillRounded(context, x, y, width, height, 3, WidgetTheme.TOOLTIP_BG);
+        context.fill(x + 3, y, x + width - 3, y + 1, WidgetTheme.ACCENT_LINE);
 
         context.pose().pushPose();
         context.pose().translate(x + paddingX, y + (height - Minecraft.getInstance().font.lineHeight * labelScale) / 2.0f, 0);
@@ -182,8 +183,8 @@ public final class HudEditorOverlayRenderer {
             x = 2;
         }
 
-        context.fill(x, y, x + width, y + height, WidgetTheme.TOOLTIP_BG);
-        context.fill(x, y, x + width, y + 1, WidgetTheme.ACCENT_LINE);
+        HudSurface.fillRounded(context, x, y, width, height, 3, WidgetTheme.TOOLTIP_BG);
+        context.fill(x + 3, y, x + width - 3, y + 1, WidgetTheme.ACCENT_LINE);
 
         context.pose().pushPose();
         context.pose().translate(x + paddingX, y + (height - Minecraft.getInstance().font.lineHeight * labelScale) / 2.0f, 0);

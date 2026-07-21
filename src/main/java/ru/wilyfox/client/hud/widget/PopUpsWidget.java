@@ -100,8 +100,7 @@ public final class PopUpsWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         context.drawString(mc.font, "Pop-Ups", PADDING_X, 6, WidgetTheme.TITLE);
         context.drawString(mc.font, "No active pop-up's", PADDING_X, 16, WidgetTheme.TEXT_MUTED);
 
@@ -122,13 +121,10 @@ public final class PopUpsWidget extends AbstractWidget {
         int bodyColor = withScaledAlpha(WidgetTheme.TEXT_PRIMARY, alpha);
         int titleColor = withScaledAlpha(getTitleColor(notification.severity()), alpha);
         int accentColor = withScaledAlpha(getAccentColor(notification.severity()), alpha);
-        int borderColor = withScaledAlpha(WidgetTheme.WIDGET_ACCENT_LINE, alpha * 0.35f);
-        int glowColor = withScaledAlpha(WidgetTheme.WIDGET_PANEL_BG_SOFT, alpha);
 
-        context.fill(x, y, x + width, y + height, panelColor);
-        context.fill(x, y, x + width, y + 1, accentColor);
-        context.fill(x, y, x + 1, y + height, borderColor);
-        context.fill(x + 1, y + height - 1, x + width, y + height, glowColor);
+        // New-style surface: rounded panel + a single inset severity accent line (fades with the pop-up).
+        HudSurface.fillRounded(context, x, y, width, height, 4, panelColor);
+        context.fill(x + 4, y, x + width - 4, y + 1, accentColor);
 
         int textX = x + PADDING_X;
         int titleY = y + PADDING_Y;

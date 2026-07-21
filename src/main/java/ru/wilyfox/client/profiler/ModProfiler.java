@@ -339,8 +339,15 @@ public final class ModProfiler {
                 .append(formatMillis(topSelfSection.selfNanos())).append(" ms</code> self.\n");
         markdown.append("- Largest spike: <code>").append(escapeHtml(topSpike.name())).append("</code> with <code>")
                 .append(formatMillis(topSpike.maxNanos())).append(" ms</code> max.\n");
+        SectionView hudRender = findSection(snapshot, "hud/render");
+        if (hudRender != null && hudRender.calls() > 0L) {
+            markdown.append("- HUD render cost: <code>").append(formatMillis(hudRender.avgNanos()))
+                    .append(" ms/frame</code> avg over <code>").append(hudRender.calls())
+                    .append("</code> frames (peak <code>").append(formatMillis(hudRender.maxNanos())).append(" ms</code>).\n");
+        }
         markdown.append("\n");
 
+        appendHudFrameBreakdown(markdown, snapshot);
         appendSectionTable(markdown, "Top Sections By Total Time", sectionsByTotal.stream().limit(30).toList());
         appendSectionTable(markdown, "Top Sections By Self Time", sectionsBySelf.stream().limit(30).toList());
         appendSectionTable(markdown, "Largest Max Spikes", sectionsBySpike.stream().limit(20).toList());
@@ -373,6 +380,65 @@ public final class ModProfiler {
         markdown.append("- <code>total</code> in counter tables: accumulated work units, not time.\n");
         markdown.append("</details>\n");
         return markdown.toString();
+    }
+
+    /**
+     * HUD-focused, per-frame view. FPS is about cost <em>per frame</em>, not session totals, so every
+     * {@code hud/} / {@code widget/} / {@code ui/} section is normalised by the number of profiled HUD
+     * frames ({@code hud/render} calls) into ms/frame and calls/frame — the numbers that actually map to
+     * a frame budget (~16.7 ms at 60 fps).
+     */
+    private void appendHudFrameBreakdown(StringBuilder markdown, ReportSnapshot snapshot) {
+        markdown.append("## HUD Render Breakdown (per frame)\n\n");
+
+        SectionView hudRender = findSection(snapshot, "hud/render");
+        long frames = hudRender != null ? hudRender.calls() : 0L;
+        if (frames <= 0L) {
+            markdown.append("> No <code>hud/render</code> frames recorded — profile while the in-game HUD is visible.\n\n");
+            return;
+        }
+
+        List<SectionView> hudSections = snapshot.sections().stream()
+                .filter(ModProfiler::isHudSection)
+                .sorted(Comparator.comparingLong(SectionView::totalNanos).reversed())
+                .limit(40)
+                .toList();
+        if (hudSections.isEmpty()) {
+            markdown.append("> No HUD sections captured.\n\n");
+            return;
+        }
+
+        markdown.append("Recorded HUD frames: <code>").append(frames)
+                .append("</code> · avg <code>hud/render</code>: <code>").append(formatMillis(hudRender.avgNanos()))
+                .append(" ms/frame</code> · worst frame: <code>").append(formatMillis(hudRender.maxNanos()))
+                .append(" ms</code> · frame budget @60fps: <code>16.667 ms</code>.\n\n");
+
+        markdown.append("| Section | Calls/frame | ms/frame | Avg ms | Max ms | Total ms | Share |\n");
+        markdown.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+        for (SectionView section : hudSections) {
+            double msPerFrame = nanosToMillis(section.totalNanos()) / frames;
+            double callsPerFrame = section.calls() / (double) frames;
+            markdown.append("| <code>").append(escapePipe(section.name())).append("</code> | ")
+                    .append(String.format(Locale.ROOT, "%.1f", callsPerFrame)).append(" | ")
+                    .append(String.format(Locale.ROOT, "%.3f", msPerFrame)).append(" | ")
+                    .append(formatMillis(section.avgNanos())).append(" | ")
+                    .append(formatMillis(section.maxNanos())).append(" | ")
+                    .append(formatMillis(section.totalNanos())).append(" | ")
+                    .append(String.format(Locale.ROOT, "%.1f%%", section.sharePercent())).append(" |\n");
+        }
+        markdown.append("\n");
+    }
+
+    private static boolean isHudSection(SectionView section) {
+        String name = section.name();
+        return name.startsWith("hud/") || name.startsWith("widget/") || name.startsWith("ui/");
+    }
+
+    private SectionView findSection(ReportSnapshot snapshot, String name) {
+        return snapshot.sections().stream()
+                .filter(section -> section.name().equals(name))
+                .findFirst()
+                .orElse(null);
     }
 
     private void appendSectionTable(StringBuilder markdown, String title, List<SectionView> sections) {

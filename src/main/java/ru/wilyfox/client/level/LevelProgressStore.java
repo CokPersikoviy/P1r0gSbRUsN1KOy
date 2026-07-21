@@ -10,18 +10,20 @@ public final class LevelProgressStore {
     private volatile boolean hasCurrentData;
     private volatile boolean hasRequirementData;
 
-    public void updateCurrent(int level, int blocks, double money) {
-        int sanitizedLevel = Math.max(0, level);
-        int sanitizedBlocks = Math.max(0, blocks);
-        double sanitizedMoney = Math.max(0.0D, money);
-
-        if (hasCurrentData && sanitizedLevel == 0 && sanitizedBlocks == 0 && sanitizedMoney == 0.0D) {
+    public void updateCurrent(Integer level, Integer blocks, Double money) {
+        if (level == null && blocks == null && money == null) {
             return;
         }
 
-        this.level = sanitizedLevel;
-        this.blocks = sanitizedBlocks;
-        this.money = sanitizedMoney;
+        if (level != null) {
+            this.level = Math.max(0, level);
+        }
+        if (blocks != null) {
+            this.blocks = Math.max(0, blocks);
+        }
+        if (money != null) {
+            this.money = Math.max(0.0D, money);
+        }
         this.hasCurrentData = true;
     }
 

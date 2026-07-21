@@ -58,8 +58,7 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        context.fill(0, 0, panelWidth, panelHeight, WidgetTheme.WIDGET_PANEL_BG);
-        context.fill(0, 0, panelWidth, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPanel(context, panelWidth, panelHeight);
 
         renderHeader(context, mc, snapshot, panelWidth);
         renderEdges(context, snapshot, layout);

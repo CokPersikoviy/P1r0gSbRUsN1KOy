@@ -1,6 +1,7 @@
 package ru.wilyfox.client.protocol;
 
 import net.minecraft.network.chat.Component;
+import ru.wilyfox.boss.BossIconInfo;
 import ru.wilyfox.boss.BossRepository;
 import ru.wilyfox.client.ability.AbilityCooldownStore;
 import ru.wilyfox.client.boss.BossDamageStore;
@@ -12,11 +13,15 @@ import ru.wilyfox.client.pet.ActivePetsStore;
 import ru.wilyfox.client.potion.PotionStore;
 import ru.wilyfox.client.rune.ActiveRunesStore;
 import ru.wilyfox.client.seller.SellerCooldownStore;
+import ru.wilyfox.client.wand.WandCooldownTracker;
 
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class DiamondWorldProtocolClient {
     private static final Set<String> MANUAL_FISHING_LOCATION_IDS = Set.of(
@@ -86,6 +91,10 @@ public final class DiamondWorldProtocolClient {
         STATE.boosterStore = store;
     }
 
+    public static void bindWandCooldownTracker(WandCooldownTracker tracker) {
+        STATE.wandCooldownTracker = tracker;
+    }
+
     public static String getCurrentServerDisplayName(Component footer) {
         if (STATE.currentServerInfo != null && STATE.currentServerInfo.isKnown()) {
             return STATE.currentServerInfo.displayName();
@@ -109,6 +118,16 @@ public final class DiamondWorldProtocolClient {
         return STATE.currentGameEvent != null ? STATE.currentGameEvent : DwGameEvent.NONE;
     }
 
+    /** The local player's current DiamondWorld level (0 if not known yet). */
+    public static int getCurrentLevel() {
+        return STATE.levelProgressStore != null ? STATE.levelProgressStore.getSnapshot().level() : 0;
+    }
+
+    /** The local player's active ability cooldowns (empty if none/unavailable). */
+    public static java.util.List<AbilityCooldownStore.Entry> getAbilityCooldowns() {
+        return STATE.abilityCooldownStore != null ? STATE.abilityCooldownStore.getActiveEntries() : java.util.List.of();
+    }
+
     public static boolean isMythicalEventActive() {
         return getCurrentGameEvent() == DwGameEvent.MYTHICAL_EVENT;
     }
@@ -125,6 +144,55 @@ public final class DiamondWorldProtocolClient {
         }
 
         return false;
+    }
+
+    /**
+     * Optimistically refresh the active-runes HUD from the currently open rune bag. The bag inventory
+     * syncs faster than the activerunes packet (which can lag seconds under server load), so this
+     * removes the "old set lingers a few seconds after switching" freeze. Accepts an empty list (a
+     * genuinely emptied set) — callers gate this on {@code RuneSetEffectOverlay.isRuneBagLoaded}.
+     */
+    public static void updateActiveRunesFromBag(List<String> runes) {
+        if (STATE.activeRunesStore != null) {
+            STATE.activeRunesStore.replace(runes);
+        }
+    }
+
+    /** Boss ids inside a clan-info "bosses" JSON array, e.g. ["heraldOfHell","brutalPiglin"]. */
+    private static final Pattern CAPTURED_BOSS_ID = Pattern.compile("\"([^\"]+)\"");
+    // Parse result cache: the claninfo "bosses" string only changes ~every couple of minutes, but this
+    // used to regex-parse + allocate a fresh Set on EVERY call — and BossHudWidget calls it per boss per
+    // measurement per frame. Cache the parsed set, keyed on the raw string, and reuse the instance.
+    private static String cachedCapturedBossesRaw;
+    private static Set<Integer> cachedCapturedLevels = Set.of();
+
+    /**
+     * Levels of the bosses the player's clan currently holds ("captured") — parsed from the claninfo
+     * {@code bosses} list and mapped through {@link DwBossType}. A held boss is being captured / its
+     * location is occupied. Empty if not in a clan or nothing is held. Returned set is shared/read-only.
+     */
+    public static Set<Integer> getCapturedBossLevels() {
+        String bosses = STATE.clanInfo.get("bosses");
+        if (bosses == null || bosses.isBlank()) {
+            cachedCapturedBossesRaw = bosses;
+            cachedCapturedLevels = Set.of();
+            return cachedCapturedLevels;
+        }
+        if (bosses.equals(cachedCapturedBossesRaw)) {
+            return cachedCapturedLevels; // clan data unchanged since last parse — reuse
+        }
+
+        Set<Integer> levels = new HashSet<>();
+        Matcher matcher = CAPTURED_BOSS_ID.matcher(bosses);
+        while (matcher.find()) {
+            DwBossType type = STATE.bossTypes.get(matcher.group(1));
+            if (type != null) {
+                levels.add(type.level());
+            }
+        }
+        cachedCapturedBossesRaw = bosses;
+        cachedCapturedLevels = levels.isEmpty() ? Set.of() : levels;
+        return cachedCapturedLevels;
     }
 
     public static String getCurrentGameLocation() {
@@ -191,6 +259,35 @@ public final class DiamondWorldProtocolClient {
         for (DwBossType type : STATE.bossTypes.values()) {
             if (type.level() == level) {
                 return type.name();
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Highest boss level reported by the server via {@code bosstypes}, or 0 if none seen yet.
+     * Lets the level filter/slider ceiling extend automatically when new high-level bosses are added.
+     */
+    public static int getHighestKnownBossLevel() {
+        int highest = 0;
+        for (DwBossType type : STATE.bossTypes.values()) {
+            if (type.level() > highest) {
+                highest = type.level();
+            }
+        }
+
+        return highest;
+    }
+
+    public static BossIconInfo getBossIconByLevel(int level) {
+        if (level <= 0) {
+            return null;
+        }
+
+        for (DwBossType type : STATE.bossTypes.values()) {
+            if (type.level() == level && type.material() != null && !type.material().isBlank()) {
+                return new BossIconInfo(type.material(), type.customModelData());
             }
         }
 

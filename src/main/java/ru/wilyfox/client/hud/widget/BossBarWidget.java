@@ -112,8 +112,7 @@ public class BossBarWidget extends AbstractWidget {
         context.pose().translate(startX, startY, 0);
         context.pose().scale(getScale(), getScale(), 1.0f);
 
-        context.fill(0, 0, EMPTY_WIDTH, EMPTY_HEIGHT, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(0, 0, EMPTY_WIDTH, 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         context.drawString(Minecraft.getInstance().font, "Boss Bar", 6, 2, WidgetTheme.TITLE);
 
         context.pose().popPose();

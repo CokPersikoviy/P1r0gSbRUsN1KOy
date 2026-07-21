@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.ThemePreset;
+import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 public final class ThemePresetSettingsComponent extends SettingsComponent {
@@ -24,7 +25,7 @@ public final class ThemePresetSettingsComponent extends SettingsComponent {
         int textColor = selected ? WidgetTheme.TITLE : (hovered ? WidgetTheme.TEXT_SOFT : WidgetTheme.TEXT_PRIMARY);
         int chipBg = selected ? WidgetTheme.PANEL_BG : WidgetTheme.BAR_BG;
 
-        context.fill(x, y, x + width, y + height, rowBg);
+        HudSurface.fillRounded(context, x, y, width, height, 4, rowBg);
 
         int textY = y + (height - mc.font.lineHeight) / 2;
         int squareSize = 10;
