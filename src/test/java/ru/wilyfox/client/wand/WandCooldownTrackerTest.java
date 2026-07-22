@@ -105,6 +105,22 @@ class WandCooldownTrackerTest {
     }
 
     @Test
+    void numericModeKeepsStaffVisibleThroughFinalSecond() {
+        AtomicLong now = new AtomicLong(45_000L);
+        WandCooldownTracker tracker = new WandCooldownTracker(now::get);
+        tracker.replaceTypes(Map.of(1, "Посох силы"), Map.of(1, 1));
+        tracker.replaceProtocol(Map.of(1, 5_000L));
+
+        now.addAndGet(4_000L);
+        assertFalse(tracker.hasActiveEntries());
+        assertTrue(tracker.hasActiveEntries(true));
+        assertEquals(1, tracker.getActiveEntries(true).size());
+
+        now.addAndGet(1_000L);
+        assertFalse(tracker.hasActiveEntries(true));
+    }
+
+    @Test
     void serverRefreshReplacesDeadlineExactly() {
         AtomicLong now = new AtomicLong(50_000L);
         WandCooldownTracker tracker = new WandCooldownTracker(now::get);
@@ -118,8 +134,9 @@ class WandCooldownTrackerTest {
     }
 
     @Test
-    void recognizesOnlyBothConfiguredWindVariantsForLocalTracking() {
+    void recognizesWindVariantsAndHarpyAliasForLocalTracking() {
         assertTrue(WandCooldownTracker.isWindStaffName("Посох ветра"));
+        assertTrue(WandCooldownTracker.isWindStaffName("Величие гарпии"));
         assertTrue(WandCooldownTracker.isWindStaffName("Посох вихря"));
         assertTrue(WandCooldownTracker.isWindStaffName("Посох вихря Пробужденный"));
         assertFalse(WandCooldownTracker.isWindStaffName("Посох силы"));

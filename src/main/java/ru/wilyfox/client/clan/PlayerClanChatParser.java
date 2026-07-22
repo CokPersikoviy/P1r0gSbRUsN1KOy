@@ -1,6 +1,7 @@
 package ru.wilyfox.client.clan;
 
 import net.minecraft.network.chat.Component;
+import ru.wilyfox.client.chat.ChatMessageSanitizer;
 import ru.wilyfox.client.chat.ChatTimestampFormatter;
 import ru.wilyfox.utils.Formatting;
 
@@ -43,7 +44,7 @@ public final class PlayerClanChatParser {
         }
 
         String text = Formatting.stripMinecraftFormatting(component.getString()).replace(' ', ' ').trim();
-        text = stripAllTimestampPrefixes(text);
+        text = stripAllTimestampPrefixes(ChatMessageSanitizer.forLogic(text));
 
         int colonIndex = text.indexOf(':');
         if (colonIndex < 0) {
@@ -58,6 +59,8 @@ public final class PlayerClanChatParser {
         if (rawText == null || rawText.isBlank()) {
             return null;
         }
+
+        rawText = ChatMessageSanitizer.forLogic(rawText);
 
         String text = Formatting.stripMinecraftFormatting(rawText).replace('\u00A0', ' ').trim();
         text = stripAllTimestampPrefixes(text);

@@ -18,6 +18,10 @@ public final class ChatMessageCopyExtractor {
     }
 
     public static boolean copyHoveredMessage(ChatComponent chat, double mouseX, double mouseY) {
+        return copyHoveredMessage(chat, mouseX, mouseY, false);
+    }
+
+    public static boolean copyHoveredMessage(ChatComponent chat, double mouseX, double mouseY, boolean fullMessage) {
         if (!(chat instanceof ChatComponentAccessor accessor)) {
             return false;
         }
@@ -37,7 +41,8 @@ public final class ChatMessageCopyExtractor {
 
         List<GuiMessage.Line> messageParts = collectMessageParts(visibleMessages, index);
 
-        String copied = normalizeCopiedText(collectPlainText(messageParts));
+        String displayedText = ChatMessageSanitizer.forLogic(collectPlainText(messageParts));
+        String copied = selectCopiedText(displayedText, fullMessage);
         if (copied.isBlank()) {
             return false;
         }
@@ -75,6 +80,13 @@ public final class ChatMessageCopyExtractor {
             });
         }
         return builder.toString();
+    }
+
+    static String selectCopiedText(String displayedText, boolean fullMessage) {
+        if (fullMessage) {
+            return displayedText == null ? "" : displayedText;
+        }
+        return normalizeCopiedText(displayedText);
     }
 
     private static String normalizeCopiedText(String raw) {

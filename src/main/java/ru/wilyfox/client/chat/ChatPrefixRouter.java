@@ -20,7 +20,7 @@ public final class ChatPrefixRouter {
             return ChatTab.ALL;
         }
 
-        String text = Formatting.stripMinecraftFormatting(raw).replace('\u00A0', ' ');
+        String text = Formatting.stripMinecraftFormatting(ChatMessageSanitizer.forLogic(raw)).replace('\u00A0', ' ');
         text = ChatTimestampFormatter.stripTimestampPrefix(text).stripLeading();
 
         for (ChatTab tab : ChatTab.values()) {
@@ -46,7 +46,7 @@ public final class ChatPrefixRouter {
     }
 
     public static String stripKnownPrefix(String text, ChatTab tab) {
-        String clean = ChatTimestampFormatter.stripTimestampPrefix(text).stripLeading();
+        String clean = ChatTimestampFormatter.stripTimestampPrefix(ChatMessageSanitizer.forLogic(text)).stripLeading();
 
         for (String candidate : tab.getResolvePrefixes()) {
             if (candidate.isEmpty()) {

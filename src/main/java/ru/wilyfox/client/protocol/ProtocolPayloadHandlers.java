@@ -2,6 +2,7 @@ package ru.wilyfox.client.protocol;
 
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import ru.wilyfox.boss.BossInfo;
 import ru.wilyfox.client.boss.BossDamageInfo;
 import ru.wilyfox.client.miner.ActiveMinerInfo;
 import ru.wilyfox.client.pet.ActivePetInfo;
@@ -74,6 +75,7 @@ final class ProtocolPayloadHandlers {
             state.bossTypes = new LinkedHashMap<>(packet.types());
             state.capturedBossLevels = DwClanBossResolver.resolveLevels(state.clanInfo, state.bossTypes);
             if (state.bossRepository != null) {
+                state.bossRepository.clearProtocolMetadata();
                 packet.types().forEach((id, type) ->
                         state.bossRepository.updateProtocolMetadata(id, type.name(), type.level()));
             }
@@ -949,6 +951,7 @@ final class ProtocolPayloadHandlers {
         }
 
         long now = System.currentTimeMillis();
+        Map<String, BossInfo> snapshot = new LinkedHashMap<>();
 
         for (Map.Entry<String, Long> entry : packet.timers().entrySet()) {
             String bossId = entry.getKey();
@@ -961,8 +964,10 @@ final class ProtocolPayloadHandlers {
                 level = type.level();
             }
 
-            state.bossRepository.upsertProtocol(bossId, bossName, now + entry.getValue(), level);
+            snapshot.put(bossId, new BossInfo(bossName, now + entry.getValue(), level));
         }
+
+        state.bossRepository.replaceProtocol(snapshot);
     }
 
 }

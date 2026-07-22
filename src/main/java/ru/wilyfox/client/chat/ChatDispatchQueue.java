@@ -77,6 +77,20 @@ public final class ChatDispatchQueue {
         enqueue(MessageType.COMMAND, command, delayMs);
     }
 
+    public static void removeQueuedCommandsContaining(String fragment) {
+        if (fragment == null || fragment.isEmpty()) {
+            return;
+        }
+
+        QUEUE.removeIf(message -> message.type() == MessageType.COMMAND && message.content().contains(fragment));
+        if (lastAttemptedMessage != null
+                && lastAttemptedMessage.type() == MessageType.COMMAND
+                && lastAttemptedMessage.content().contains(fragment)) {
+            lastAttemptedMessage = null;
+            lastAttemptedAt = 0L;
+        }
+    }
+
     public static void handleIncomingMessage(Component component) {
         if (component == null) {
             return;

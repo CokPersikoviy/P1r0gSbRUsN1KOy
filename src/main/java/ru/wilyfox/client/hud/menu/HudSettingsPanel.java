@@ -17,6 +17,7 @@ import ru.wilyfox.client.hud.config.ThemePreset;
 import ru.wilyfox.client.hud.config.WidgetChrome;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
+import ru.wilyfox.client.moduser.ModUserProtocol;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import ru.wilyfox.client.quickaccess.QuickAccessScreen;
 
@@ -1077,9 +1078,9 @@ public class HudSettingsPanel {
         componentsByCategory.get(SettingsCategory.RENDER).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
-                        "FrogHelper Mesh Sync (PM)",
+                        "Socials",
                         () -> ConfigManager.get().render.modUserMesh,
-                        value -> ConfigManager.get().render.modUserMesh = value
+                        ModUserProtocol::setSocialsEnabled
                 )
         );
         componentsByCategory.get(SettingsCategory.RENDER).add(
@@ -1175,6 +1176,14 @@ public class HudSettingsPanel {
                         () -> ConfigManager.get().render.copyChatMessages,
                         value -> ConfigManager.get().render.copyChatMessages = value
                 )
+        );
+        componentsByCategory.get(SettingsCategory.RENDER).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Full Message Copy",
+                        () -> ConfigManager.get().render.fullMessageCopy,
+                        value -> ConfigManager.get().render.fullMessageCopy = value
+                ).withVisibility(() -> ConfigManager.get().render.copyChatMessages)
         );
         componentsByCategory.get(SettingsCategory.RENDER).add(
                 new StepperSettingsComponent(
@@ -1434,6 +1443,14 @@ public class HudSettingsPanel {
                         () -> ConfigManager.get().wandCooldown.active,
                         value -> ConfigManager.get().wandCooldown.active = value
                 )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Numeric Cooldown",
+                        () -> ConfigManager.get().wandCooldown.numericCooldown,
+                        value -> ConfigManager.get().wandCooldown.numericCooldown = value
+                ).withVisibility(() -> ConfigManager.get().wandCooldown.active)
         );
         componentsByCategory.get(SettingsCategory.WIDGET).add(
                 new ToggleSettingsComponent(

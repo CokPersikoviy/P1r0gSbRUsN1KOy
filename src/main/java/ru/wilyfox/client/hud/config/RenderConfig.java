@@ -9,9 +9,10 @@ public class RenderConfig {
     public boolean hideFireOverlay = false;
     public boolean hideFirstPersonCosmetics = true;
     public boolean modUserBadge = true;                       // frog badge on FrogHelper users' nametags
-    public boolean modUserMesh = true;                        // silent PM mesh: pair + sync known-user lists
+    public boolean modUserMesh = true;                        // Socials: outgoing beacon + PM mesh participation
     public boolean toneDownChat = false;
     public boolean copyChatMessages = true;
+    public boolean fullMessageCopy = false;
     public boolean chatTimestamps = true;
     public int extraChatHistoryLines = 200;
     public boolean autoThanks = true;

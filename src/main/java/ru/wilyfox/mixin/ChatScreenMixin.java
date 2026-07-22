@@ -12,10 +12,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.wilyfox.client.Client;
 import ru.wilyfox.client.chat.BossShareService;
-import ru.wilyfox.client.moduser.ModUserStorage;
 import ru.wilyfox.client.chat.ChatMessageCopyExtractor;
 import ru.wilyfox.client.chat.ChatTabOverlay;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.moduser.ModUserMarker;
+import ru.wilyfox.client.moduser.ModUserProtocol;
 import ru.wilyfox.client.profiler.ProfilerDebugCommand;
 import ru.wilyfox.client.protocol.ProtocolDebugCommand;
 
@@ -49,7 +50,12 @@ public abstract class ChatScreenMixin extends Screen {
             return;
         }
 
-        if (ChatMessageCopyExtractor.copyHoveredMessage(this.minecraft.gui.getChat(), mouseX, mouseY)) {
+        if (ChatMessageCopyExtractor.copyHoveredMessage(
+                this.minecraft.gui.getChat(),
+                mouseX,
+                mouseY,
+                ConfigManager.get().render.fullMessageCopy
+        )) {
             cir.setReturnValue(true);
         }
     }
@@ -62,14 +68,7 @@ public abstract class ChatScreenMixin extends Screen {
     // stripped from chat display for mod users.
     @ModifyVariable(method = "handleChatInput", at = @At("HEAD"), argsOnly = true, ordinal = 0)
     private String froghelper$injectModMarker(String input) {
-        if (input == null || input.isBlank() || input.startsWith("/")
-                || input.contains(ModUserStorage.MARKER) || input.contains("{fh")) {
-            return input;
-        }
-        if (input.length() + ModUserStorage.MARKER.length() > 256) {
-            return input;
-        }
-        return input + ModUserStorage.MARKER;
+        return ModUserMarker.appendToOutgoing(input, ModUserProtocol.isSocialsEnabled());
     }
 
     @Inject(method = "handleChatInput", at = @At("HEAD"), cancellable = true)

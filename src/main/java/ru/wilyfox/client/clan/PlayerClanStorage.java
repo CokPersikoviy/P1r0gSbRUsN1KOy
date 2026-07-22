@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.chat.Component;
-import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -19,7 +18,6 @@ import static ru.wilyfox.client.debug.DebugLogger.error;
 
 public final class PlayerClanStorage {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path STORAGE_PATH = FabricLoader.getInstance().getConfigDir().resolve("froghelper-player-clans.json");
     private static final Map<String, PlayerClanEntry> ENTRIES = new LinkedHashMap<>();
 
     private static boolean loaded;
@@ -46,11 +44,6 @@ public final class PlayerClanStorage {
             return null;
         }
 
-        String protocolClan = DiamondWorldProtocolClient.getCurrentClanNameForMember(playerName);
-        if (protocolClan != null) {
-            return protocolClan;
-        }
-
         ensureLoaded();
         PlayerClanEntry entry = ENTRIES.get(normalized);
         if (entry == null || entry.clanName == null || entry.clanName.isBlank()) {
@@ -68,21 +61,38 @@ public final class PlayerClanStorage {
         }
 
         ensureLoaded();
+        if (!updateEntry(ENTRIES, cleanName, clanName, System.currentTimeMillis())) {
+            return;
+        }
+        save();
+    }
+
+    static boolean updateEntry(
+            Map<String, PlayerClanEntry> entries,
+            String playerName,
+            String clanName,
+            long updatedAt
+    ) {
+        String cleanName = cleanPlayerName(playerName);
+        String normalized = normalize(cleanName);
+        if (normalized == null) {
+            return false;
+        }
 
         String cleanClan = cleanClan(clanName);
-        PlayerClanEntry existing = ENTRIES.get(normalized);
+        PlayerClanEntry existing = entries.get(normalized);
         if (existing != null
                 && equalsNullable(existing.playerName, cleanName)
                 && equalsNullable(existing.clanName, cleanClan)) {
-            return;
+            return false;
         }
 
         PlayerClanEntry entry = existing != null ? existing : new PlayerClanEntry();
         entry.playerName = cleanName;
         entry.clanName = cleanClan;
-        entry.updatedAt = System.currentTimeMillis();
-        ENTRIES.put(normalized, entry);
-        save();
+        entry.updatedAt = updatedAt;
+        entries.put(normalized, entry);
+        return true;
     }
 
     private static void ensureLoaded() {
@@ -93,11 +103,12 @@ public final class PlayerClanStorage {
         loaded = true;
         ENTRIES.clear();
 
-        if (!Files.exists(STORAGE_PATH)) {
+        Path storagePath = storagePath();
+        if (!Files.exists(storagePath)) {
             return;
         }
 
-        try (Reader reader = Files.newBufferedReader(STORAGE_PATH)) {
+        try (Reader reader = Files.newBufferedReader(storagePath)) {
             PlayerClanStorageFile file = GSON.fromJson(reader, PlayerClanStorageFile.class);
             if (file == null || file.entries == null) {
                 return;
@@ -118,25 +129,30 @@ public final class PlayerClanStorage {
                 ENTRIES.put(normalized, sanitized);
             }
         } catch (Exception exception) {
-            error(LOGGER, "Failed to load FrogHelper clan storage from {}", STORAGE_PATH, exception);
+            error(LOGGER, "Failed to load FrogHelper clan storage from {}", storagePath, exception);
         }
     }
 
     private static void save() {
+        Path storagePath = storagePath();
         try {
-            Files.createDirectories(STORAGE_PATH.getParent());
+            Files.createDirectories(storagePath.getParent());
 
             PlayerClanStorageFile file = new PlayerClanStorageFile();
             for (Map.Entry<String, PlayerClanEntry> entry : ENTRIES.entrySet()) {
                 file.entries.put(entry.getKey(), entry.getValue());
             }
 
-            try (Writer writer = Files.newBufferedWriter(STORAGE_PATH)) {
+            try (Writer writer = Files.newBufferedWriter(storagePath)) {
                 GSON.toJson(file, writer);
             }
         } catch (Exception exception) {
-            error(LOGGER, "Failed to save FrogHelper clan storage to {}", STORAGE_PATH, exception);
+            error(LOGGER, "Failed to save FrogHelper clan storage to {}", storagePath, exception);
         }
+    }
+
+    private static Path storagePath() {
+        return FabricLoader.getInstance().getConfigDir().resolve("froghelper-player-clans.json");
     }
 
     private static boolean equalsNullable(String left, String right) {

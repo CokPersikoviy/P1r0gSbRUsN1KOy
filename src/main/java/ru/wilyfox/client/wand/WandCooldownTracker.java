@@ -29,6 +29,7 @@ public final class WandCooldownTracker {
 
     // DiamondWorld's awakened wind staff is named "Посох вихря" in the item/type registry.
     private static final String WIND_STAFF_NAME = "Посох ветра";
+    private static final String WIND_STAFF_LOCAL_ALIAS = "Величие гарпии";
     private static final String AWAKENED_WIND_STAFF_NAME = "Посох вихря";
 
     private final Map<Integer, CooldownState> protocolEntries = new LinkedHashMap<>();
@@ -105,7 +106,7 @@ public final class WandCooldownTracker {
         }
 
         String itemName = stack.getHoverName().getString().trim();
-        WindStaffVariant variant = WindStaffVariant.fromName(itemName);
+        WindStaffVariant variant = WindStaffVariant.fromLocalName(itemName);
         if (variant == null) {
             return;
         }
@@ -130,6 +131,10 @@ public final class WandCooldownTracker {
     }
 
     public List<WandCooldownEntry> getActiveEntries() {
+        return getActiveEntries(false);
+    }
+
+    public List<WandCooldownEntry> getActiveEntries(boolean includeFinalSecond) {
         long now = clock.getAsLong();
         cleanupElapsed(now);
 
@@ -138,7 +143,7 @@ public final class WandCooldownTracker {
 
         for (Map.Entry<Integer, CooldownState> entry : protocolEntries.entrySet()) {
             CooldownState window = entry.getValue();
-            if (!isVisibleStaffWindow(window, now)) {
+            if (!isVisibleStaffWindow(window, now, includeFinalSecond)) {
                 continue;
             }
 
@@ -168,7 +173,7 @@ public final class WandCooldownTracker {
         for (Map.Entry<WindStaffVariant, LocalWindCooldown> entry : localWindEntries.entrySet()) {
             WindStaffVariant variant = entry.getKey();
             LocalWindCooldown local = entry.getValue();
-            if (!isVisibleStaffWindow(local.window(), now)) {
+            if (!isVisibleStaffWindow(local.window(), now, includeFinalSecond)) {
                 continue;
             }
 
@@ -201,20 +206,24 @@ public final class WandCooldownTracker {
     }
 
     public boolean hasActiveEntries() {
+        return hasActiveEntries(false);
+    }
+
+    public boolean hasActiveEntries(boolean includeFinalSecond) {
         long now = clock.getAsLong();
         cleanupElapsed(now);
 
         boolean hasProtocol = protocolEntries.entrySet().stream().anyMatch(entry ->
-                staffTypes.containsKey(entry.getKey()) && isVisibleStaffWindow(entry.getValue(), now)
+                staffTypes.containsKey(entry.getKey()) && isVisibleStaffWindow(entry.getValue(), now, includeFinalSecond)
         );
         boolean hasLocalWind = localWindEntries.values().stream().anyMatch(entry ->
-                isVisibleStaffWindow(entry.window(), now)
+                isVisibleStaffWindow(entry.window(), now, includeFinalSecond)
         );
         return hasProtocol || hasLocalWind || !specialEntries.isEmpty();
     }
 
     public static boolean isWindStaffName(String name) {
-        return WindStaffVariant.fromName(name) != null;
+        return WindStaffVariant.fromLocalName(name) != null;
     }
 
     public void clear() {
@@ -257,8 +266,9 @@ public final class WandCooldownTracker {
         return new CooldownState(startedAt, now + remainingMillis, duration);
     }
 
-    private static boolean isVisibleStaffWindow(CooldownState window, long now) {
-        return window.endsAt() - now > READY_WINDOW_MILLIS;
+    private static boolean isVisibleStaffWindow(CooldownState window, long now, boolean includeFinalSecond) {
+        long remaining = window.endsAt() - now;
+        return remaining > (includeFinalSecond ? 0L : READY_WINDOW_MILLIS);
     }
 
     private static WandCooldownEntry toLocalEntry(WindStaffVariant variant, LocalWindCooldown local) {
@@ -313,6 +323,14 @@ public final class WandCooldownTracker {
                 }
             }
             return null;
+        }
+
+        static WindStaffVariant fromLocalName(String name) {
+            String normalized = normalizeStaffName(name);
+            if (normalizeStaffName(WIND_STAFF_LOCAL_ALIAS).equals(normalized)) {
+                return WIND;
+            }
+            return fromName(normalized);
         }
 
         String entryKey() {

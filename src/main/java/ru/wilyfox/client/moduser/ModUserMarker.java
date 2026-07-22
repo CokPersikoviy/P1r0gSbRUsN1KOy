@@ -14,6 +14,21 @@ public final class ModUserMarker {
     private ModUserMarker() {
     }
 
+    public static String strip(String text) {
+        return text == null ? "" : text.replace(ModUserStorage.MARKER, "");
+    }
+
+    public static String appendToOutgoing(String input, boolean socialsEnabled) {
+        if (!socialsEnabled || input == null || input.isBlank() || input.startsWith("/")
+                || input.contains(ModUserStorage.MARKER) || input.contains("{fh")) {
+            return input;
+        }
+        if (input.length() + ModUserStorage.MARKER.length() > 256) {
+            return input;
+        }
+        return input + ModUserStorage.MARKER;
+    }
+
     public static Component strip(Component component) {
         if (component == null) {
             return Component.empty();
@@ -28,7 +43,7 @@ public final class ModUserMarker {
         ComponentContents contents = node.getContents();
         MutableComponent out;
         if (contents instanceof PlainTextContents.LiteralContents literal) {
-            out = Component.literal(literal.text().replace(ModUserStorage.MARKER, ""));
+            out = Component.literal(strip(literal.text()));
         } else {
             out = MutableComponent.create(contents);
         }

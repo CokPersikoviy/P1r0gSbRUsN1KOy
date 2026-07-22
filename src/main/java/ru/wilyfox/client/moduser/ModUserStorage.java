@@ -90,7 +90,7 @@ public final class ModUserStorage {
                 info(LOGGER, "FrogHelper mod user detected: {}", name);
                 save();
             }
-            ModUserProtocol.onModUserSeen(name); // silent PM pairing + list sync (no-op if mesh disabled)
+            ModUserProtocol.onModUserSeen(name); // silent PM pairing + list sync (no-op if Socials is disabled)
             return;
         }
 

@@ -15,6 +15,7 @@ import ru.wilyfox.client.chat.BoosterChatDebug;
 import ru.wilyfox.client.chat.BossShareService;
 import ru.wilyfox.client.chat.ChatDispatchQueue;
 import ru.wilyfox.client.chat.ChatMessageDecorator;
+import ru.wilyfox.client.chat.ChatMessageSanitizer;
 import ru.wilyfox.client.chat.ChatTabManager;
 import ru.wilyfox.client.chat.HigherBitingNotifier;
 import ru.wilyfox.client.chat.PrivateMessagePopUpNotifier;
@@ -27,42 +28,45 @@ import ru.wilyfox.client.moduser.ModUserProtocol;
 public class ChatHudMixin {
     @ModifyVariable(method = "addMessage(Lnet/minecraft/network/chat/Component;)V", at = @At("HEAD"), argsOnly = true)
     private Component froghelper$decorateChat(Component component) {
-        HigherBitingNotifier.onIncomingMessage(component);
+        if (!ChatTabManager.getInstance().isRebuilding()) {
+            HigherBitingNotifier.onIncomingMessage(ChatMessageSanitizer.forLogic(component));
+        }
         return ChatMessageDecorator.decorate(component);
     }
 
     @Inject(method = "addMessage(Lnet/minecraft/network/chat/Component;)V", at = @At("HEAD"), cancellable = true)
     private void froghelper$captureSimple(Component component, CallbackInfo ci) {
-        ChatDispatchQueue.handleIncomingMessage(component);
-        BoosterChatDebug.onIncomingMessage(component);
-        AutoThanks.onIncomingMessage(component);
-        AutoBossAnnouncer.onIncomingMessage(component);
-        PrivateMessagePopUpNotifier.onIncomingMessage(component);
-        VisibilityStatusTracker.onIncomingMessage(component);
-        ComboTimerChatTracker.onIncomingMessage(component);
-        PlayerClanStorage.captureFromChat(component);
-        // ModUserStorage.captureFromChat runs in ChatMessageDecorator.decorate (before the Ⓕ beacon is
-        // stripped for display) so detection still sees the raw marker.
-
-        if (BossShareService.handleIncomingShare(component)) {
-            ci.cancel();
-            return;
-        }
-
-        if (ModUserProtocol.handleIncoming(component)) {
-            ci.cancel(); // silent mesh sync PM — hide from chat
-            return;
-        }
-
         ChatTabManager manager = ChatTabManager.getInstance();
-
-        manager.captureIncoming(component);
-
         if (manager.isRebuilding()) {
             return;
         }
 
-        if (!manager.shouldDisplayInActiveTab(component)) {
+        Component logicalComponent = ChatMessageSanitizer.forLogic(component);
+
+        ChatDispatchQueue.handleIncomingMessage(logicalComponent);
+        BoosterChatDebug.onIncomingMessage(logicalComponent);
+        AutoThanks.onIncomingMessage(logicalComponent);
+        AutoBossAnnouncer.onIncomingMessage(logicalComponent);
+        PrivateMessagePopUpNotifier.onIncomingMessage(logicalComponent);
+        VisibilityStatusTracker.onIncomingMessage(logicalComponent);
+        ComboTimerChatTracker.onIncomingMessage(logicalComponent);
+        PlayerClanStorage.captureFromChat(logicalComponent);
+        // ModUserStorage.captureFromChat runs in ChatMessageDecorator.decorate (before the Ⓕ beacon is
+        // stripped for display) so detection still sees the raw marker.
+
+        if (BossShareService.handleIncomingShare(logicalComponent)) {
+            ci.cancel();
+            return;
+        }
+
+        if (ModUserProtocol.handleIncoming(logicalComponent)) {
+            ci.cancel(); // silent mesh sync PM — hide from chat
+            return;
+        }
+
+        manager.captureIncoming(logicalComponent);
+
+        if (!manager.shouldDisplayInActiveTab(logicalComponent)) {
             ci.cancel();
         }
     }

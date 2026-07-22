@@ -35,7 +35,9 @@ public final class ChatMessageDecorator {
         }
 
         // Detect the mod beacon on the RAW line (before we strip it below); this also seeds the mesh.
-        ModUserStorage.captureFromChat(component);
+        if (!ChatTabManager.getInstance().isRebuilding()) {
+            ModUserStorage.captureFromChat(component);
+        }
 
         // Decide the badge from the RAW line's sender (before we prepend a timestamp etc.).
         boolean modUserBadge = ConfigManager.get().render.modUserBadge && isKnownSender(component);
@@ -46,15 +48,83 @@ public final class ChatMessageDecorator {
             result = ChatToneDownFormatter.format(result);
         }
 
+        if (modUserBadge) {
+            result = insertModUserBadge(result);
+        }
+
         if (ConfigManager.get().render.chatTimestamps) {
             result = prependTimestamp(result);
         }
 
-        if (modUserBadge) {
-            result = ModUserBadge.prefix(result);
+        return result;
+    }
+
+    static Component insertModUserBadge(Component component) {
+        String text = ChatMessageSanitizer.forLogic(component.getString());
+        ChatTab tab = ChatPrefixRouter.resolve(text);
+        int insertionIndex = findPrefixEnd(text, tab);
+        return ModUserBadge.insert(component, insertionIndex);
+    }
+
+    private static int findPrefixEnd(String text, ChatTab tab) {
+        if (text == null || text.isEmpty()) {
+            return 0;
         }
 
-        return result;
+        if (tab != ChatTab.ALL) {
+            for (String candidate : tab.getResolvePrefixes()) {
+                int end = matchedPrefixEnd(text, candidate);
+                if (end >= 0) {
+                    return skipWhitespace(text, end);
+                }
+            }
+        }
+
+        int firstWhitespace = firstWhitespace(text);
+        if (firstWhitespace >= 0) {
+            return skipWhitespace(text, firstWhitespace);
+        }
+
+        int colon = text.indexOf(':');
+        return colon >= 0 ? colon + 1 : text.length();
+    }
+
+    private static int matchedPrefixEnd(String text, String candidate) {
+        String bracketed = "[" + candidate + "]";
+        if (text.startsWith(bracketed)) {
+            return bracketed.length();
+        }
+        if (!text.startsWith(candidate)) {
+            return -1;
+        }
+
+        int end = candidate.length();
+        if (end == text.length()) {
+            return end;
+        }
+
+        char next = text.charAt(end);
+        if (next == ':') {
+            return end + 1;
+        }
+        return Character.isWhitespace(next) ? end : -1;
+    }
+
+    private static int firstWhitespace(String text) {
+        for (int index = 0; index < text.length(); index++) {
+            if (Character.isWhitespace(text.charAt(index))) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static int skipWhitespace(String text, int index) {
+        int current = index;
+        while (current < text.length() && Character.isWhitespace(text.charAt(current))) {
+            current++;
+        }
+        return current;
     }
 
     private static boolean isKnownSender(Component component) {

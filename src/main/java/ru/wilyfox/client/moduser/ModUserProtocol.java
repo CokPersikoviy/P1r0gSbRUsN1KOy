@@ -54,12 +54,23 @@ public final class ModUserProtocol {
         });
     }
 
-    private static boolean enabled() {
+    public static boolean isSocialsEnabled() {
         return ConfigManager.get().render.modUserMesh;
     }
 
+    public static synchronized void setSocialsEnabled(boolean enabled) {
+        ConfigManager.get().render.modUserMesh = enabled;
+        if (enabled) {
+            return;
+        }
+
+        PAIRED.clear();
+        ACKED.clear();
+        ChatDispatchQueue.removeQueuedCommandsContaining(TOKEN_PREFIX);
+    }
+
     public static synchronized void onModUserSeen(String name) {
-        if (!enabled() || name == null || name.isBlank() || isSelf(name)) {
+        if (!isSocialsEnabled() || name == null || name.isBlank() || isSelf(name)) {
             return;
         }
         if (!PAIRED.add(name.toLowerCase(Locale.ROOT))) {
@@ -103,18 +114,23 @@ public final class ModUserProtocol {
         boolean haveSender = buffer.sender != null && !buffer.sender.isBlank() && !isSelf(buffer.sender);
         if (haveSender) {
             ModUserStorage.markKnown(buffer.sender);
-            PAIRED.add(buffer.sender.toLowerCase(Locale.ROOT));
+            if (isSocialsEnabled()) {
+                PAIRED.add(buffer.sender.toLowerCase(Locale.ROOT));
+            }
         }
         ModUserStorage.merge(names);
 
-        if (type == TYPE_PAIR && haveSender && ACKED.add(buffer.sender.toLowerCase(Locale.ROOT))) {
+        if (isSocialsEnabled()
+                && type == TYPE_PAIR
+                && haveSender
+                && ACKED.add(buffer.sender.toLowerCase(Locale.ROOT))) {
             send(buffer.sender, TYPE_ACK);
         }
         return true;
     }
 
     private static void send(String target, char type) {
-        if (!enabled()) {
+        if (!isSocialsEnabled()) {
             return;
         }
 
