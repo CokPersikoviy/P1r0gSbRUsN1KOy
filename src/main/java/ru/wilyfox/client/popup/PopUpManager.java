@@ -79,10 +79,13 @@ public final class PopUpManager {
             case PopUpSource.CHAT_COPY -> ConfigManager.get().popUps.chatCopyEvent;
             case PopUpSource.PRIVATE_MESSAGE -> ConfigManager.get().popUps.privateMessageEvent;
             case PopUpSource.BOSS_SPAWN -> ConfigManager.get().popUps.bossSpawnEvent;
+            case PopUpSource.BOSS_CAPTURE -> ConfigManager.get().popUps.bossCaptureEvent;
+            case PopUpSource.GAME_EVENT -> ConfigManager.get().popUps.gameEvent;
             case PopUpSource.ABILITY_READY -> ConfigManager.get().popUps.abilityReadyEvent;
             case PopUpSource.WAND_READY -> ConfigManager.get().popUps.wandReadyEvent;
             case PopUpSource.SELLER_READY -> ConfigManager.get().popUps.sellerReadyEvent;
             case PopUpSource.MINER_RETURNED -> ConfigManager.get().popUps.minerReturnedEvent;
+            case PopUpSource.LEVEL_READY -> ConfigManager.get().popUps.levelReadyEvent;
             case PopUpSource.RUNE_SET_READY -> ConfigManager.get().popUps.runeSetReadyEvent;
             case PopUpSource.POTION_EXPIRED -> ConfigManager.get().popUps.potionExpiredEvent;
             case PopUpSource.BOOSTER_EXPIRED -> ConfigManager.get().popUps.boosterExpiredEvent;

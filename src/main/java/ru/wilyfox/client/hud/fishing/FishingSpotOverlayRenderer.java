@@ -10,6 +10,7 @@ import ru.wilyfox.utils.WorldToScreen;
 
 public final class FishingSpotOverlayRenderer {
     private static final long LIFETIME_MS = 1000L;
+    private static final double HORIZONTAL_FOOTPRINT_SCALE = 3.5D;
 
     private FishingSpotOverlayRenderer() {
     }
@@ -25,7 +26,7 @@ public final class FishingSpotOverlayRenderer {
         long now = System.currentTimeMillis();
 
         for (FishingSpot spot : FishingSpotTracker.getInstance().getActiveSpots()) {
-            Vec3 renderPos = spot.center().add(0.0, 0.08, 0.0);
+            Vec3 renderPos = spot.center();
 
             WorldToScreen.ScreenPoint point = WorldToScreen.project(renderPos);
             if (point == null) {
@@ -60,7 +61,7 @@ public final class FishingSpotOverlayRenderer {
         // ~0-3 блока -> крупнее
         // ~20+ блоков -> компактнее
         float t = (float) Math.max(0.0, Math.min(1.0, (distance - 2.0) / 18.0));
-        return Math.round(25.0f - t * 15.0f); // 13 -> 7
+        return Math.round((float) ((7.0f - t * 4.0f) * HORIZONTAL_FOOTPRINT_SCALE));
     }
 
     private static int getMarkerAlpha(int bubbleCount, long ageMs) {
@@ -84,7 +85,7 @@ public final class FishingSpotOverlayRenderer {
 
     private static int getPulsingMarkerSize(FishingSpot spot, double distance) {
         float t = (float) Math.max(0.0, Math.min(1.0, (distance - 2.0) / 18.0));
-        float baseSize = 25.0f - t * 15.0f;
+        float baseSize = (float) ((7.0f - t * 4.0f) * HORIZONTAL_FOOTPRINT_SCALE);
 
         double time = System.currentTimeMillis() / 1000.0;
         double phase = (spot.center().x + spot.center().z) * 0.8;

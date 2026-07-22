@@ -47,10 +47,15 @@ public class LevelProgressWidget extends AbstractWidget {
         String title = snapshot.maxLevel()
                 ? "Level " + snapshot.level() + " · MAX"
                 : "Level " + snapshot.level();
-        String blocksLine = "Blocks: " + formatInt(snapshot.blocks()) + "/" + formatInt(snapshot.requiredBlocks());
-        String moneyLine = "Money: " + formatMoney(snapshot.money()) + "/" + formatMoney(snapshot.requiredMoney());
+        String blocksLine = snapshot.maxLevel()
+                ? null
+                : "Blocks: " + formatInt(snapshot.blocks()) + "/" + formatInt(snapshot.requiredBlocks());
+        String moneyLine = snapshot.maxLevel()
+                ? null
+                : "Money: " + formatMoney(snapshot.money()) + "/" + formatMoney(snapshot.requiredMoney());
         int width = getUnscaledWidth(mc, title, blocksLine, moneyLine);
-        int height = getUnscaledHeight(mc);
+        boolean showBar = !snapshot.maxLevel() && ConfigManager.get().levelProgress.showBar;
+        int height = getUnscaledHeight(mc, snapshot.maxLevel(), showBar);
         int blocksColor = snapshot.blocks() >= snapshot.requiredBlocks() ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_SECONDARY;
         int moneyColor = snapshot.money() >= snapshot.requiredMoney() ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_SECONDARY;
 
@@ -60,12 +65,16 @@ public class LevelProgressWidget extends AbstractWidget {
 
         HudSurface.drawPanel(context, width, height);
         context.drawString(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
-        context.drawString(mc.font, blocksLine, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, blocksColor);
-        context.drawString(mc.font, moneyLine, PADDING_X, PADDING_Y + (mc.font.lineHeight + 2) * 2, moneyColor);
+        if (!snapshot.maxLevel()) {
+            context.drawString(mc.font, blocksLine, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, blocksColor);
+            context.drawString(mc.font, moneyLine, PADDING_X, PADDING_Y + (mc.font.lineHeight + 2) * 2, moneyColor);
+        }
 
-        int barY = height - PADDING_Y - BAR_HEIGHT;
-        HudSurface.drawBar(context, PADDING_X, barY, width - PADDING_X * 2, BAR_HEIGHT,
-                (float) snapshot.progress(), WidgetTheme.BAR_FILL);
+        if (showBar) {
+            int barY = height - PADDING_Y - BAR_HEIGHT;
+            HudSurface.drawBar(context, PADDING_X, barY, width - PADDING_X * 2, BAR_HEIGHT,
+                    (float) snapshot.progress(), WidgetTheme.BAR_FILL);
+        }
 
         context.pose().popPose();
     }
@@ -79,15 +88,20 @@ public class LevelProgressWidget extends AbstractWidget {
 
         Minecraft mc = Minecraft.getInstance();
         String title = snapshot.maxLevel() ? "Level " + snapshot.level() + " · MAX" : "Level " + snapshot.level();
-        String blocksLine = "Blocks: " + formatInt(snapshot.blocks()) + "/" + formatInt(snapshot.requiredBlocks());
-        String moneyLine = "Money: " + formatMoney(snapshot.money()) + "/" + formatMoney(snapshot.requiredMoney());
+        String blocksLine = snapshot.maxLevel() ? null : "Blocks: " + formatInt(snapshot.blocks()) + "/" + formatInt(snapshot.requiredBlocks());
+        String moneyLine = snapshot.maxLevel() ? null : "Money: " + formatMoney(snapshot.money()) + "/" + formatMoney(snapshot.requiredMoney());
         return Math.round(getUnscaledWidth(mc, title, blocksLine, moneyLine) * getScale());
     }
 
     @Override
     public int getHeight() {
         LevelProgressStore.LevelProgressSnapshot snapshot = store.getSnapshot();
-        int baseHeight = snapshot.available() ? getUnscaledHeight(Minecraft.getInstance()) : EMPTY_HEIGHT;
+        boolean showBar = snapshot.available()
+                && !snapshot.maxLevel()
+                && ConfigManager.get().levelProgress.showBar;
+        int baseHeight = snapshot.available()
+                ? getUnscaledHeight(Minecraft.getInstance(), snapshot.maxLevel(), showBar)
+                : EMPTY_HEIGHT;
         return Math.round(baseHeight * getScale());
     }
 
@@ -102,12 +116,19 @@ public class LevelProgressWidget extends AbstractWidget {
     }
 
     private int getUnscaledWidth(Minecraft mc, String title, String blocksLine, String moneyLine) {
-        int maxWidth = Math.max(mc.font.width(title), Math.max(mc.font.width(blocksLine), mc.font.width(moneyLine)));
+        int maxWidth = mc.font.width(title);
+        if (blocksLine != null) {
+            maxWidth = Math.max(maxWidth, mc.font.width(blocksLine));
+        }
+        if (moneyLine != null) {
+            maxWidth = Math.max(maxWidth, mc.font.width(moneyLine));
+        }
         return maxWidth + PADDING_X * 2;
     }
 
-    private int getUnscaledHeight(Minecraft mc) {
-        return PADDING_Y * 2 + mc.font.lineHeight * 3 + 4 + BAR_HEIGHT + 2;
+    private int getUnscaledHeight(Minecraft mc, boolean maxLevel, boolean showBar) {
+        int textHeight = maxLevel ? mc.font.lineHeight : mc.font.lineHeight * 3 + 4;
+        return PADDING_Y * 2 + textHeight + (showBar ? BAR_HEIGHT + 2 : 0);
     }
 
     private boolean isEditorPreview() {
@@ -161,4 +182,3 @@ public class LevelProgressWidget extends AbstractWidget {
         return MONEY_FORMAT.format(value);
     }
 }
-

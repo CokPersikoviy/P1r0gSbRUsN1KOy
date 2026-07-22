@@ -2,6 +2,7 @@ package ru.wilyfox.client.dungeon;
 
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.world.level.saveddata.maps.MapId;
+import ru.wilyfox.client.clan.ClanSiegeMap;
 
 public final class DungeonMapTracker {
     private static final DungeonMapTracker INSTANCE = new DungeonMapTracker();
@@ -26,7 +27,9 @@ public final class DungeonMapTracker {
     }
 
     public void updateMapId(MapId mapId) {
-        this.mapId = mapId;
+        if (!ClanSiegeMap.isSiegeMap(mapId)) {
+            this.mapId = mapId;
+        }
     }
 
     public MapId getMapId() {

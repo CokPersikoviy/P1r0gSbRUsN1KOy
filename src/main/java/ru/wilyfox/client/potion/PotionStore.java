@@ -57,7 +57,6 @@ public final class PotionStore {
 
     public void applyCooldownUpdate(Map<Integer, Long> cooldowns) {
         long now = System.currentTimeMillis();
-        cleanupCooldowns(now);
 
         for (Map.Entry<Integer, Long> entry : cooldowns.entrySet()) {
             long remainingMillis = entry.getValue();
@@ -69,11 +68,41 @@ public final class PotionStore {
 
     public Map<Integer, Long> getCooldownsRemaining() {
         long now = System.currentTimeMillis();
-        cleanupCooldowns(now);
 
         Map<Integer, Long> remaining = new LinkedHashMap<>();
-        cooldownEndsAt.forEach((id, endsAt) -> remaining.put(id, Math.max(0L, endsAt - now)));
+        cooldownEndsAt.forEach((id, endsAt) -> {
+            if (endsAt > now) {
+                remaining.put(id, endsAt - now);
+            }
+        });
         return Map.copyOf(remaining);
+    }
+
+    public List<CooldownPotionEntry> getCooldownEntries(long graceMillis) {
+        long now = System.currentTimeMillis();
+        cleanupCooldowns(now, graceMillis);
+
+        List<CooldownPotionEntry> result = new ArrayList<>();
+        for (Map.Entry<Integer, Long> cooldown : cooldownEndsAt.entrySet()) {
+            int id = cooldown.getKey();
+            PotionType type = resolveType(id);
+            String name = type != null && type.name() != null && !type.name().isBlank()
+                    ? sanitizePotionName(type.name())
+                    : "\u0417\u0435\u043b\u044c\u0435 #" + id;
+            ItemStack icon = type != null ? getOrCreateIcon(type) : new ItemStack(Items.POTION);
+
+            result.add(new CooldownPotionEntry(id, name, cooldown.getValue() - now, icon));
+        }
+
+        result.sort(Comparator
+                .comparingLong(CooldownPotionEntry::remainingMillis)
+                .thenComparingInt(CooldownPotionEntry::id));
+        return result;
+    }
+
+    public boolean hasCooldownEntries(long graceMillis) {
+        cleanupCooldowns(System.currentTimeMillis(), graceMillis);
+        return !cooldownEndsAt.isEmpty();
     }
 
     public List<ActivePotionEntry> getActiveEntries() {
@@ -108,6 +137,12 @@ public final class PotionStore {
         return !states.isEmpty();
     }
 
+    public List<ActivePotionEntry> getCurrentlyActiveEntries() {
+        return getActiveEntries().stream()
+                .filter(entry -> entry.remainingMillis() > 0L)
+                .toList();
+    }
+
     public void clear() {
         types.clear();
         states.clear();
@@ -120,8 +155,9 @@ public final class PotionStore {
         states.entrySet().removeIf(entry -> now - entry.getValue().endsAt() >= grace);
     }
 
-    private void cleanupCooldowns(long now) {
-        cooldownEndsAt.entrySet().removeIf(entry -> entry.getValue() <= now);
+    private void cleanupCooldowns(long now, long graceMillis) {
+        long grace = Math.max(0L, graceMillis);
+        cooldownEndsAt.entrySet().removeIf(entry -> now - entry.getValue() >= grace);
     }
 
     private static long graceMs() {
@@ -164,6 +200,14 @@ public final class PotionStore {
             int id,
             String name,
             int quality,
+            long remainingMillis,
+            ItemStack icon
+    ) {
+    }
+
+    public record CooldownPotionEntry(
+            int id,
+            String name,
             long remainingMillis,
             ItemStack icon
     ) {

@@ -12,7 +12,7 @@ public final class DwBossDamageDecoder {
 
         try {
             String bossId = DwProtocolCodec.readString(buf);
-            long damage = DwProtocolCodec.readInt(buf);
+            int damage = DwProtocolCodec.readInt(buf);
 
             return new DwBossDamagePacket(bossId, damage);
         } finally {

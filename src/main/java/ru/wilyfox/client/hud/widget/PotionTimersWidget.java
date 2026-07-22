@@ -14,30 +14,35 @@ import ru.wilyfox.utils.Formatting;
 import java.util.List;
 
 public class PotionTimersWidget extends AbstractWidget {
+    private static final String READY_TEXT = "\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e";
+    private static final String AFTER_TEXT = "\u0447\u0435\u0440\u0435\u0437 ";
     private static final int PADDING_X = 6;
     private static final int PADDING_Y = 5;
     private static final int ICON_SIZE = 16;
     private static final int ICON_TEXT_GAP = 5;
     private static final int ROW_GAP = 3;
-    private static final int EMPTY_WIDTH = 124;
+    private static final int EMPTY_WIDTH = 138;
     private static final int EMPTY_HEIGHT = 28;
 
     private final PotionStore store;
 
-    // Per-frame cache: render()/getWidth()/getHeight() each call getActiveEntries() (which rebuilds a
-    // list) every frame; compute once per HUD frame, keyed on HudFrameClock.
+    // Resolve names, icons and remaining times only once per HUD frame.
     private long cachedFrameId = Long.MIN_VALUE;
-    private List<PotionStore.ActivePotionEntry> cachedEntries;
+    private List<PotionStore.CooldownPotionEntry> cachedEntries;
 
     public PotionTimersWidget(int x, int y, HudLayer layer, PotionStore store) {
         super(x, y, layer);
         this.store = store;
     }
 
-    private List<PotionStore.ActivePotionEntry> entries() {
+    private List<PotionStore.CooldownPotionEntry> entries() {
         long frame = HudFrameClock.current();
         if (frame != cachedFrameId || cachedEntries == null) {
-            cachedEntries = store.getActiveEntries();
+            List<PotionStore.CooldownPotionEntry> activeEntries = store.getCooldownEntries(graceMillis());
+            int limit = Math.max(1, Math.min(15, ConfigManager.get().potionTimers.maxEntries));
+            cachedEntries = activeEntries.size() <= limit
+                    ? activeEntries
+                    : List.copyOf(activeEntries.subList(0, limit));
             cachedFrameId = frame;
         }
         return cachedEntries;
@@ -50,7 +55,7 @@ public class PotionTimersWidget extends AbstractWidget {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        List<PotionStore.ActivePotionEntry> entries = entries();
+        List<PotionStore.CooldownPotionEntry> entries = entries();
 
         if (entries.isEmpty()) {
             if (!isEditorPreview()) {
@@ -73,11 +78,11 @@ public class PotionTimersWidget extends AbstractWidget {
 
         int y = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, "Potions", PADDING_X, y, WidgetTheme.TITLE);
+            context.drawString(mc.font, "Potion Cooldowns", PADDING_X, y, WidgetTheme.TITLE);
             y += mc.font.lineHeight + 4;
         }
 
-        for (PotionStore.ActivePotionEntry entry : entries) {
+        for (PotionStore.CooldownPotionEntry entry : entries) {
             renderRow(context, mc, entry, width, y, rowHeight);
             y += rowHeight + ROW_GAP;
         }
@@ -97,54 +102,55 @@ public class PotionTimersWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().potionTimers.active && (store.hasActiveEntries() || isEditorPreview());
+        return ConfigManager.get().potionTimers.active && (store.hasCooldownEntries(graceMillis()) || isEditorPreview());
     }
 
     @Override
     public String getDisplayName() {
-        return "Potions";
+        return "Potion Cooldowns";
     }
 
-    private void renderRow(GuiGraphics context, Minecraft mc, PotionStore.ActivePotionEntry entry, int width, int y, int rowHeight) {
+    private void renderRow(GuiGraphics context, Minecraft mc, PotionStore.CooldownPotionEntry entry, int width, int y, int rowHeight) {
         int iconX = PADDING_X;
         int iconY = y + Math.max(0, (rowHeight - ICON_SIZE) / 2);
-        ItemStack icon = entry.icon();
-        if (!icon.isEmpty()) {
-            context.renderItem(icon, iconX, iconY);
+        if (showIcons()) {
+            ItemStack icon = entry.icon();
+            if (!icon.isEmpty()) {
+                context.renderItem(icon, iconX, iconY);
+            }
         }
 
-        boolean expired = entry.remainingMillis() < 0L;
-        String nameText = entry.name() + " [" + entry.quality() + "%]";
-        String timeText = formatTimer(entry.remainingMillis());
+        boolean ready = entry.remainingMillis() <= 0L;
+        String nameText = entry.name() + ":";
+        String timeText = ready ? READY_TEXT : AFTER_TEXT + formatTimer(entry.remainingMillis());
 
-        int textX = iconX + ICON_SIZE + ICON_TEXT_GAP;
+        int textX = PADDING_X + iconBlockWidth();
         int textY = y + Math.max(0, (rowHeight - mc.font.lineHeight) / 2);
         int timeWidth = mc.font.width(timeText);
         int rightX = width - PADDING_X;
 
-        context.drawString(mc.font, nameText, textX, textY, expired ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SOFT);
-        context.drawString(mc.font, timeText, rightX - timeWidth, textY, expired ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SECONDARY);
+        context.drawString(mc.font, nameText, textX, textY, ready ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SOFT);
+        context.drawString(mc.font, timeText, rightX - timeWidth, textY, ready ? WidgetTheme.STATUS_SUCCESS : WidgetTheme.TEXT_SECONDARY);
     }
 
-    /** Signed "−MM:SS" while an expired potion is in its below-zero grace window, "MM:SS" otherwise. */
     private static String formatTimer(long remainingMillis) {
-        long endsAt = System.currentTimeMillis() + remainingMillis;
-        return remainingMillis < 0L ? Formatting.formatMillisSigned(endsAt) : Formatting.formatMillis(endsAt);
+        return Formatting.formatMillis(System.currentTimeMillis() + remainingMillis);
     }
 
-    private int getUnscaledWidth(List<PotionStore.ActivePotionEntry> entries) {
+    private int getUnscaledWidth(List<PotionStore.CooldownPotionEntry> entries) {
         if (entries.isEmpty()) {
             return EMPTY_WIDTH;
         }
 
         Minecraft mc = Minecraft.getInstance();
-        int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Potions") : 0;
+        int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Potion Cooldowns") : 0;
 
-        for (PotionStore.ActivePotionEntry entry : entries) {
-            int lineWidth = ICON_SIZE + ICON_TEXT_GAP
-                    + mc.font.width(entry.name() + " [" + entry.quality() + "%]")
+        for (PotionStore.CooldownPotionEntry entry : entries) {
+            String stateText = entry.remainingMillis() <= 0L ? READY_TEXT : AFTER_TEXT + formatTimer(entry.remainingMillis());
+            int lineWidth = iconBlockWidth()
+                    + mc.font.width(entry.name() + ":")
                     + 8
-                    + mc.font.width(formatTimer(entry.remainingMillis()));
+                    + mc.font.width(stateText);
             maxWidth = Math.max(maxWidth, lineWidth);
         }
 
@@ -165,16 +171,27 @@ public class PotionTimersWidget extends AbstractWidget {
         return Minecraft.getInstance().screen instanceof HudEditingScreen;
     }
 
+    private static boolean showIcons() {
+        return ConfigManager.get().potionTimers.showIcons;
+    }
+
+    private static int iconBlockWidth() {
+        return showIcons() ? ICON_SIZE + ICON_TEXT_GAP : 0;
+    }
+
+    private static long graceMillis() {
+        return Math.max(0, ConfigManager.get().potionTimers.belowZeroSeconds) * 1000L;
+    }
+
     private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
         context.pose().pushPose();
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Potions", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No active potions", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.drawString(mc.font, "Potion Cooldowns", PADDING_X, 6, WidgetTheme.TITLE);
+        context.drawString(mc.font, "No potion cooldowns", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
         context.pose().popPose();
     }
 }
-

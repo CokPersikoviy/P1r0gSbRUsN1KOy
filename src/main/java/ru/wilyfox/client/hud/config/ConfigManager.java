@@ -119,13 +119,23 @@ public class ConfigManager {
         if (sanitized.blocksPerSecondWidget == null) sanitized.blocksPerSecondWidget = new BlocksPerSecondWidgetConfig();
         if (sanitized.estimatedTps == null) sanitized.estimatedTps = new EstimatedTpsConfig();
         if (sanitized.fishing == null) sanitized.fishing = new FishingConfig();
+        if (sanitized.fishing.nibblesVisibility == null) sanitized.fishing.nibblesVisibility = FishingWidgetVisibility.FISHING_WARP;
+        if (sanitized.fishing.nibblesSort == null) sanitized.fishing.nibblesSort = FishingNibblesSort.DIMENSION;
+        if (sanitized.fishing.questsVisibility == null) sanitized.fishing.questsVisibility = FishingWidgetVisibility.FISHING_WARP;
+        if (sanitized.fishing.questsTypeFilter == null) sanitized.fishing.questsTypeFilter = FishingQuestTypeFilter.ALL;
+        if (sanitized.fishing.questsDescription == null) sanitized.fishing.questsDescription = FishingQuestDescriptionMode.FISHING_ROD;
+        sanitized.fishing.autoFishDelayTicks = Math.max(0, Math.min(40, sanitized.fishing.autoFishDelayTicks));
         if (sanitized.bossBar == null) sanitized.bossBar = new BossBarConfig();
         if (sanitized.scoreboard == null) sanitized.scoreboard = new ScoreboardConfig();
         if (sanitized.playerHealthBars == null) sanitized.playerHealthBars = new PlayerHealthBarsConfig();
+        if (sanitized.alchemy == null) sanitized.alchemy = new AlchemyConfig();
+        sanitized.alchemy.recipeActionLeadMillis = Math.max(100, Math.min(2_000, sanitized.alchemy.recipeActionLeadMillis));
         if (sanitized.potionRecipe == null) sanitized.potionRecipe = new PotionRecipeConfig();
+        if (sanitized.potionRecipe.visibility == null) sanitized.potionRecipe.visibility = PotionRecipeVisibility.ALWAYS;
         if (sanitized.craftRecipe == null) sanitized.craftRecipe = new CraftRecipeConfig();
         if (sanitized.potionTimers == null) sanitized.potionTimers = new PotionTimersConfig();
         if (sanitized.sellerCooldown == null) sanitized.sellerCooldown = new SellerCooldownConfig();
+        if (sanitized.sellerCooldown.filter == null) sanitized.sellerCooldown.filter = SellerCooldownFilter.ALL;
         if (sanitized.comboProgress == null) sanitized.comboProgress = new ComboProgressConfig();
         if (sanitized.wandCooldown == null) sanitized.wandCooldown = new WandCooldownConfig();
         if (sanitized.abilityCooldown == null) sanitized.abilityCooldown = new AbilityCooldownConfig();
@@ -135,6 +145,7 @@ public class ConfigManager {
         if (sanitized.bossDamage == null) sanitized.bossDamage = new BossDamageConfig();
         if (sanitized.visibilityStatus == null) sanitized.visibilityStatus = new VisibilityStatusConfig();
         if (sanitized.dungeonMap == null) sanitized.dungeonMap = new DungeonMapConfig();
+        sanitized.dungeonMap.siegeZoomPercent = Math.max(100, Math.min(310, sanitized.dungeonMap.siegeZoomPercent));
         if (sanitized.entityInspect == null) sanitized.entityInspect = new EntityInspectConfig();
         if (sanitized.outgoingChatQueue == null) sanitized.outgoingChatQueue = new OutgoingChatQueueConfig();
         if (sanitized.protocolGraphWidget == null) sanitized.protocolGraphWidget = new ProtocolGraphWidgetConfig();
@@ -172,6 +183,8 @@ public class ConfigManager {
         sanitized.discordRpc.updateIntervalSeconds = Math.max(1, Math.min(60, sanitized.discordRpc.updateIntervalSeconds));
         sanitized.render.extraChatHistoryLines = Math.max(0, Math.min(10000, sanitized.render.extraChatHistoryLines));
         sanitized.theme.widgetBackgroundOpacityPercent = Math.max(0, Math.min(50, sanitized.theme.widgetBackgroundOpacityPercent));
+        sanitized.potionTimers.maxEntries = Math.max(1, Math.min(15, sanitized.potionTimers.maxEntries));
+        sanitized.potionTimers.belowZeroSeconds = Math.max(0, Math.min(60, sanitized.potionTimers.belowZeroSeconds));
         if (sanitized.bossWidget != null) {
             sanitized.bossWidget.postSpawnShowSeconds = Math.max(0, Math.min(600, sanitized.bossWidget.postSpawnShowSeconds));
         }

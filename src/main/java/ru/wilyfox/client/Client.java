@@ -6,6 +6,7 @@ import net.minecraft.resources.ResourceLocation;
 import ru.wilyfox.boss.BossRepository;
 import ru.wilyfox.boss.BossTracker;
 import ru.wilyfox.client.ability.AbilityCooldownStore;
+import ru.wilyfox.client.alchemy.AlchemyBrewingTracker;
 import ru.wilyfox.client.boss.BossMenuIconCollector;
 import ru.wilyfox.client.boss.BossDamageStore;
 import ru.wilyfox.client.booster.BoosterStore;
@@ -17,6 +18,7 @@ import ru.wilyfox.client.chat.FrogChatProtocol;
 import ru.wilyfox.client.chat.VisibilityStatusTracker;
 import ru.wilyfox.client.clan.PlayerClanStorage;
 import ru.wilyfox.client.combo.ComboProgressStore;
+import ru.wilyfox.client.combo.ComboTimerChatTracker;
 import ru.wilyfox.client.dungeon.DungeonDecorationHighlightRenderHook;
 import ru.wilyfox.client.dungeon.DungeonMapTracker;
 import ru.wilyfox.client.discord.DiscordRpcService;
@@ -42,6 +44,7 @@ import ru.wilyfox.client.hud.widget.CraftRecipeWidget;
 import ru.wilyfox.client.hud.widget.EntityInspectWidget;
 import ru.wilyfox.client.hud.widget.EstimatedTpsWidget;
 import ru.wilyfox.client.hud.widget.FishingNibblesWidget;
+import ru.wilyfox.client.hud.widget.FishingQuestsWidget;
 import ru.wilyfox.client.hud.widget.DungeonMapWidget;
 import ru.wilyfox.client.hud.widget.LevelProgressWidget;
 import ru.wilyfox.client.hud.widget.OutgoingChatQueueWidget;
@@ -113,6 +116,10 @@ public class Client {
         return wandCooldownTracker;
     }
 
+    public PotionStore getPotionStore() {
+        return potionStore;
+    }
+
     public void init() {
         ru.wilyfox.client.command.FhCommands.register();
         new ClientEntityEventHandler(this.bossTracker).register();
@@ -132,6 +139,7 @@ public class Client {
         RuneSetSwitcher.register();
         Clicker.register();
         AutoFish.register();
+        AlchemyBrewingTracker.register();
         ChatDispatchQueue.init();
         AutoMessageScheduler.getInstance().register();
         AutoBossAnnouncer.bindRepository(repository);
@@ -142,6 +150,7 @@ public class Client {
         PopUpEventNotifier.getInstance().bindBossRepository(repository);
         PopUpEventNotifier.getInstance().bindAbilityCooldownStore(abilityCooldownStore);
         PopUpEventNotifier.getInstance().bindActiveMinersStore(activeMinersStore);
+        PopUpEventNotifier.getInstance().bindLevelProgressStore(levelProgressStore);
         PopUpEventNotifier.getInstance().bindSellerCooldownStore(sellerCooldownStore);
         PopUpEventNotifier.getInstance().bindPotionStore(potionStore);
         PopUpEventNotifier.getInstance().bindBoosterStore(boosterStore);
@@ -149,6 +158,7 @@ public class Client {
         PopUpEventNotifier.getInstance().register();
         BossShareService.bindRepository(repository);
         VisibilityStatusTracker.bindStore(visibilityStatusStore);
+        ComboTimerChatTracker.bindStore(comboProgressStore);
         FrogChatProtocol.init();
         BossMenuIconCollector.bindRepository(repository);
         DiamondWorldProtocolClient.bindBossRepository(repository);
@@ -259,6 +269,10 @@ public class Client {
         );
         hudRenderer.registerWidget(
                 new FishingNibblesWidget(20, 380, HudLayer.CONTENT),
+                ScreenAnchor.RIGHT_CENTER
+        );
+        hudRenderer.registerWidget(
+                new FishingQuestsWidget(20, 410, HudLayer.CONTENT),
                 ScreenAnchor.RIGHT_CENTER
         );
         hudRenderer.registerWidget(

@@ -801,7 +801,7 @@ public final class UsefulWorldHighlightRenderHook {
             return false;
         }
 
-        if (DiamondWorldProtocolClient.getFishingLocationIds().contains(locationId)) {
+        if (DiamondWorldProtocolClient.isCurrentFishingLocation()) {
             return false;
         }
 

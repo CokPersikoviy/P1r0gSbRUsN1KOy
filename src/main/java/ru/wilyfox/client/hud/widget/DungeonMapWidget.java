@@ -8,6 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import ru.wilyfox.client.dungeon.DungeonMapTracker;
+import ru.wilyfox.client.clan.ClanSiegeMapRenderer;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
@@ -34,6 +35,24 @@ public final class DungeonMapWidget extends AbstractWidget {
         context.pose().pushPose();
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0F);
+
+        if (DiamondWorldProtocolClient.isSiegeLocation()) {
+            HudSurface.drawPanel(context, OUTER_SIZE, OUTER_SIZE);
+            int tileCount = ClanSiegeMapRenderer.render(
+                    context,
+                    mc,
+                    MAP_DRAW_OFFSET,
+                    MAP_DRAW_OFFSET,
+                    MAP_SIZE,
+                    0.7F * ConfigManager.get().dungeonMap.siegeZoomPercent / 100.0F,
+                    ConfigManager.get().dungeonMap.rotateSiegeMap
+            );
+            if (tileCount == 0) {
+                renderPlaceholder(context, mc);
+            }
+            context.pose().popPose();
+            return;
+        }
 
         if (!canRenderLiveMap(mc)) {
             renderPlaceholder(context, mc);
@@ -71,7 +90,9 @@ public final class DungeonMapWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().dungeonMap.active && (canRenderLiveMap(Minecraft.getInstance()) || isEditorPreview());
+        Minecraft minecraft = Minecraft.getInstance();
+        return ConfigManager.get().dungeonMap.active
+                && (canRenderLiveMap(minecraft) || ClanSiegeMapRenderer.canRender(minecraft) || isEditorPreview());
     }
 
     @Override
@@ -91,7 +112,7 @@ public final class DungeonMapWidget extends AbstractWidget {
 
     private boolean canRenderLiveMap(Minecraft mc) {
         return mc.level != null
-                && DiamondWorldProtocolClient.isDungeonOrSiegeLocation()
+                && DiamondWorldProtocolClient.isDungeonLocation()
                 && DungeonMapTracker.getInstance().hasMapId();
     }
 
@@ -112,4 +133,3 @@ public final class DungeonMapWidget extends AbstractWidget {
         context.drawCenteredString(mc.font, "Waiting for map", OUTER_SIZE / 2, OUTER_SIZE / 2 + 6, WidgetTheme.TEXT_MUTED);
     }
 }
-

@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 
 public final class BoosterStore {
     public enum Kind {
@@ -13,8 +15,16 @@ public final class BoosterStore {
     }
 
     private final Map<Kind, List<Entry>> entries = new EnumMap<>(Kind.class);
+    private final LongSupplier wallClockMillis;
+    private final LongSupplier monotonicNanos;
 
     public BoosterStore() {
+        this(System::currentTimeMillis, System::nanoTime);
+    }
+
+    BoosterStore(LongSupplier wallClockMillis, LongSupplier monotonicNanos) {
+        this.wallClockMillis = wallClockMillis;
+        this.monotonicNanos = monotonicNanos;
         for (Kind kind : Kind.values()) {
             entries.put(kind, new ArrayList<>());
         }
@@ -25,7 +35,22 @@ public final class BoosterStore {
             return;
         }
 
-        long now = System.currentTimeMillis();
+        long wallNow = wallClockMillis.getAsLong();
+        long monotonicNow = monotonicNanos.getAsLong();
+        entries.put(kind, mapEntries(protocolEntries, wallNow, monotonicNow));
+    }
+
+    public void replaceAll(Map<Kind, List<ProtocolEntry>> protocolSnapshot) {
+        long wallNow = wallClockMillis.getAsLong();
+        long monotonicNow = monotonicNanos.getAsLong();
+
+        for (Kind kind : Kind.values()) {
+            List<ProtocolEntry> protocolEntries = protocolSnapshot != null ? protocolSnapshot.get(kind) : null;
+            entries.put(kind, mapEntries(protocolEntries, wallNow, monotonicNow));
+        }
+    }
+
+    private List<Entry> mapEntries(List<ProtocolEntry> protocolEntries, long wallNow, long monotonicNow) {
         List<Entry> mapped = new ArrayList<>();
         if (protocolEntries != null) {
             for (ProtocolEntry entry : protocolEntries) {
@@ -33,21 +58,27 @@ public final class BoosterStore {
                     continue;
                 }
 
-                mapped.add(new Entry(entry.multiplier(), now, now + entry.remainingMillis(), entry.remainingMillis()));
+                mapped.add(new Entry(
+                        entry.multiplier(),
+                        wallNow,
+                        saturatingAdd(wallNow, entry.remainingMillis()),
+                        entry.remainingMillis(),
+                        saturatingAdd(monotonicNow, TimeUnit.MILLISECONDS.toNanos(entry.remainingMillis())),
+                        monotonicNanos
+                ));
             }
         }
         mapped.sort(java.util.Comparator.comparingLong(Entry::endsAt));
-
-        entries.put(kind, mapped);
+        return mapped;
     }
 
     public Snapshot getSnapshot(Kind kind) {
-        cleanup(System.currentTimeMillis());
+        cleanup(monotonicNanos.getAsLong());
         return new Snapshot(List.copyOf(entries.get(kind)));
     }
 
     public boolean hasAnyActive() {
-        cleanup(System.currentTimeMillis());
+        cleanup(monotonicNanos.getAsLong());
         return entries.values().stream().anyMatch(list -> !list.isEmpty());
     }
 
@@ -55,20 +86,63 @@ public final class BoosterStore {
         entries.values().forEach(List::clear);
     }
 
-    private void cleanup(long now) {
+    private void cleanup(long monotonicNow) {
         for (List<Entry> values : entries.values()) {
-            values.removeIf(entry -> entry.endsAt() <= now);
+            values.removeIf(entry -> entry.hasExpired(monotonicNow));
         }
     }
 
-    public record Entry(
-            double multiplier,
-            long startedAt,
-            long endsAt,
-            long durationMillis
-    ) {
+    private static long saturatingAdd(long left, long right) {
+        try {
+            return Math.addExact(left, right);
+        } catch (ArithmeticException ignored) {
+            return right >= 0L ? Long.MAX_VALUE : Long.MIN_VALUE;
+        }
+    }
+
+    public static final class Entry {
+        private final double multiplier;
+        private final long startedAt;
+        private final long endsAt;
+        private final long durationMillis;
+        private final long monotonicDeadlineNanos;
+        private final LongSupplier monotonicNanos;
+
+        private Entry(
+                double multiplier,
+                long startedAt,
+                long endsAt,
+                long durationMillis,
+                long monotonicDeadlineNanos,
+                LongSupplier monotonicNanos
+        ) {
+            this.multiplier = multiplier;
+            this.startedAt = startedAt;
+            this.endsAt = endsAt;
+            this.durationMillis = durationMillis;
+            this.monotonicDeadlineNanos = monotonicDeadlineNanos;
+            this.monotonicNanos = monotonicNanos;
+        }
+
+        public double multiplier() {
+            return multiplier;
+        }
+
+        public long startedAt() {
+            return startedAt;
+        }
+
+        public long endsAt() {
+            return endsAt;
+        }
+
+        public long durationMillis() {
+            return durationMillis;
+        }
+
         public long remainingMillis() {
-            return Math.max(0L, endsAt - System.currentTimeMillis());
+            long remainingNanos = monotonicDeadlineNanos - monotonicNanos.getAsLong();
+            return remainingNanos <= 0L ? 0L : TimeUnit.NANOSECONDS.toMillis(remainingNanos);
         }
 
         public float progress() {
@@ -77,6 +151,14 @@ public final class BoosterStore {
             }
 
             return remainingMillis() / (float) durationMillis;
+        }
+
+        public boolean expired() {
+            return hasExpired(monotonicNanos.getAsLong());
+        }
+
+        private boolean hasExpired(long monotonicNow) {
+            return monotonicDeadlineNanos - monotonicNow <= 0L;
         }
     }
 

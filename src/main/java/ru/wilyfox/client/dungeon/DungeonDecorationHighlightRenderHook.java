@@ -12,7 +12,6 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -20,13 +19,14 @@ import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 
+import java.util.Locale;
+
 public final class DungeonDecorationHighlightRenderHook {
     private static final float RED = 1.0F;
-    private static final float GREEN = 0.91F;
-    private static final float BLUE = 0.20F;
+    private static final float GREEN = 207.0F / 255.0F;
+    private static final float BLUE = 36.0F / 255.0F;
     private static final float ALPHA = 1.0F;
-    private static final double BOX_WIDTH = 0.92D;
-    private static final double BOX_HEIGHT = 1.05D;
+    private static final double BOX_SIZE = 1.0D;
 
     private DungeonDecorationHighlightRenderHook() {
     }
@@ -46,7 +46,7 @@ public final class DungeonDecorationHighlightRenderHook {
                 return;
             }
 
-            if (!DiamondWorldProtocolClient.isDungeonLocation()) {
+            if (!isDungeonLocation()) {
                 return;
             }
 
@@ -66,10 +66,10 @@ public final class DungeonDecorationHighlightRenderHook {
 
                 Vec3 position = itemDisplay.position();
                 AABB box = AABB.ofSize(
-                                new Vec3(position.x, position.y + BOX_HEIGHT * 0.5D, position.z),
-                                BOX_WIDTH,
-                                BOX_HEIGHT,
-                                BOX_WIDTH
+                                new Vec3(position.x, position.y + BOX_SIZE * 0.5D, position.z),
+                                BOX_SIZE,
+                                BOX_SIZE,
+                                BOX_SIZE
                         )
                         .move(-cameraPos.x, -cameraPos.y, -cameraPos.z);
                 ShapeRenderer.renderLineBox(poseStack, vertexConsumer, box, RED, GREEN, BLUE, ALPHA);
@@ -81,7 +81,7 @@ public final class DungeonDecorationHighlightRenderHook {
 
     private static boolean shouldHighlight(Display.ItemDisplay itemDisplay) {
         ItemStack stack = itemDisplay.getSlot(0).get();
-        if (stack.isEmpty() || !stack.is(Items.PAPER)) {
+        if (stack.isEmpty()) {
             return false;
         }
 
@@ -95,7 +95,12 @@ public final class DungeonDecorationHighlightRenderHook {
             return false;
         }
 
-        int cmd = Math.round(firstValue);
+        int cmd = (int) (float) firstValue;
         return (cmd >= 10271 && cmd <= 10282) || (cmd >= 10311 && cmd <= 10327);
+    }
+
+    private static boolean isDungeonLocation() {
+        String location = DiamondWorldProtocolClient.getCurrentGameLocation();
+        return location != null && location.trim().toLowerCase(Locale.ROOT).startsWith("dungeon");
     }
 }

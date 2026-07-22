@@ -7,6 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
 import org.lwjgl.glfw.GLFW;
 import ru.wilyfox.client.profiler.ModProfiler;
+import ru.wilyfox.client.clan.ClanSiegeMapScreen;
 
 public final class KeyBinds {
     public static final String CATEGORY = "FrogHelper";
@@ -66,6 +67,15 @@ public final class KeyBinds {
             )
     );
 
+    public static final KeyMapping CLAN_SIEGE_MAP = KeyBindingHelper.registerKeyBinding(
+            new KeyMapping(
+                    "Clan Siege Map",
+                    InputConstants.Type.KEYSYM,
+                    GLFW.GLFW_KEY_M,
+                    CATEGORY
+            )
+    );
+
     public static final KeyMapping RUNES_BAG = KeyBindingHelper.registerKeyBinding(
             new KeyMapping(
                     "Runes Bag",
@@ -105,6 +115,12 @@ public final class KeyBinds {
 
             while (CLAN_HIDE.consumeClick()) {
                 client.player.connection.sendCommand("clanhide");
+            }
+
+            while (CLAN_SIEGE_MAP.consumeClick()) {
+                if (ClanSiegeMapScreen.canOpen()) {
+                    client.setScreen(new ClanSiegeMapScreen());
+                }
             }
 
             while (RUNES_BAG.consumeClick()) {

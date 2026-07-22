@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
@@ -29,18 +30,29 @@ final class ProtocolPayloadSupport {
     private ProtocolPayloadSupport() {
     }
 
-    static List<ActivePetInfo> extractActivePets(ProtocolState state, DwStatisticInfoPacket packet) {
+    static Optional<List<ActivePetInfo>> extractActivePets(ProtocolState state, DwStatisticInfoPacket packet) {
         String petsJson = packet.values().get("pets");
-        if (petsJson == null || petsJson.isBlank()) {
-            return List.of();
+        if (petsJson == null) {
+            return Optional.empty();
+        }
+        if (petsJson.isBlank()) {
+            throw new IllegalArgumentException("statisticinfo pets value is blank");
         }
 
         JsonElement parsed = JsonParser.parseString(petsJson);
-        if (!parsed.isJsonArray()) {
-            return List.of();
+        if (parsed.isJsonNull()) {
+            return Optional.empty();
         }
 
-        JsonArray petsArray = parsed.getAsJsonArray();
+        JsonArray petsArray;
+        if (parsed.isJsonArray()) {
+            petsArray = parsed.getAsJsonArray();
+        } else if (parsed.isJsonObject()) {
+            petsArray = new JsonArray();
+            petsArray.add(parsed);
+        } else {
+            throw new IllegalArgumentException("statisticinfo pets value must be a JSON array or object");
+        }
         List<ActivePetInfo> result = new ArrayList<>();
 
         for (JsonElement element : petsArray) {
@@ -57,30 +69,44 @@ final class ProtocolPayloadSupport {
             ActivePetInfo pet = new ActivePetInfo(
                     id,
                     prettifyId(id),
-                    new ItemStack(Items.BONE),
+                    ItemStack.EMPTY,
                     getInt(object, "level"),
                     getDouble(object, "exp"),
-                    getDouble(object, "energy")
+                    getDouble(object, "energy"),
+                    false
             );
             result.add(enrichActivePet(state, pet));
         }
 
-        return result;
+        return Optional.of(result);
     }
 
-    static List<ActiveMinerInfo> extractActiveMiners(ProtocolState state, DwStatisticInfoPacket packet) {
+    static Optional<List<ActiveMinerInfo>> extractActiveMiners(ProtocolState state, DwStatisticInfoPacket packet) {
         String minersJson = packet.values().get("miners");
-        if (minersJson == null || minersJson.isBlank()) {
-            return List.of();
+        if (minersJson == null) {
+            return Optional.empty();
+        }
+        if (minersJson.isBlank()) {
+            throw new IllegalArgumentException("statisticinfo miners value is blank");
         }
 
         JsonElement parsed = JsonParser.parseString(minersJson);
-        if (!parsed.isJsonArray()) {
-            return List.of();
+        if (parsed.isJsonNull()) {
+            return Optional.empty();
         }
 
-        JsonArray minersArray = parsed.getAsJsonArray();
+        JsonArray minersArray;
+        if (parsed.isJsonArray()) {
+            minersArray = parsed.getAsJsonArray();
+        } else if (parsed.isJsonObject()) {
+            minersArray = new JsonArray();
+            minersArray.add(parsed);
+        } else {
+            throw new IllegalArgumentException("statisticinfo miners value must be a JSON array or object");
+        }
         List<ActiveMinerInfo> result = new ArrayList<>();
+        long wallNow = System.currentTimeMillis();
+        long monotonicNow = System.nanoTime();
 
         for (JsonElement element : minersArray) {
             if (!element.isJsonObject()) {
@@ -91,9 +117,10 @@ final class ProtocolPayloadSupport {
             JsonObject data = object.has("data") && object.get("data").isJsonObject()
                     ? object.getAsJsonObject("data")
                     : new JsonObject();
-            int level = resolveMinerLevel(object, data);
-            int spriteIdOffset = resolveMinerSpriteIdOffset(object, data);
+            int level = deriveMinerLevel(getInt(object, "exp"));
+            int spriteIdOffset = Math.max(0, getInt(object, "spriteIdOffset"));
             String category = getString(data, "category");
+            long homecomingAt = getInstantMillis(data, "homecoming");
 
             if (!state.loggedFirstMinerPayload) {
                 state.loggedFirstMinerPayload = true;
@@ -103,13 +130,17 @@ final class ProtocolPayloadSupport {
             result.add(new ActiveMinerInfo(
                     createMinerIcon(spriteIdOffset, level, category),
                     level,
+                    category,
+                    spriteIdOffset,
                     prettifyMinerResource(category),
                     getString(object, "status"),
-                    getInstantMillis(data, "homecoming")
+                    homecomingAt,
+                    monotonicNow,
+                    homecomingAt <= 0L ? 0L : homecomingAt - wallNow
             ));
         }
 
-        return result;
+        return Optional.of(result);
     }
 
     // Abilities that DO NOT lock rune-set swapping when used (their runes read "не накладывает КД смены
@@ -187,7 +218,15 @@ final class ProtocolPayloadSupport {
     static ActivePetInfo enrichActivePet(ProtocolState state, ActivePetInfo pet) {
         DwPetType type = state.petTypes.get(pet.id());
         if (type == null) {
-            return pet;
+            return new ActivePetInfo(
+                    pet.id(),
+                    prettifyId(pet.id()),
+                    ItemStack.EMPTY,
+                    pet.level(),
+                    pet.exp(),
+                    pet.energy(),
+                    false
+            );
         }
 
         return new ActivePetInfo(
@@ -196,7 +235,8 @@ final class ProtocolPayloadSupport {
                 createPetIcon(type),
                 pet.level(),
                 pet.exp(),
-                pet.energy()
+                pet.energy(),
+                true
         );
     }
 
@@ -269,6 +309,22 @@ final class ProtocolPayloadSupport {
         }
 
         return trimmed;
+    }
+
+    static DwGameLocation parseGameLocation(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            JsonElement parsed = JsonParser.parseString(value.trim());
+            if (!parsed.isJsonPrimitive() || !parsed.getAsJsonPrimitive().isString()) {
+                return null;
+            }
+            return DiamondWorldProtocolClient.createGameLocation(parsed.getAsString());
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     static String formatRemainingMillis(int remainingMillis) {
@@ -368,49 +424,6 @@ final class ProtocolPayloadSupport {
         } catch (Exception ignored) {
             return 0.0D;
         }
-    }
-
-    private static int resolveMinerLevel(JsonObject object, JsonObject data) {
-        int level = getInt(object, "level");
-        if (level > 0) {
-            return level;
-        }
-
-        level = getInt(data, "level");
-        if (level > 0) {
-            return level;
-        }
-
-        level = getInt(object, "minerLevel");
-        if (level > 0) {
-            return level;
-        }
-
-        level = getInt(data, "minerLevel");
-        if (level > 0) {
-            return level;
-        }
-
-        int experience = getInt(object, "exp");
-        if (experience >= 0) {
-            return deriveMinerLevel(experience);
-        }
-
-        return 0;
-    }
-
-    private static int resolveMinerSpriteIdOffset(JsonObject object, JsonObject data) {
-        int spriteIdOffset = getInt(object, "spriteIdOffset");
-        if (spriteIdOffset >= 0) {
-            return spriteIdOffset;
-        }
-
-        spriteIdOffset = getInt(data, "spriteIdOffset");
-        if (spriteIdOffset >= 0) {
-            return spriteIdOffset;
-        }
-
-        return 0;
     }
 
     private static ItemStack createMinerIcon(int spriteIdOffset, int level, String category) {

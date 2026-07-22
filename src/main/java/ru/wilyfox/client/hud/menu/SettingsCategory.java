@@ -11,6 +11,7 @@ public enum SettingsCategory {
     POP_UPS("Pop-Ups"),
     DISCORD("Discord"),
     THEME("Theme"),
+    ALCHEMY("Alchemy"),
     RENDER("Render"),
     WIDGET("Widget"),
     RUNES_BAG_KEYBINDS("Runes Bag Keybinds"),

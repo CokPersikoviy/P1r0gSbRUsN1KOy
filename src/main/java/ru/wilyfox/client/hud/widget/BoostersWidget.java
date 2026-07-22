@@ -7,7 +7,6 @@ import ru.wilyfox.client.booster.BoosterStore;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
-import ru.wilyfox.utils.Formatting;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -131,7 +130,7 @@ public final class BoostersWidget extends AbstractWidget {
 
         for (BoosterStore.Entry entry : snapshot.entries()) {
             String left = "Active x" + formatMultiplier(entry.multiplier());
-            String right = Formatting.formatMillis(entry.endsAt());
+            String right = formatRemaining(entry.remainingMillis());
             context.drawString(mc.font, left, x, y, WidgetTheme.TEXT_SOFT);
             context.drawString(mc.font, right, x + width - mc.font.width(right), y, WidgetTheme.TEXT_SECONDARY);
             y += mc.font.lineHeight + 1;
@@ -163,7 +162,7 @@ public final class BoostersWidget extends AbstractWidget {
         int maxWidth = mc.font.width(view.label() + " x" + formatMultiplier(snapshot.totalMultiplier()));
         maxWidth = Math.max(maxWidth, mc.font.width("No active boosts"));
         for (BoosterStore.Entry entry : snapshot.entries()) {
-            String line = "Active x" + formatMultiplier(entry.multiplier()) + " " + Formatting.formatMillis(entry.endsAt());
+            String line = "Active x" + formatMultiplier(entry.multiplier()) + " " + formatRemaining(entry.remainingMillis());
             maxWidth = Math.max(maxWidth, mc.font.width(line));
         }
         return maxWidth;
@@ -185,7 +184,7 @@ public final class BoostersWidget extends AbstractWidget {
             return view.label() + ": no active boosts";
         }
         return view.label() + ": x" + formatMultiplier(snapshot.totalMultiplier())
-                + " (" + Formatting.formatMillis(latest.endsAt()) + ")";
+                + " (" + formatRemaining(latest.remainingMillis()) + ")";
     }
 
     private List<BoosterView> getViews() {
@@ -213,6 +212,17 @@ public final class BoostersWidget extends AbstractWidget {
 
     private static String formatMultiplier(double multiplier) {
         return MULTIPLIER_FORMAT.format(multiplier);
+    }
+
+    private static String formatRemaining(long remainingMillis) {
+        long totalSeconds = Math.max(0L, remainingMillis) / 1000L;
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        long seconds = totalSeconds % 60L;
+
+        return hours > 0L
+                ? String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes, seconds)
+                : String.format(Locale.ROOT, "%02d:%02d", minutes, seconds);
     }
 
     private record BoosterView(String label, BoosterStore.Snapshot snapshot) {

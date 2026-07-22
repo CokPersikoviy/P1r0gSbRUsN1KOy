@@ -23,7 +23,7 @@ public class PotionRecipeWidget extends AbstractWidget {
 
     @Override
     public void render(GuiGraphics context, DeltaTracker tickCounter) {
-        if (!ConfigManager.get().potionRecipe.active) {
+        if (!isConfiguredVisible()) {
             return;
         }
 
@@ -32,10 +32,6 @@ public class PotionRecipeWidget extends AbstractWidget {
         List<String> recipeLines = tracker.getRecipeLines();
 
         if (!tracker.hasRecipe()) {
-            if (!isEditorPreview()) {
-                return;
-            }
-
             renderPlaceholder(context, mc);
             return;
         }
@@ -65,7 +61,7 @@ public class PotionRecipeWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().potionRecipe.active && (PotionRecipeTracker.getInstance().hasRecipe() || isEditorPreview());
+        return isConfiguredVisible();
     }
 
     @Override
@@ -116,16 +112,24 @@ public class PotionRecipeWidget extends AbstractWidget {
         return Minecraft.getInstance().screen instanceof HudEditingScreen;
     }
 
+    private boolean isConfiguredVisible() {
+        return ConfigManager.get().potionRecipe.active
+                && (isEditorPreview() || ConfigManager.get().potionRecipe.visibility.isVisible());
+    }
+
     private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
         context.pose().pushPose();
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
-        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
+        if (isEditorPreview()) {
+            HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
+        } else {
+            HudSurface.drawPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
+        }
         context.drawString(mc.font, "Potion Recipe", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No recipe selected", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.drawString(mc.font, "\u0420\u0435\u0446\u0435\u043f\u0442 \u043d\u0435 \u0432\u044b\u0431\u0440\u0430\u043d", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
         context.pose().popPose();
     }
 }
-

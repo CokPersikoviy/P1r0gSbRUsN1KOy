@@ -21,6 +21,7 @@ public class BossWidgetConfig {
     public boolean showIcons = true;
     public boolean showLevel = true;
     public boolean showTimer = true;
+    public boolean showCollectibles = true;
 
     /** How long (seconds) a spawned boss keeps counting into the negative before it drops from the timer. */
     public int postSpawnShowSeconds = 30;

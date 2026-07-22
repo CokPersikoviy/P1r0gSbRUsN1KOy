@@ -7,6 +7,12 @@ import ru.wilyfox.client.hud.config.AutoMessageEntryConfig;
 import ru.wilyfox.client.hud.config.BossTimerSourceMode;
 import ru.wilyfox.client.hud.config.BossWidgetConfig;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.FishingNibblesSort;
+import ru.wilyfox.client.hud.config.FishingQuestDescriptionMode;
+import ru.wilyfox.client.hud.config.FishingQuestTypeFilter;
+import ru.wilyfox.client.hud.config.FishingWidgetVisibility;
+import ru.wilyfox.client.hud.config.PotionRecipeVisibility;
+import ru.wilyfox.client.hud.config.SellerCooldownFilter;
 import ru.wilyfox.client.hud.config.ThemePreset;
 import ru.wilyfox.client.hud.config.WidgetChrome;
 import ru.wilyfox.client.hud.widget.HudSurface;
@@ -252,6 +258,67 @@ public class HudSettingsPanel {
             );
         }
 
+        componentsByCategory.get(SettingsCategory.ALCHEMY).add(new BreakLineSettingsComponent("World"));
+        componentsByCategory.get(SettingsCategory.ALCHEMY).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Ingredient markers",
+                        () -> ConfigManager.get().render.showAlchemyIngredientMarkers,
+                        value -> ConfigManager.get().render.showAlchemyIngredientMarkers = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.ALCHEMY).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Auto-brewing cost",
+                        () -> ConfigManager.get().alchemy.autoBrewingCost,
+                        value -> ConfigManager.get().alchemy.autoBrewingCost = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.ALCHEMY).add(new BreakLineSettingsComponent("Recipe alerts"));
+        componentsByCategory.get(SettingsCategory.ALCHEMY).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Action alerts",
+                        () -> ConfigManager.get().alchemy.recipeActionAlerts,
+                        value -> ConfigManager.get().alchemy.recipeActionAlerts = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.ALCHEMY).add(
+                new StepperSettingsComponent(
+                        0, 0, 0, 0,
+                        "Alert lead (ms)",
+                        () -> ConfigManager.get().alchemy.recipeActionLeadMillis,
+                        value -> ConfigManager.get().alchemy.recipeActionLeadMillis = value,
+                        100, 2_000, 100
+                ).withVisibility(() -> ConfigManager.get().alchemy.recipeActionAlerts)
+        );
+        componentsByCategory.get(SettingsCategory.ALCHEMY).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Alert sound",
+                        () -> ConfigManager.get().alchemy.recipeActionSound,
+                        value -> ConfigManager.get().alchemy.recipeActionSound = value
+                ).withVisibility(() -> ConfigManager.get().alchemy.recipeActionAlerts)
+        );
+        componentsByCategory.get(SettingsCategory.ALCHEMY).add(new BreakLineSettingsComponent("Potion effects"));
+        componentsByCategory.get(SettingsCategory.ALCHEMY).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Active potions in TAB",
+                        () -> ConfigManager.get().alchemy.potionsInTab,
+                        value -> ConfigManager.get().alchemy.potionsInTab = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.ALCHEMY).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Expiration message in chat",
+                        () -> ConfigManager.get().alchemy.potionExpirationChat,
+                        value -> ConfigManager.get().alchemy.potionExpirationChat = value
+                )
+        );
+
         componentsByCategory.get(SettingsCategory.QUICK_ACCESS).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
@@ -380,6 +447,15 @@ public class HudSettingsPanel {
         componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
+                        "Show collectibles",
+                        () -> ConfigManager.get().bossWidget.showCollectibles,
+                        value -> ConfigManager.get().bossWidget.showCollectibles = value
+                )
+        );
+
+        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
                         "Full alignment",
                         () -> ConfigManager.get().bossWidget.fullAligment,
                         value -> ConfigManager.get().bossWidget.fullAligment = value
@@ -392,6 +468,14 @@ public class HudSettingsPanel {
                         "Pre-respawn message",
                         () -> ConfigManager.get().bossRespawnMessages.preRespawnMessage,
                         value -> ConfigManager.get().bossRespawnMessages.preRespawnMessage = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.BOSS_RESPAWN_MESSAGES).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Pre-respawn clan message",
+                        () -> ConfigManager.get().bossRespawnMessages.preRespawnClanMessage,
+                        value -> ConfigManager.get().bossRespawnMessages.preRespawnClanMessage = value
                 )
         );
 
@@ -413,6 +497,14 @@ public class HudSettingsPanel {
                         value -> ConfigManager.get().bossRespawnMessages.spawnMessage = value
                 )
         );
+        componentsByCategory.get(SettingsCategory.BOSS_RESPAWN_MESSAGES).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Spawned clan message",
+                        () -> ConfigManager.get().bossRespawnMessages.spawnClanMessage,
+                        value -> ConfigManager.get().bossRespawnMessages.spawnClanMessage = value
+                )
+        );
 
         componentsByCategory.get(SettingsCategory.BOSS_RESPAWN_MESSAGES).add(
                 new ToggleSettingsComponent(
@@ -422,6 +514,14 @@ public class HudSettingsPanel {
                         value -> ConfigManager.get().bossRespawnMessages.curseMessage = value
                 )
         );
+        componentsByCategory.get(SettingsCategory.BOSS_RESPAWN_MESSAGES).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Curse clan message",
+                        () -> ConfigManager.get().bossRespawnMessages.curseClanMessage,
+                        value -> ConfigManager.get().bossRespawnMessages.curseClanMessage = value
+                )
+        );
 
         componentsByCategory.get(SettingsCategory.BOSS_RESPAWN_MESSAGES).add(
                 new ToggleSettingsComponent(
@@ -429,6 +529,14 @@ public class HudSettingsPanel {
                         "Low HP message",
                         () -> ConfigManager.get().bossRespawnMessages.lowHealthMessage,
                         value -> ConfigManager.get().bossRespawnMessages.lowHealthMessage = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.BOSS_RESPAWN_MESSAGES).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Low HP clan message",
+                        () -> ConfigManager.get().bossRespawnMessages.lowHealthClanMessage,
+                        value -> ConfigManager.get().bossRespawnMessages.lowHealthClanMessage = value
                 )
         );
 
@@ -558,6 +666,53 @@ public class HudSettingsPanel {
         );
 
         componentsByCategory.get(SettingsCategory.FISHING).add(
+                new CycleSettingsComponent<>(0, 0, 0, 0, "Nibbles visibility",
+                        () -> ConfigManager.get().fishing.nibblesVisibility,
+                        value -> ConfigManager.get().fishing.nibblesVisibility = value,
+                        FishingWidgetVisibility.values(), FishingWidgetVisibility::displayName)
+        );
+
+        componentsByCategory.get(SettingsCategory.FISHING).add(
+                new CycleSettingsComponent<>(0, 0, 0, 0, "Nibbles sorting",
+                        () -> ConfigManager.get().fishing.nibblesSort,
+                        value -> ConfigManager.get().fishing.nibblesSort = value,
+                        FishingNibblesSort.values(), FishingNibblesSort::displayName)
+        );
+
+        componentsByCategory.get(SettingsCategory.FISHING).add(
+                new ToggleSettingsComponent(0, 0, 0, 0, "Show fishing quests widget",
+                        () -> ConfigManager.get().fishing.showFishingQuestsWidget,
+                        value -> ConfigManager.get().fishing.showFishingQuestsWidget = value)
+        );
+
+        componentsByCategory.get(SettingsCategory.FISHING).add(
+                new CycleSettingsComponent<>(0, 0, 0, 0, "Quests visibility",
+                        () -> ConfigManager.get().fishing.questsVisibility,
+                        value -> ConfigManager.get().fishing.questsVisibility = value,
+                        FishingWidgetVisibility.values(), FishingWidgetVisibility::displayName)
+        );
+
+        componentsByCategory.get(SettingsCategory.FISHING).add(
+                new CycleSettingsComponent<>(0, 0, 0, 0, "Quest dimension",
+                        () -> ConfigManager.get().fishing.questsTypeFilter,
+                        value -> ConfigManager.get().fishing.questsTypeFilter = value,
+                        FishingQuestTypeFilter.values(), FishingQuestTypeFilter::displayName)
+        );
+
+        componentsByCategory.get(SettingsCategory.FISHING).add(
+                new CycleSettingsComponent<>(0, 0, 0, 0, "Quest descriptions",
+                        () -> ConfigManager.get().fishing.questsDescription,
+                        value -> ConfigManager.get().fishing.questsDescription = value,
+                        FishingQuestDescriptionMode.values(), FishingQuestDescriptionMode::displayName)
+        );
+
+        componentsByCategory.get(SettingsCategory.FISHING).add(
+                new ToggleSettingsComponent(0, 0, 0, 0, "Higher nibble notification",
+                        () -> ConfigManager.get().fishing.higherBitingNotification,
+                        value -> ConfigManager.get().fishing.higherBitingNotification = value)
+        );
+
+        componentsByCategory.get(SettingsCategory.FISHING).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
                         "AutoFish",
@@ -572,7 +727,7 @@ public class HudSettingsPanel {
                         "AutoFish delay",
                         () -> ConfigManager.get().fishing.autoFishDelayTicks,
                         value -> ConfigManager.get().fishing.autoFishDelayTicks = value,
-                        1, 20
+                        0, 40
                 )
         );
 
@@ -785,6 +940,24 @@ public class HudSettingsPanel {
         componentsByCategory.get(SettingsCategory.POP_UPS).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
+                        "Event: Boss captured",
+                        () -> ConfigManager.get().popUps.bossCaptureEvent,
+                        value -> ConfigManager.get().popUps.bossCaptureEvent = value
+                )
+        );
+
+        componentsByCategory.get(SettingsCategory.POP_UPS).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Event: Game event",
+                        () -> ConfigManager.get().popUps.gameEvent,
+                        value -> ConfigManager.get().popUps.gameEvent = value
+                )
+        );
+
+        componentsByCategory.get(SettingsCategory.POP_UPS).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
                         "Event: Ability ready",
                         () -> ConfigManager.get().popUps.abilityReadyEvent,
                         value -> ConfigManager.get().popUps.abilityReadyEvent = value
@@ -824,6 +997,15 @@ public class HudSettingsPanel {
                         "Event: Miner returned",
                         () -> ConfigManager.get().popUps.minerReturnedEvent,
                         value -> ConfigManager.get().popUps.minerReturnedEvent = value
+                )
+        );
+
+        componentsByCategory.get(SettingsCategory.POP_UPS).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Event: Level requirements",
+                        () -> ConfigManager.get().popUps.levelReadyEvent,
+                        value -> ConfigManager.get().popUps.levelReadyEvent = value
                 )
         );
 
@@ -1028,14 +1210,6 @@ public class HudSettingsPanel {
         componentsByCategory.get(SettingsCategory.RENDER).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
-                        "Alchemy markers",
-                        () -> ConfigManager.get().render.showAlchemyIngredientMarkers,
-                        value -> ConfigManager.get().render.showAlchemyIngredientMarkers = value
-                )
-        );
-        componentsByCategory.get(SettingsCategory.RENDER).add(
-                new ToggleSettingsComponent(
-                        0, 0, 0, 0,
                         "Dungeon decorations highlight",
                         () -> ConfigManager.get().render.dungeonDecorationHighlight,
                         value -> ConfigManager.get().render.dungeonDecorationHighlight = value
@@ -1163,6 +1337,14 @@ public class HudSettingsPanel {
         componentsByCategory.get(SettingsCategory.WIDGET).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
+                        "Show Level Progress Bar",
+                        () -> ConfigManager.get().levelProgress.showBar,
+                        value -> ConfigManager.get().levelProgress.showBar = value
+                ).withVisibility(() -> ConfigManager.get().levelProgress.active)
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
                         "Show Block Counter Widget",
                         () -> ConfigManager.get().blocksPerSecondWidget.active,
                         value -> ConfigManager.get().blocksPerSecondWidget.active = value
@@ -1193,6 +1375,16 @@ public class HudSettingsPanel {
                         () -> ConfigManager.get().potionRecipe.active,
                         value -> ConfigManager.get().potionRecipe.active = value
                 )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new CycleSettingsComponent<>(
+                        0, 0, 0, 0,
+                        "Potion Recipe Visibility",
+                        () -> ConfigManager.get().potionRecipe.visibility,
+                        value -> ConfigManager.get().potionRecipe.visibility = value,
+                        PotionRecipeVisibility.values(),
+                        PotionRecipeVisibility::getTitle
+                ).withVisibility(() -> ConfigManager.get().potionRecipe.active)
         );
         componentsByCategory.get(SettingsCategory.WIDGET).add(
                 new ToggleSettingsComponent(
@@ -1243,7 +1435,7 @@ public class HudSettingsPanel {
         componentsByCategory.get(SettingsCategory.WIDGET).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
-                        "Show Potions Widget",
+                        "Show Potion Cooldowns",
                         () -> ConfigManager.get().potionTimers.active,
                         value -> ConfigManager.get().potionTimers.active = value
                 )
@@ -1251,7 +1443,24 @@ public class HudSettingsPanel {
         componentsByCategory.get(SettingsCategory.WIDGET).add(
                 new SliderSettingsComponent(
                         0, 0, 0, 0,
-                        "Potion Keep After Expiry (s)",
+                        "Potion Rows",
+                        () -> ConfigManager.get().potionTimers.maxEntries,
+                        value -> ConfigManager.get().potionTimers.maxEntries = value,
+                        1, 15
+                ).withVisibility(() -> ConfigManager.get().potionTimers.active)
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Potion Icons",
+                        () -> ConfigManager.get().potionTimers.showIcons,
+                        value -> ConfigManager.get().potionTimers.showIcons = value
+                ).withVisibility(() -> ConfigManager.get().potionTimers.active)
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new SliderSettingsComponent(
+                        0, 0, 0, 0,
+                        "Potion Ready Grace (s)",
                         () -> ConfigManager.get().potionTimers.belowZeroSeconds,
                         value -> ConfigManager.get().potionTimers.belowZeroSeconds = value,
                         0, 60
@@ -1266,12 +1475,30 @@ public class HudSettingsPanel {
                 )
         );
         componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new CycleSettingsComponent<>(
+                        0, 0, 0, 0,
+                        "Seller Filter",
+                        () -> ConfigManager.get().sellerCooldown.filter,
+                        value -> ConfigManager.get().sellerCooldown.filter = value,
+                        SellerCooldownFilter.values(),
+                        SellerCooldownFilter::getTitle
+                ).withVisibility(() -> ConfigManager.get().sellerCooldown.active)
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
                         "Show Combo Progress",
                         () -> ConfigManager.get().comboProgress.active,
                         value -> ConfigManager.get().comboProgress.active = value
                 )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Show Combo Progress Bar",
+                        () -> ConfigManager.get().comboProgress.showBar,
+                        value -> ConfigManager.get().comboProgress.showBar = value
+                ).withVisibility(() -> ConfigManager.get().comboProgress.active)
         );
         componentsByCategory.get(SettingsCategory.WIDGET).add(
                 new ToggleSettingsComponent(
@@ -1345,6 +1572,31 @@ public class HudSettingsPanel {
                         "Show Dungeon / Siege Map Widget",
                         () -> ConfigManager.get().dungeonMap.active,
                         value -> ConfigManager.get().dungeonMap.active = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new StepperSettingsComponent(
+                        0, 0, 0, 0,
+                        "Siege Map Zoom",
+                        () -> ConfigManager.get().dungeonMap.siegeZoomPercent,
+                        value -> ConfigManager.get().dungeonMap.siegeZoomPercent = value,
+                        100, 310, 25
+                )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Rotate Siege Map",
+                        () -> ConfigManager.get().dungeonMap.rotateSiegeMap,
+                        value -> ConfigManager.get().dungeonMap.rotateSiegeMap = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Hide Physical Siege Maps",
+                        () -> ConfigManager.get().dungeonMap.hidePhysicalSiegeMap,
+                        value -> ConfigManager.get().dungeonMap.hidePhysicalSiegeMap = value
                 )
         );
         componentsByCategory.get(SettingsCategory.WIDGET).add(

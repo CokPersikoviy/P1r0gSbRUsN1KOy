@@ -9,6 +9,9 @@ public final class LevelProgressStore {
     private volatile boolean maxLevel;
     private volatile boolean hasCurrentData;
     private volatile boolean hasRequirementData;
+    private volatile long levelInfoRevision;
+    private volatile boolean lastLevelInfoCompleted;
+    private volatile long lastCompletionRevision;
 
     public void updateCurrent(Integer level, Integer blocks, Double money) {
         if (level == null && blocks == null && money == null) {
@@ -31,14 +34,36 @@ public final class LevelProgressStore {
         int sanitizedBlocks = Math.max(0, requiredBlocks);
         double sanitizedMoney = Math.max(0.0D, requiredMoney);
 
-        if (!maxLevel && hasRequirementData && sanitizedBlocks == 0 && sanitizedMoney == 0.0D) {
-            return;
-        }
-
         this.requiredBlocks = sanitizedBlocks;
         this.requiredMoney = sanitizedMoney;
         this.maxLevel = maxLevel;
         this.hasRequirementData = true;
+    }
+
+    public void updateFromLevelInfo(
+            int level,
+            int blocks,
+            double money,
+            int requiredBlocks,
+            double requiredMoney,
+            boolean maxLevel
+    ) {
+        this.level = Math.max(0, level);
+        this.blocks = Math.max(0, blocks);
+        this.money = Math.max(0.0D, money);
+        this.requiredBlocks = Math.max(0, requiredBlocks);
+        this.requiredMoney = Math.max(0.0D, requiredMoney);
+        this.maxLevel = maxLevel;
+        this.hasCurrentData = true;
+        this.hasRequirementData = true;
+        this.levelInfoRevision++;
+        boolean completed = !maxLevel
+                && this.blocks >= this.requiredBlocks
+                && this.money >= this.requiredMoney;
+        if (completed && !lastLevelInfoCompleted) {
+            this.lastCompletionRevision = this.levelInfoRevision;
+        }
+        this.lastLevelInfoCompleted = completed;
     }
 
     public LevelProgressSnapshot getSnapshot() {
@@ -49,7 +74,9 @@ public final class LevelProgressStore {
                 requiredBlocks,
                 requiredMoney,
                 maxLevel,
-                hasCurrentData && hasRequirementData
+                hasCurrentData && hasRequirementData,
+                levelInfoRevision,
+                lastCompletionRevision
         );
     }
 
@@ -59,9 +86,12 @@ public final class LevelProgressStore {
         money = 0.0D;
         requiredBlocks = 0;
         requiredMoney = 0.0D;
-        maxLevel = false;
+        maxLevel = true;
         hasCurrentData = false;
         hasRequirementData = false;
+        levelInfoRevision = 0L;
+        lastLevelInfoCompleted = false;
+        lastCompletionRevision = 0L;
     }
 
     public record LevelProgressSnapshot(
@@ -71,10 +101,13 @@ public final class LevelProgressStore {
             int requiredBlocks,
             double requiredMoney,
             boolean maxLevel,
-            boolean available
+            boolean available,
+            long levelInfoRevision,
+            long lastCompletionRevision
     ) {
         public boolean completed() {
-            return !maxLevel
+            return available
+                    && !maxLevel
                     && blocks >= requiredBlocks
                     && money >= requiredMoney;
         }

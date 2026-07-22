@@ -3,18 +3,19 @@ package ru.wilyfox.client.hud.widget;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.item.Items;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.FishingNibblesSort;
+import ru.wilyfox.client.hud.config.FishingWidgetVisibility;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 public final class FishingNibblesWidget extends AbstractWidget {
     private static final int PADDING_X = 6;
@@ -69,8 +70,8 @@ public final class FishingNibblesWidget extends AbstractWidget {
     @Override
     public boolean isVisible() {
         return ConfigManager.get().fishing.showFishingNibblesWidget
-                && (isEditorPreview()
-                || (DiamondWorldProtocolClient.isCurrentFishingLocation() && DiamondWorldProtocolClient.hasFishingNibbles()));
+                && (isEditorPreview() || (matchesVisibility(ConfigManager.get().fishing.nibblesVisibility)
+                && DiamondWorldProtocolClient.hasFishingNibbles()));
     }
 
     @Override
@@ -93,7 +94,7 @@ public final class FishingNibblesWidget extends AbstractWidget {
     }
 
     private List<String> buildLines() {
-        if (!DiamondWorldProtocolClient.isCurrentFishingLocation() || !DiamondWorldProtocolClient.hasFishingNibbles()) {
+        if (!DiamondWorldProtocolClient.hasFishingNibbles()) {
             if (!isEditorPreview()) {
                 return List.of();
             }
@@ -110,20 +111,37 @@ public final class FishingNibblesWidget extends AbstractWidget {
         List<String> lines = new ArrayList<>();
         Map<String, Double> nibbles = DiamondWorldProtocolClient.getFishingNibbles();
         Map<String, String> locationNames = DiamondWorldProtocolClient.getFishingLocationNames();
-        Set<String> locationIds = new LinkedHashSet<>(locationNames.keySet());
-        locationIds.addAll(nibbles.keySet());
+        Comparator<Map.Entry<String, Double>> comparator = ConfigManager.get().fishing.nibblesSort == FishingNibblesSort.NIBBLE
+                ? Comparator.<Map.Entry<String, Double>>comparingDouble(Map.Entry::getValue).reversed()
+                : Comparator.<Map.Entry<String, Double>>comparingInt(entry -> dimensionOrder(entry.getKey()))
+                        .thenComparing(Map.Entry.<String, Double>comparingByValue().reversed());
 
-        for (String locationId : locationIds.stream()
-                .sorted(Comparator
-                        .comparingDouble((String id) -> nibbles.getOrDefault(id, Double.NEGATIVE_INFINITY))
-                        .reversed()
-                        .thenComparing(id -> DiamondWorldProtocolClient.getFishingLocationName(id), String.CASE_INSENSITIVE_ORDER))
+        for (Map.Entry<String, Double> entry : nibbles.entrySet().stream()
+                .filter(entry -> locationNames.containsKey(entry.getKey()))
+                .sorted(comparator.thenComparing(entry -> locationNames.get(entry.getKey()), String.CASE_INSENSITIVE_ORDER))
                 .toList()) {
-            String name = DiamondWorldProtocolClient.getFishingLocationName(locationId);
-            Double nibble = nibbles.get(locationId);
-            lines.add(name + " - " + (nibble != null ? String.format(Locale.ROOT, "%.1f%%", nibble) : "-"));
+            String name = locationNames.get(entry.getKey());
+            lines.add(name + " - " + String.format(Locale.ROOT, "%.1f%%", entry.getValue()));
         }
         return lines;
+    }
+
+    private static boolean matchesVisibility(FishingWidgetVisibility visibility) {
+        Minecraft mc = Minecraft.getInstance();
+        return switch (visibility) {
+            case ALWAYS -> true;
+            case FISHING_WARP -> DiamondWorldProtocolClient.isCurrentFishingLocation();
+            case FISHING_ROD -> mc.player != null && mc.player.getMainHandItem().is(Items.FISHING_ROD);
+        };
+    }
+
+    private static int dimensionOrder(String id) {
+        return switch (id) {
+            case "overworld" -> 0;
+            case "nether" -> 1;
+            case "end" -> 2;
+            default -> Integer.MAX_VALUE;
+        };
     }
 
     private int getUnscaledWidth(List<String> lines, Minecraft mc) {
@@ -158,4 +176,3 @@ public final class FishingNibblesWidget extends AbstractWidget {
         context.drawString(mc.font, "No fishing data", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
     }
 }
-

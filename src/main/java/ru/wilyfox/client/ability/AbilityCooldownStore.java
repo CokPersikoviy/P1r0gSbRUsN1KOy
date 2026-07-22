@@ -1,15 +1,26 @@
 package ru.wilyfox.client.ability;
 
-import ru.wilyfox.utils.CooldownWindow;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.LongSupplier;
 
 public class AbilityCooldownStore {
-    private final Map<String, Entry> entries = new LinkedHashMap<>();
+    private static final long PROTOCOL_DISPLAY_THRESHOLD_MS = 1_000L;
+
+    private final Map<String, StoredCooldown> entries = new LinkedHashMap<>();
     private final Map<String, String> names = new LinkedHashMap<>();
+    private final LongSupplier clock;
+
+    public AbilityCooldownStore() {
+        this(System::currentTimeMillis);
+    }
+
+    AbilityCooldownStore(LongSupplier clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
 
     public void replaceTypes(Map<String, String> updatedNames) {
         names.clear();
@@ -20,7 +31,11 @@ public class AbilityCooldownStore {
         cleanup();
 
         for (Map.Entry<String, Long> entry : remainingMillisById.entrySet()) {
-            upsertCooldown(entry.getKey(), names.getOrDefault(entry.getKey(), entry.getKey()), entry.getValue());
+            String id = entry.getKey();
+            long remainingMillis = entry.getValue();
+            if (id != null && !id.isBlank() && remainingMillis > PROTOCOL_DISPLAY_THRESHOLD_MS) {
+                entries.put(id, new StoredCooldown(clock.getAsLong() + remainingMillis, null));
+            }
         }
     }
 
@@ -29,33 +44,26 @@ public class AbilityCooldownStore {
             return;
         }
 
-        upsertCooldown(id, name, remainingMillis);
-    }
-
-    private void upsertCooldown(String id, String name, long remainingMillis) {
-        Entry previous = entries.get(id);
-        CooldownWindow previousWindow = previous == null
-                ? null
-                : new CooldownWindow(previous.startedAt(), previous.endsAt(), previous.durationMillis());
-
-        CooldownWindow window = CooldownWindow.extend(previousWindow, remainingMillis);
-        if (window == null) {
+        if (remainingMillis <= 0L) {
             entries.remove(id);
             return;
         }
 
-        entries.put(id, new Entry(
-                id,
-                name != null && !name.isBlank() ? name : id,
-                window.startedAt(),
-                window.endsAt(),
-                window.durationMillis()
-        ));
+        String explicitName = name != null && !name.isBlank() ? name : id;
+        entries.put(id, new StoredCooldown(clock.getAsLong() + remainingMillis, explicitName));
     }
 
     public List<Entry> getActiveEntries() {
         cleanup();
-        return new ArrayList<>(entries.values());
+        long now = clock.getAsLong();
+        List<Entry> result = new ArrayList<>(entries.size());
+        entries.forEach((id, cooldown) -> result.add(new Entry(
+                id,
+                resolveName(id, cooldown),
+                cooldown.endsAt(),
+                Math.max(0L, cooldown.endsAt() - now)
+        )));
+        return result;
     }
 
     public boolean hasActiveEntries() {
@@ -69,27 +77,26 @@ public class AbilityCooldownStore {
     }
 
     private void cleanup() {
-        long now = System.currentTimeMillis();
+        long now = clock.getAsLong();
         entries.entrySet().removeIf(entry -> entry.getValue().endsAt() <= now);
+    }
+
+    private String resolveName(String id, StoredCooldown cooldown) {
+        if (cooldown.explicitName() != null && !cooldown.explicitName().isBlank()) {
+            return cooldown.explicitName();
+        }
+        String resolved = names.get(id);
+        return resolved != null && !resolved.isBlank() ? resolved : id;
+    }
+
+    private record StoredCooldown(long endsAt, String explicitName) {
     }
 
     public record Entry(
             String id,
             String name,
-            long startedAt,
             long endsAt,
-            long durationMillis
+            long remainingMillis
     ) {
-        public long remainingMillis() {
-            return Math.max(0L, endsAt - System.currentTimeMillis());
-        }
-
-        public float progress() {
-            if (durationMillis <= 0L) {
-                return 0.0F;
-            }
-
-            return remainingMillis() / (float) durationMillis;
-        }
     }
 }

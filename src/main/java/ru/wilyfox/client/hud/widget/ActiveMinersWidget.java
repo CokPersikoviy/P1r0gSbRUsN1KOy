@@ -9,9 +9,9 @@ import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.miner.ActiveMinerInfo;
 import ru.wilyfox.client.miner.ActiveMinersStore;
-import ru.wilyfox.utils.Formatting;
 
 import java.util.List;
+import java.util.Locale;
 
 public class ActiveMinersWidget extends AbstractWidget {
     private static final int PADDING_X = 6;
@@ -173,17 +173,16 @@ public class ActiveMinersWidget extends AbstractWidget {
     }
 
     private String formatState(ActiveMinerInfo miner) {
-        long now = System.currentTimeMillis();
         if (miner.isDead()) {
             return "\u041f\u043e\u0433\u0438\u0431";
         }
 
-        if (miner.isComplete(now)) {
+        if (miner.isComplete()) {
             return "\u0412\u0435\u0440\u043d\u0443\u043b\u0441\u044f";
         }
 
         if (miner.isInTravel()) {
-            return Formatting.formatMillis(miner.homecomingAt());
+            return formatRemaining(miner.remainingMillis());
         }
 
         return prettifyStatus(miner.status());
@@ -194,7 +193,7 @@ public class ActiveMinersWidget extends AbstractWidget {
             return WidgetTheme.TEXT_SECONDARY;
         }
 
-        if (miner.isComplete(System.currentTimeMillis())) {
+        if (miner.isComplete()) {
             return WidgetTheme.TEXT_PRIMARY;
         }
 
@@ -226,5 +225,16 @@ public class ActiveMinersWidget extends AbstractWidget {
         }
 
         return builder.isEmpty() ? normalized : builder.toString();
+    }
+
+    private static String formatRemaining(long remainingMillis) {
+        long totalSeconds = Math.max(0L, remainingMillis) / 1000L;
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        long seconds = totalSeconds % 60L;
+
+        return hours > 0L
+                ? String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes, seconds)
+                : String.format(Locale.ROOT, "%02d:%02d", minutes, seconds);
     }
 }

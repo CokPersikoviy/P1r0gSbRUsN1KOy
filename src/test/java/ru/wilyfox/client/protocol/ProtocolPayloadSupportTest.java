@@ -8,10 +8,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import ru.wilyfox.client.miner.ActiveMinerInfo;
 import ru.wilyfox.client.pet.ActivePetInfo;
+import ru.wilyfox.client.pet.ActivePetsStore;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -39,7 +41,7 @@ class ProtocolPayloadSupportTest {
         List<ActiveMinerInfo> result = ProtocolPayloadSupport.extractActiveMiners(
                 state,
                 new DwStatisticInfoPacket(Map.of("miners", miners))
-        );
+        ).orElseThrow();
 
         assertEquals(2, result.getFirst().level());
         assertEquals(Instant.parse(isoTime).toEpochMilli(), result.getFirst().homecomingAt());
@@ -49,10 +51,87 @@ class ProtocolPayloadSupportTest {
 
     @Test
     void expiredTravelIsEffectivelyComplete() {
-        ActiveMinerInfo miner = new ActiveMinerInfo(null, 1, "Mobs", "IN_TRAVEL", 1_000L);
+        long receivedAt = 1_000_000L;
+        ActiveMinerInfo miner = new ActiveMinerInfo(
+                null,
+                1,
+                "MOBS",
+                2,
+                "Mobs",
+                "IN_TRAVEL",
+                1_000L,
+                receivedAt,
+                10_000L
+        );
 
-        assertTrue(miner.isComplete(1_001L));
-        assertFalse(miner.isComplete(999L));
+        assertFalse(miner.isCompleteAt(receivedAt + TimeUnit.SECONDS.toNanos(9L)));
+        assertTrue(miner.isCompleteAt(receivedAt + TimeUnit.SECONDS.toNanos(10L)));
+        assertEquals(6_000L, miner.remainingMillisAt(receivedAt + TimeUnit.SECONDS.toNanos(4L)));
+    }
+
+    @Test
+    void singleMinerObjectIsNormalizedAndLevelComesOnlyFromExperience() {
+        ProtocolState state = new ProtocolState();
+        state.loggedFirstMinerPayload = true;
+        String minerObject = """
+                {"status":"IN_TRAVEL","exp":31,"level":99,
+                 "data":{"category":"MOBS","homecoming":1234567890000},"spriteIdOffset":2}
+                """;
+
+        List<ActiveMinerInfo> miners = ProtocolPayloadSupport.extractActiveMiners(
+                state,
+                new DwStatisticInfoPacket(Map.of("miners", minerObject))
+        ).orElseThrow();
+
+        assertEquals(1, miners.size());
+        assertEquals(2, miners.getFirst().level());
+        assertEquals("MOBS_2", miners.getFirst().id());
+    }
+
+    @Test
+    void missingOrNullMinersValueDoesNotReplacePreviousSnapshot() {
+        ProtocolState state = new ProtocolState();
+
+        assertTrue(ProtocolPayloadSupport.extractActiveMiners(
+                state,
+                new DwStatisticInfoPacket(Map.of("location", "spawn"))
+        ).isEmpty());
+        assertTrue(ProtocolPayloadSupport.extractActiveMiners(
+                state,
+                new DwStatisticInfoPacket(Map.of("miners", "null"))
+        ).isEmpty());
+    }
+
+    @Test
+    void emptyMinerArrayIsAnExplicitEmptySnapshot() {
+        ProtocolState state = new ProtocolState();
+
+        List<ActiveMinerInfo> miners = ProtocolPayloadSupport.extractActiveMiners(
+                state,
+                new DwStatisticInfoPacket(Map.of("miners", "[]"))
+        ).orElseThrow();
+
+        assertTrue(miners.isEmpty());
+    }
+
+    @Test
+    void minersInSameCategoryRemainDistinctBySpriteOffset() {
+        ProtocolState state = new ProtocolState();
+        state.loggedFirstMinerPayload = true;
+        String minersJson = """
+                [
+                  {"status":"IN_TRAVEL","exp":0,"data":{"category":"MOBS"},"spriteIdOffset":1},
+                  {"status":"IN_TRAVEL","exp":0,"data":{"category":"MOBS"},"spriteIdOffset":2}
+                ]
+                """;
+
+        List<ActiveMinerInfo> miners = ProtocolPayloadSupport.extractActiveMiners(
+                state,
+                new DwStatisticInfoPacket(Map.of("miners", minersJson))
+        ).orElseThrow();
+
+        assertEquals(2, miners.size());
+        assertEquals(List.of("MOBS_1", "MOBS_2"), miners.stream().map(ActiveMinerInfo::id).toList());
     }
 
     @Test
@@ -64,10 +143,73 @@ class ProtocolPayloadSupportTest {
         ActivePetInfo pet = ProtocolPayloadSupport.extractActivePets(
                 state,
                 new DwStatisticInfoPacket(Map.of("pets", pets))
-        ).getFirst();
+        ).orElseThrow().getFirst();
 
         assertEquals("Wolf", pet.name());
+        assertTrue(pet.resolved());
         CustomModelData modelData = pet.icon().get(DataComponents.CUSTOM_MODEL_DATA);
         assertEquals(321.0F, modelData.getFloat(0));
+    }
+
+    @Test
+    void singlePetObjectIsNormalizedToList() {
+        ProtocolState state = new ProtocolState();
+        String petObject = "{\"pet\":\"WOLF\",\"level\":5,\"exp\":12.5,\"energy\":7.4}";
+
+        List<ActivePetInfo> pets = ProtocolPayloadSupport.extractActivePets(
+                state,
+                new DwStatisticInfoPacket(Map.of("pets", petObject))
+        ).orElseThrow();
+
+        assertEquals(1, pets.size());
+        assertEquals("WOLF", pets.getFirst().id());
+        assertFalse(pets.getFirst().resolved());
+    }
+
+    @Test
+    void missingOrNullPetsValueDoesNotReplacePreviousSnapshot() {
+        ProtocolState state = new ProtocolState();
+
+        assertTrue(ProtocolPayloadSupport.extractActivePets(
+                state,
+                new DwStatisticInfoPacket(Map.of("location", "spawn"))
+        ).isEmpty());
+        assertTrue(ProtocolPayloadSupport.extractActivePets(
+                state,
+                new DwStatisticInfoPacket(Map.of("pets", "null"))
+        ).isEmpty());
+    }
+
+    @Test
+    void emptyPetArrayIsAnExplicitEmptySnapshot() {
+        ProtocolState state = new ProtocolState();
+
+        List<ActivePetInfo> pets = ProtocolPayloadSupport.extractActivePets(
+                state,
+                new DwStatisticInfoPacket(Map.of("pets", "[]"))
+        ).orElseThrow();
+
+        assertTrue(pets.isEmpty());
+    }
+
+    @Test
+    void unresolvedPetBecomesVisibleAfterPetTypesArrive() {
+        ProtocolState state = new ProtocolState();
+        String petsJson = "[{\"pet\":\"WOLF\",\"level\":5,\"exp\":12.5,\"energy\":7.4}]";
+        ActivePetsStore store = new ActivePetsStore();
+        store.replace(ProtocolPayloadSupport.extractActivePets(
+                state,
+                new DwStatisticInfoPacket(Map.of("pets", petsJson))
+        ).orElseThrow());
+
+        assertFalse(store.hasResolved());
+
+        state.petTypes = Map.of("WOLF", new DwPetType("WOLF", "Wolf", "COMMON", "minecraft:bone", 321));
+        store.replace(store.getAll().stream()
+                .map(pet -> ProtocolPayloadSupport.enrichActivePet(state, pet))
+                .toList());
+
+        assertTrue(store.hasResolved());
+        assertEquals("Wolf", store.getResolved().getFirst().name());
     }
 }

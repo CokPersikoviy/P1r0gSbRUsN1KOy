@@ -33,25 +33,28 @@ public final class ProtocolGraphTelemetry {
         registerRoute("sellers", "DwSellersDecoder", "handleSellers", outputs(store("sellerCooldownStore"), widget("SellerCooldownWidget")));
         registerRoute("combo", "DwComboDecoder", "handleCombo", outputs(store("comboProgressStore"), widget("ComboProgressWidget")));
         registerRoute("comboblocks", "DwComboBlocksDecoder", "handleComboBlocks", outputs(store("comboProgressStore"), widget("ComboProgressWidget")));
-        registerRoute("potiontimers", "DwPotionTimersDecoder", "handlePotionTimers", outputs(store("potionStore"), widget("PotionTimersWidget")));
+        registerRoute("potiontimers", "DwPotionTimersDecoder", "handlePotionTimers", outputs(store("potionStore")));
         registerRoute("statisticinfo", "DwStatisticInfoDecoder", "handleStatisticInfo", outputs(store("activePetsStore"), store("activeMinersStore"), state("currentGameLocation")));
         registerRoute("fishingpots", "DwFishingSpotsDecoder", "handleFishingSpots", outputs(state("fishingLocationIds"), widget("FishingNibblesWidget")));
         registerRoute("spotnibbles", "DwSpotNibblesDecoder", "handleSpotNibbles", outputs(state("fishingNibbles"), widget("FishingNibblesWidget")));
+        registerRoute("hourlyquestypes", "DwHourlyQuestTypesDecoder", "handleHourlyQuestTypes", outputs(state("hourlyQuestTypes"), widget("FishingQuestsWidget")));
+        registerRoute("hourlyquestinfo", "DwHourlyQuestInfoDecoder", "handleHourlyQuestInfo", outputs(state("hourlyQuestProgress"), widget("FishingQuestsWidget")));
         registerRoute("stafftypes", "DwStaffTypesDecoder", "handleStaffTypes", outputs(state("staffTypes"), widget("WandCooldownWidget")));
         registerRoute("stafftimers", "DwStaffTimersDecoder", "handleStaffTimers", outputs(store("WandCooldownTracker"), widget("WandCooldownWidget")));
         registerRoute("abilitytypes", "DwAbilityTypesDecoder", "handleAbilityTypes", outputs(state("abilityTypes"), widget("AbilityCooldownWidget")));
         registerRoute("abilitytimers", "DwAbilityTimersDecoder", "handleAbilityTimers", outputs(store("abilityCooldownStore"), widget("AbilityCooldownWidget")));
         registerRoute("bossdamage", "DwBossDamageDecoder", "handleBossDamage", outputs(store("bossDamageStore"), widget("BossDamageWidget")));
-        registerRoute("bosscollect", "DwBossCollectDecoder", "handleBossCollect", outputs(state("bossCollectibles")));
+        registerRoute("bosscollect", "DwBossCollectDecoder", "handleBossCollect", outputs(state("bossCollectibles"), widget("BossHudWidget")));
         registerRoute("levelinfo", "DwLevelInfoDecoder", "handleLevelInfo", outputs(store("levelProgressStore"), widget("LevelProgressWidget")));
         registerRoute("harpooncd", "DwCooldownValueDecoder", "handleHarpoonCooldown", outputs(store("WandCooldownTracker"), widget("WandCooldownWidget")));
         registerRoute("marketcd", "DwCooldownValueDecoder", "handleNamedCooldown", outputs(state("externalCooldowns")));
         registerRoute("gourmetcd", "DwCooldownValueDecoder", "handleGourmetCooldown", outputs(store("abilityCooldownStore"), widget("AbilityCooldownWidget")));
-        registerRoute("potioncd", "DwPotionCooldownsDecoder", "handlePotionCooldowns", outputs(store("potionStore")));
+        registerRoute("potioncd", "DwPotionCooldownsDecoder", "handlePotionCooldowns", outputs(store("potionStore"), widget("PotionTimersWidget")));
         registerRoute("token", "DwTokenDecoder", "handleToken", outputs(state("token")));
         registerRoute("boosters", "DwBoostersDecoder", "handleBoosters", outputs(store("boosterStore"), widget("BoostersWidget")));
         registerRoute("gameevent", "DwGameEventDecoder", "handleGameEvent", outputs(state("currentGameEvent")));
         registerRoute("claninfo", "DwClanInfoDecoder", "handleClanInfo", outputs(state("clanInfo")));
+        registerRoute("siegepos", "DwClanSiegePositionDecoder", "handleClanSiegePosition", outputs(state("clanSiegePosition"), widget("DungeonMapWidget")));
     }
 
     public static ProtocolGraphTelemetry getInstance() {

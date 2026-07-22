@@ -6,15 +6,19 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.BossHealthOverlay;
 import net.minecraft.client.gui.components.LerpingBossEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.TextColor;
 import ru.wilyfox.boss.BossInfo;
 import ru.wilyfox.boss.BossRepository;
 import ru.wilyfox.bridge.BossHealthOverlayAccessor;
 import ru.wilyfox.client.hud.config.BossRespawnMessagesConfig;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.popup.PopUpManager;
+import ru.wilyfox.client.popup.PopUpRequest;
+import ru.wilyfox.client.popup.PopUpSeverity;
+import ru.wilyfox.client.popup.PopUpSource;
 import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
-import ru.wilyfox.utils.BossName;
-import ru.wilyfox.utils.BossLevel;
+import ru.wilyfox.client.protocol.DwBossType;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -25,15 +29,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public final class AutoBossAnnouncer {
-    private static final Pattern BOSS_CURSED_PATTERN = Pattern.compile("Босс проклят! Особенность: ([А-Яа-яЁё ]+)");
-    // DW boss-bar title is "<name> <number>❤" (heart U+2764, no space before it). Trailing \D* tolerates
-    // the heart and any other non-digit suffix (e.g. cursed markers) — the old "(?:\s+.*)?" needed a space
-    // before the trailing text, so "<number>❤" failed to match and both HP and name detection broke.
-    private static final Pattern BOSS_HEALTH_PATTERN = Pattern.compile("^(.+?)\\s+(\\d+(?:\\.\\d+)?)\\D*$");
+    private static final int CURSED_BAR_COLOR = 0x25D192;
     private static final long SPAWN_ANNOUNCE_WINDOW_MS = 2_000L;
     private static final long RESPAWN_RESET_GRACE_MS = 5_000L;
     private static final DecimalFormat HEALTH_FORMAT = new DecimalFormat("0.##", DecimalFormatSymbols.getInstance(Locale.US));
@@ -74,21 +72,32 @@ public final class AutoBossAnnouncer {
     }
 
     public static void onIncomingMessage(Component component) {
-        if (component == null || !ConfigManager.get().bossRespawnMessages.curseMessage) {
+        if (component == null) {
             return;
         }
 
-        Matcher matcher = BOSS_CURSED_PATTERN.matcher(component.getString());
-        if (!matcher.find()) {
+        String text = component.getString();
+        BossMessageParser.BossCapture capture = BossMessageParser.parseCapture(text);
+        if (capture != null) {
+            publishBossCapture(capture);
+        }
+
+        BossRespawnMessagesConfig config = ConfigManager.get().bossRespawnMessages;
+        if (!config.curseMessage && !config.curseClanMessage) {
             return;
         }
 
-        BossBarSnapshot snapshot = getCurrentBossBarSnapshot();
-        if (snapshot == null) {
+        String curse = BossMessageParser.parseCurse(text);
+        DwBossType type = DiamondWorldProtocolClient.getCurrentBossType();
+        if (curse == null || type == null) {
             return;
         }
 
-        showLocalMessage(formatBossLabel(snapshot.name(), snapshot.level()) + " проклят: " + matcher.group(1));
+        publishMessage(
+                formatServerPrefix() + formatBossLabel(type.name(), type.level()) + " проклят: " + curse,
+                config.curseMessage,
+                config.curseClanMessage
+        );
     }
 
     private static void checkRespawnMessages() {
@@ -105,20 +114,28 @@ public final class AutoBossAnnouncer {
             resetRespawnAnnouncementIfNewCycle(config, bossKey, remaining);
             resetSpawnAnnouncementIfNewCycle(bossKey, remaining);
 
-            if (config.preRespawnMessage
+            if ((config.preRespawnMessage || config.preRespawnClanMessage)
                     && config.preRespawnSeconds > 0
                     && remaining > 0L
                     && remaining <= config.preRespawnSeconds * 1000L
                     && !announcedRespawns.containsKey(bossKey)) {
-                showLocalMessage(formatBossLabel(boss.getName(), boss.getLevel()) + " возродится через " + formatDuration(remaining));
+                publishMessage(
+                        formatBossLabel(boss.getName(), boss.getLevel()) + " возродится через " + formatDuration(remaining),
+                        config.preRespawnMessage,
+                        config.preRespawnClanMessage
+                );
                 announcedRespawns.put(bossKey, respawnAt);
             }
 
-            if (config.spawnMessage
+            if ((config.spawnMessage || config.spawnClanMessage)
                     && remaining <= 0L
                     && remaining >= -SPAWN_ANNOUNCE_WINDOW_MS
                     && !announcedSpawns.containsKey(bossKey)) {
-                showLocalMessage(formatBossLabel(boss.getName(), boss.getLevel()) + " возродился");
+                publishMessage(
+                        formatBossLabel(boss.getName(), boss.getLevel()) + " возродился",
+                        config.spawnMessage,
+                        config.spawnClanMessage
+                );
                 announcedSpawns.put(bossKey, respawnAt);
             }
         }
@@ -129,7 +146,7 @@ public final class AutoBossAnnouncer {
 
     private static void checkLowHealthMessages() {
         BossRespawnMessagesConfig config = ConfigManager.get().bossRespawnMessages;
-        if (!config.lowHealthMessage) {
+        if (!config.lowHealthMessage && !config.lowHealthClanMessage) {
             return;
         }
 
@@ -151,11 +168,20 @@ public final class AutoBossAnnouncer {
                 ? " осталось " + HEALTH_FORMAT.format(snapshot.health()) + " HP (" + Math.round(snapshot.percent()) + "%)"
                 : " осталось " + Math.round(snapshot.percent()) + "% HP";
 
-        showLocalMessage(formatServerPrefix() + formatBossLabel(snapshot.name(), snapshot.level()) + healthText);
+        String curseMarker = snapshot.cursed() ? " [Прок]" : "";
+        publishMessage(
+                formatServerPrefix() + formatBossLabel(snapshot.name(), snapshot.level()) + curseMarker + healthText,
+                config.lowHealthMessage,
+                config.lowHealthClanMessage
+        );
         lowHealthAnnouncements.put(bossKey, now);
     }
 
     private static BossBarSnapshot getCurrentBossBarSnapshot() {
+        if (!DiamondWorldProtocolClient.isCurrentBossLocation()) {
+            return null;
+        }
+
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.gui == null) {
             return null;
@@ -167,41 +193,18 @@ public final class AutoBossAnnouncer {
         }
 
         List<LerpingBossEvent> events = accessor.froghelper$getEvents();
-        for (int index = 0; index < events.size(); index++) {
-            // Index 0 is always reserved by the server for a status line (player info etc.), never a boss.
-            if (index == 0) {
+        for (LerpingBossEvent event : events) {
+            BossMessageParser.BossBarText parsed = BossMessageParser.parseBossBar(event.getName().getString());
+            if (parsed == null) {
                 continue;
             }
 
-            LerpingBossEvent event = events.get(index);
-            String rawTitle = event.getName().getString().trim();
-
-            // The absolute HP number is best-effort: if the title format doesn't yield one we still
-            // proceed. Detection relies on the bar fill (getProgress) below, so a title that doesn't
-            // match this pattern must not suppress the low-health alert (it did before).
-            String nameCandidate = rawTitle;
-            double health = -1.0d;
-            Matcher matcher = BOSS_HEALTH_PATTERN.matcher(rawTitle);
-            if (matcher.find()) {
-                nameCandidate = matcher.group(1);
-                health = parseDouble(matcher.group(2));
-            }
-
-            String bossName = normalizeBossBarName(nameCandidate);
-            Integer level = BossLevel.getBossLevel(bossName);
-            if (level == null) {
-                String normalizedBossName = BossName.getBossName(bossName.toUpperCase(Locale.ROOT));
-                if (normalizedBossName != null) {
-                    bossName = normalizedBossName;
-                    level = BossLevel.getBossLevel(bossName);
-                }
-            }
-            if (level == null) {
+            DwBossType type = DiamondWorldProtocolClient.getBossTypeByName(parsed.bossName());
+            if (type == null) {
                 continue;
             }
-
             double percent = Math.max(0.0d, Math.min(100.0d, event.getProgress() * 100.0d));
-            return new BossBarSnapshot(bossName, level, health, percent);
+            return new BossBarSnapshot(type.name(), type.level(), parsed.health(), percent, isCursed(event.getName()));
         }
 
         return null;
@@ -235,24 +238,8 @@ public final class AutoBossAnnouncer {
         }
     }
 
-    private static double parseDouble(String text) {
-        try {
-            return Double.parseDouble(text);
-        } catch (NumberFormatException ignored) {
-            return -1.0d;
-        }
-    }
-
     private static String formatBossLabel(String bossName, int level) {
         return bossName + " [" + level + "]";
-    }
-
-    private static String normalizeBossBarName(String rawBossName) {
-        String normalized = rawBossName == null ? "" : rawBossName.trim();
-        if (normalized.startsWith("Босс ")) {
-            normalized = normalized.substring(5).trim();
-        }
-        return normalized;
     }
 
     private static String formatServerPrefix() {
@@ -278,11 +265,48 @@ public final class AutoBossAnnouncer {
 
     private static void showLocalMessage(String message) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player != null && minecraft.player.connection != null) {
-            ChatDispatchQueue.enqueueChat("@" + message, 1_000L);
-        } else if (minecraft.gui != null) {
-            minecraft.gui.getChat().addMessage(Component.literal("@" + message));
+        if (minecraft.gui != null) {
+            minecraft.gui.getChat().addMessage(Component.literal(message));
         }
+    }
+
+    private static void publishMessage(String message, boolean local, boolean clan) {
+        if (local) {
+            showLocalMessage(message);
+        }
+        if (clan) {
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.player != null && minecraft.player.connection != null) {
+                ChatDispatchQueue.enqueueChat("@" + message, 1_000L);
+            }
+        }
+    }
+
+    private static void publishBossCapture(BossMessageParser.BossCapture capture) {
+        DwBossType type = DiamondWorldProtocolClient.getBossTypeByName(capture.bossName());
+        if (type == null || capture.clanName().isBlank()) {
+            return;
+        }
+
+        PopUpManager.getInstance().publish(PopUpRequest.of(
+                PopUpSource.BOSS_CAPTURE,
+                "Босс " + formatBossLabel(type.name(), type.level()) + " захвачен",
+                "кланом " + capture.clanName() + ".",
+                PopUpSeverity.INFO
+        ));
+    }
+
+    private static boolean isCursed(Component component) {
+        TextColor color = component.getStyle().getColor();
+        if (color != null && color.getValue() == CURSED_BAR_COLOR) {
+            return true;
+        }
+        for (Component sibling : component.getSiblings()) {
+            if (isCursed(sibling)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String bossKey(BossInfo boss) {
@@ -295,6 +319,6 @@ public final class AutoBossAnnouncer {
         lowHealthAnnouncements.clear();
     }
 
-    private record BossBarSnapshot(String name, int level, double health, double percent) {
+    private record BossBarSnapshot(String name, int level, double health, double percent, boolean cursed) {
     }
 }

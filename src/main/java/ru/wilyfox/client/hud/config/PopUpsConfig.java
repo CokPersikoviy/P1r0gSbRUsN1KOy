@@ -9,11 +9,14 @@ public class PopUpsConfig {
     public boolean chatCopyEvent = true;
     public boolean privateMessageEvent = true;
     public boolean bossSpawnEvent = true;
+    public boolean bossCaptureEvent = true;
+    public boolean gameEvent = true;
     public boolean abilityReadyEvent = true;
     public boolean wandReadyEvent = true;
     public boolean windStaffReadyEvent = true;
     public boolean sellerReadyEvent = true;
     public boolean minerReturnedEvent = true;
+    public boolean levelReadyEvent = true;
     public boolean runeSetReadyEvent = true;
     public boolean potionExpiredEvent = false;
     public boolean boosterExpiredEvent = false;

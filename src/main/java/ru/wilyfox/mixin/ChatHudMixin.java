@@ -17,15 +17,18 @@ import ru.wilyfox.client.chat.ChatDispatchQueue;
 import ru.wilyfox.client.chat.ChatMessageDecorator;
 import ru.wilyfox.client.chat.ChatTabManager;
 import ru.wilyfox.client.chat.FrogChatProtocol;
+import ru.wilyfox.client.chat.HigherBitingNotifier;
 import ru.wilyfox.client.chat.PrivateMessagePopUpNotifier;
 import ru.wilyfox.client.chat.VisibilityStatusTracker;
 import ru.wilyfox.client.clan.PlayerClanStorage;
+import ru.wilyfox.client.combo.ComboTimerChatTracker;
 import ru.wilyfox.client.moduser.ModUserProtocol;
 
 @Mixin(ChatComponent.class)
 public class ChatHudMixin {
     @ModifyVariable(method = "addMessage(Lnet/minecraft/network/chat/Component;)V", at = @At("HEAD"), argsOnly = true)
     private Component froghelper$decorateChat(Component component) {
+        HigherBitingNotifier.onIncomingMessage(component);
         return ChatMessageDecorator.decorate(component);
     }
 
@@ -37,6 +40,7 @@ public class ChatHudMixin {
         AutoBossAnnouncer.onIncomingMessage(component);
         PrivateMessagePopUpNotifier.onIncomingMessage(component);
         VisibilityStatusTracker.onIncomingMessage(component);
+        ComboTimerChatTracker.onIncomingMessage(component);
         PlayerClanStorage.captureFromChat(component);
         // ModUserStorage.captureFromChat runs in ChatMessageDecorator.decorate (before the Ⓕ beacon is
         // stripped for display) so detection still sees the raw marker.

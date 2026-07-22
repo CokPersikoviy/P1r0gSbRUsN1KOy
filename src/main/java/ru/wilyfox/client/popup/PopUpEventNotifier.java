@@ -3,24 +3,31 @@ package ru.wilyfox.client.popup;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import ru.wilyfox.boss.BossInfo;
 import ru.wilyfox.boss.BossRepository;
 import ru.wilyfox.client.ability.AbilityCooldownStore;
 import ru.wilyfox.client.booster.BoosterStore;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.level.LevelProgressStore;
 import ru.wilyfox.client.miner.ActiveMinerInfo;
 import ru.wilyfox.client.miner.ActiveMinersStore;
 import ru.wilyfox.client.potion.PotionStore;
 import ru.wilyfox.client.profiler.ModProfiler;
+import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
+import ru.wilyfox.client.protocol.DwGameEvent;
 import ru.wilyfox.client.rune.RuneSetCooldownStore;
 import ru.wilyfox.client.seller.SellerCooldownStore;
 import ru.wilyfox.client.wand.WandCooldownTracker;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public final class PopUpEventNotifier {
     private static final long BOSS_SPAWN_WINDOW_MS = 2_000L;
@@ -29,14 +36,16 @@ public final class PopUpEventNotifier {
     private final Map<String, Long> announcedBossRespawns = new HashMap<>();
     private final Map<String, String> previousAbilityNames = new LinkedHashMap<>();
     private final Map<String, String> previousWandNames = new LinkedHashMap<>();
-    private final Map<String, SellerCooldownStore.Entry> previousSellerEntries = new LinkedHashMap<>();
-    private final Map<String, ActiveMinerInfo> previousMiners = new LinkedHashMap<>();
+    private final Map<String, SellerStateSnapshot> previousSellerEntries = new LinkedHashMap<>();
+    private final Map<String, MinerStateSnapshot> previousMiners = new LinkedHashMap<>();
     private final Map<Integer, PotionStore.ActivePotionEntry> previousPotions = new LinkedHashMap<>();
-    private final Map<String, BoosterStateSnapshot> previousBoosters = new LinkedHashMap<>();
+    private final Set<Integer> expiredPotionIds = new HashSet<>();
+    private final List<BoosterStateSnapshot> previousBoosters = new ArrayList<>();
 
     private BossRepository bossRepository;
     private AbilityCooldownStore abilityCooldownStore;
     private ActiveMinersStore activeMinersStore;
+    private LevelProgressStore levelProgressStore;
     private SellerCooldownStore sellerCooldownStore;
     private PotionStore potionStore;
     private BoosterStore boosterStore;
@@ -45,6 +54,8 @@ public final class PopUpEventNotifier {
     private boolean registered;
     private boolean primed;
     private boolean previousRuneSetActive;
+    private DwGameEvent previousGameEvent = DwGameEvent.NONE;
+    private long previousLevelCompletionRevision;
 
     private PopUpEventNotifier() {
     }
@@ -63,6 +74,10 @@ public final class PopUpEventNotifier {
 
     public void bindActiveMinersStore(ActiveMinersStore store) {
         this.activeMinersStore = store;
+    }
+
+    public void bindLevelProgressStore(LevelProgressStore store) {
+        this.levelProgressStore = store;
     }
 
     public void bindSellerCooldownStore(SellerCooldownStore store) {
@@ -101,10 +116,12 @@ public final class PopUpEventNotifier {
                 }
 
                 checkBossSpawns();
+                checkGameEvent();
                 checkAbilityReady();
                 checkWandReady();
                 checkSellerReady();
                 checkMinerReturned();
+                checkLevelCompleted();
                 checkRuneSetReady();
                 checkPotionExpired();
                 checkBoosterExpired();
@@ -115,6 +132,10 @@ public final class PopUpEventNotifier {
     private void prime() {
         primed = true;
         previousRuneSetActive = RuneSetCooldownStore.isActive();
+        previousGameEvent = DiamondWorldProtocolClient.getCurrentGameEvent();
+        previousLevelCompletionRevision = levelProgressStore != null
+                ? levelProgressStore.getSnapshot().lastCompletionRevision()
+                : 0L;
         previousAbilityNames.clear();
         if (abilityCooldownStore != null) {
             for (AbilityCooldownStore.Entry entry : abilityCooldownStore.getActiveEntries()) {
@@ -132,21 +153,25 @@ public final class PopUpEventNotifier {
         previousSellerEntries.clear();
         if (sellerCooldownStore != null) {
             for (SellerCooldownStore.Entry entry : sellerCooldownStore.getEntries()) {
-                previousSellerEntries.put(entry.id(), entry);
+                previousSellerEntries.put(entry.id(), new SellerStateSnapshot(entry, entry.ready()));
             }
         }
 
         previousMiners.clear();
         if (activeMinersStore != null) {
             for (ActiveMinerInfo miner : activeMinersStore.getAll()) {
-                previousMiners.put(minerKey(miner), miner);
+                previousMiners.put(minerKey(miner), new MinerStateSnapshot(miner, miner.isComplete()));
             }
         }
 
         previousPotions.clear();
+        expiredPotionIds.clear();
         if (potionStore != null) {
             for (PotionStore.ActivePotionEntry entry : potionStore.getActiveEntries()) {
                 previousPotions.put(entry.id(), entry);
+                if (entry.remainingMillis() <= 0L) {
+                    expiredPotionIds.add(entry.id());
+                }
             }
         }
 
@@ -260,12 +285,13 @@ public final class PopUpEventNotifier {
             return;
         }
 
-        Map<String, SellerCooldownStore.Entry> current = new LinkedHashMap<>();
+        Map<String, SellerStateSnapshot> current = new LinkedHashMap<>();
         for (SellerCooldownStore.Entry entry : sellerCooldownStore.getEntries()) {
-            current.put(entry.id(), entry);
+            SellerStateSnapshot currentState = new SellerStateSnapshot(entry, entry.ready());
+            current.put(entry.id(), currentState);
 
-            SellerCooldownStore.Entry previous = previousSellerEntries.get(entry.id());
-            if (previous != null && !previous.ready() && entry.ready()) {
+            SellerStateSnapshot previous = previousSellerEntries.get(entry.id());
+            if (previous != null && !previous.ready() && currentState.ready()) {
                 PopUpManager.getInstance().publish(PopUpRequest.of(
                         PopUpSource.SELLER_READY,
                         "Seller Ready",
@@ -284,13 +310,14 @@ public final class PopUpEventNotifier {
             return;
         }
 
-        Map<String, ActiveMinerInfo> current = new LinkedHashMap<>();
+        Map<String, MinerStateSnapshot> current = new LinkedHashMap<>();
         for (ActiveMinerInfo miner : activeMinersStore.getAll()) {
             String key = minerKey(miner);
-            current.put(key, miner);
+            MinerStateSnapshot currentState = new MinerStateSnapshot(miner, miner.isComplete());
+            current.put(key, currentState);
 
-            ActiveMinerInfo previous = previousMiners.get(key);
-            if (previous != null && !isMinerReturned(previous) && isMinerReturned(miner)) {
+            MinerStateSnapshot previous = previousMiners.get(key);
+            if (previous != null && !previous.returned() && currentState.returned()) {
                 PopUpManager.getInstance().publish(PopUpRequest.of(
                         PopUpSource.MINER_RETURNED,
                         "Miner Returned",
@@ -302,6 +329,36 @@ public final class PopUpEventNotifier {
 
         previousMiners.clear();
         previousMiners.putAll(current);
+    }
+
+    private void checkGameEvent() {
+        DwGameEvent current = DiamondWorldProtocolClient.getCurrentGameEvent();
+        if (current != previousGameEvent && current != DwGameEvent.NONE) {
+            PopUpManager.getInstance().publish(PopUpRequest.of(
+                    PopUpSource.GAME_EVENT,
+                    "\u0422\u0435\u043a\u0443\u0449\u0435\u0435 \u0441\u043e\u0431\u044b\u0442\u0438\u0435",
+                    current.displayName(),
+                    PopUpSeverity.INFO
+            ));
+        }
+        previousGameEvent = current;
+    }
+
+    private void checkLevelCompleted() {
+        if (levelProgressStore == null) {
+            return;
+        }
+
+        long completionRevision = levelProgressStore.getSnapshot().lastCompletionRevision();
+        if (completionRevision != 0L && completionRevision != previousLevelCompletionRevision) {
+            PopUpManager.getInstance().publish(PopUpRequest.of(
+                    PopUpSource.LEVEL_READY,
+                    "Level Requirements Complete",
+                    "You can level up now",
+                    PopUpSeverity.SUCCESS
+            ));
+        }
+        previousLevelCompletionRevision = completionRevision;
     }
 
     private void checkRuneSetReady() {
@@ -325,16 +382,16 @@ public final class PopUpEventNotifier {
         Map<Integer, PotionStore.ActivePotionEntry> current = new LinkedHashMap<>();
         for (PotionStore.ActivePotionEntry entry : potionStore.getActiveEntries()) {
             current.put(entry.id(), entry);
+            if (entry.remainingMillis() > 0L) {
+                expiredPotionIds.remove(entry.id());
+            } else if (expiredPotionIds.add(entry.id())) {
+                notifyPotionExpired(entry);
+            }
         }
 
         for (Map.Entry<Integer, PotionStore.ActivePotionEntry> previous : previousPotions.entrySet()) {
-            if (!current.containsKey(previous.getKey())) {
-                PopUpManager.getInstance().publish(PopUpRequest.of(
-                        PopUpSource.POTION_EXPIRED,
-                        "Potion Expired",
-                        previous.getValue().name() + " has ended",
-                        PopUpSeverity.INFO
-                ));
+            if (!current.containsKey(previous.getKey()) && expiredPotionIds.add(previous.getKey())) {
+                notifyPotionExpired(previous.getValue());
             }
         }
 
@@ -342,77 +399,84 @@ public final class PopUpEventNotifier {
         previousPotions.putAll(current);
     }
 
+    private void notifyPotionExpired(PotionStore.ActivePotionEntry potion) {
+        String message = potion.name() + " (" + potion.quality() + "%) \u0437\u0430\u043a\u043e\u043d\u0447\u0438\u043b\u043e\u0441\u044c";
+        PopUpManager.getInstance().publish(PopUpRequest.of(
+                PopUpSource.POTION_EXPIRED,
+                "\u0417\u0435\u043b\u044c\u0435 \u0437\u0430\u043a\u043e\u043d\u0447\u0438\u043b\u043e\u0441\u044c",
+                message,
+                PopUpSeverity.INFO
+        ));
+
+        Minecraft minecraft = Minecraft.getInstance();
+        if (ConfigManager.get().alchemy.potionExpirationChat && minecraft.player != null) {
+            minecraft.player.displayClientMessage(Component.literal(message), false);
+        }
+    }
+
     private void checkBoosterExpired() {
         if (boosterStore == null) {
             return;
         }
 
-        Map<String, BoosterStateSnapshot> current = new LinkedHashMap<>();
+        List<BoosterStateSnapshot> current = new ArrayList<>();
         captureBoosterSnapshots(current);
 
-        for (Map.Entry<String, BoosterStateSnapshot> previous : previousBoosters.entrySet()) {
-            if (!current.containsKey(previous.getKey())) {
+        for (BoosterStateSnapshot previous : previousBoosters) {
+            if (previous.entry().expired()) {
                 PopUpManager.getInstance().publish(PopUpRequest.of(
                         PopUpSource.BOOSTER_EXPIRED,
                         "Booster Ended",
-                        previous.getValue().label() + " expired",
+                        previous.label() + " expired",
                         PopUpSeverity.INFO
                 ));
             }
         }
 
         previousBoosters.clear();
-        previousBoosters.putAll(current);
+        previousBoosters.addAll(current);
     }
 
-    private void captureBoosterSnapshots(Map<String, BoosterStateSnapshot> target) {
+    private void captureBoosterSnapshots(List<BoosterStateSnapshot> target) {
         for (BoosterStore.Kind kind : BoosterStore.Kind.values()) {
             BoosterStore.Snapshot snapshot = boosterStore.getSnapshot(kind);
-            List<BoosterStore.Entry> entries = snapshot.entries();
-            for (int index = 0; index < entries.size(); index++) {
-                putBooster(target, kind, entries.get(index), index);
+            for (BoosterStore.Entry entry : snapshot.entries()) {
+                putBooster(target, kind, entry);
             }
         }
     }
 
-    private void putBooster(Map<String, BoosterStateSnapshot> target, BoosterStore.Kind kind, BoosterStore.Entry entry, int index) {
+    private void putBooster(List<BoosterStateSnapshot> target, BoosterStore.Kind kind, BoosterStore.Entry entry) {
         if (entry == null) {
             return;
         }
 
-        String key = kind.name() + "|" + index;
         String kindLabel = switch (kind) {
             case SHARD -> "Shards";
             case MONEY -> "Money";
             case SHAFT -> "Shaft";
         };
         String label = kindLabel + " Booster x" + entry.multiplier();
-        target.put(key, new BoosterStateSnapshot(label));
+        target.add(new BoosterStateSnapshot(label, entry));
     }
 
     private void reset() {
         primed = false;
         previousRuneSetActive = false;
+        previousGameEvent = DwGameEvent.NONE;
+        previousLevelCompletionRevision = 0L;
         announcedBossRespawns.clear();
         previousAbilityNames.clear();
         previousWandNames.clear();
         previousSellerEntries.clear();
         previousMiners.clear();
         previousPotions.clear();
+        expiredPotionIds.clear();
         previousBoosters.clear();
     }
 
-    private boolean isMinerReturned(ActiveMinerInfo miner) {
-        if (miner == null) {
-            return false;
-        }
-
-        String status = miner.status() == null ? "" : miner.status().toUpperCase(Locale.ROOT);
-        return status.contains("COMPLETE_TRAVEL") || (miner.homecomingAt() > 0L && miner.homecomingAt() <= System.currentTimeMillis());
-    }
-
     private String minerKey(ActiveMinerInfo miner) {
-        return miner.resource() + "#" + miner.level();
+        return miner.id();
     }
 
     private String formatMinerLabel(ActiveMinerInfo miner) {
@@ -432,6 +496,12 @@ public final class PopUpEventNotifier {
         return boss.getName();
     }
 
-    private record BoosterStateSnapshot(String label) {
+    private record BoosterStateSnapshot(String label, BoosterStore.Entry entry) {
+    }
+
+    private record SellerStateSnapshot(SellerCooldownStore.Entry entry, boolean ready) {
+    }
+
+    private record MinerStateSnapshot(ActiveMinerInfo miner, boolean returned) {
     }
 }

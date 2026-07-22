@@ -16,9 +16,7 @@ import java.util.List;
 public class AbilityCooldownWidget extends AbstractWidget {
     private static final int PADDING_X = 6;
     private static final int PADDING_Y = 5;
-    private static final int LINE_GAP = 2;
     private static final int ROW_GAP = 3;
-    private static final int BAR_HEIGHT = 2;
     private static final int EMPTY_WIDTH = 116;
     private static final int EMPTY_HEIGHT = 28;
 
@@ -63,7 +61,7 @@ public class AbilityCooldownWidget extends AbstractWidget {
 
         int width = getUnscaledWidth(entries);
         int height = getUnscaledHeight(entries.size());
-        int rowHeight = mc.font.lineHeight + BAR_HEIGHT + LINE_GAP;
+        int rowHeight = mc.font.lineHeight;
 
         context.pose().pushPose();
         context.pose().translate(startX, startY, 0);
@@ -80,19 +78,10 @@ public class AbilityCooldownWidget extends AbstractWidget {
         for (Entry entry : entries) {
             String remaining = formatSeconds(entry.remainingMillis());
             int timeWidth = mc.font.width(remaining);
-            int barTop = y + mc.font.lineHeight + 1;
-            int barRight = width - PADDING_X;
+            int rightX = width - PADDING_X;
 
             context.drawString(mc.font, entry.name(), PADDING_X, y, WidgetTheme.TEXT_SOFT);
-            context.drawString(mc.font, remaining, barRight - timeWidth, y, WidgetTheme.TEXT_SECONDARY);
-
-            context.fill(PADDING_X, barTop, barRight, barTop + BAR_HEIGHT, WidgetTheme.BAR_BG);
-
-            int innerWidth = barRight - PADDING_X;
-            int fillWidth = Math.max(0, Math.min(innerWidth, Math.round(innerWidth * entry.progress())));
-            if (fillWidth > 0) {
-                context.fill(PADDING_X, barTop, PADDING_X + fillWidth, barTop + BAR_HEIGHT, WidgetTheme.BAR_FILL);
-            }
+            context.drawString(mc.font, remaining, rightX - timeWidth, y, WidgetTheme.TEXT_SECONDARY);
 
             y += rowHeight + ROW_GAP;
         }
@@ -141,7 +130,7 @@ public class AbilityCooldownWidget extends AbstractWidget {
             return EMPTY_HEIGHT;
         }
 
-        int rowHeight = Minecraft.getInstance().font.lineHeight + BAR_HEIGHT + LINE_GAP;
+        int rowHeight = Minecraft.getInstance().font.lineHeight;
         int titleBlock = WidgetUtils.showWidgetTitles() ? Minecraft.getInstance().font.lineHeight + 3 : 0;
         return PADDING_Y * 2 + titleBlock + count * rowHeight + Math.max(0, count - 1) * ROW_GAP;
     }
@@ -166,4 +155,3 @@ public class AbilityCooldownWidget extends AbstractWidget {
         context.pose().popPose();
     }
 }
-

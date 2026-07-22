@@ -39,7 +39,7 @@ public class ActivePetsWidget extends AbstractWidget {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        List<ActivePetInfo> pets = store.getAll();
+        List<ActivePetInfo> pets = store.getResolved();
 
         if (pets.isEmpty()) {
             if (!isEditorPreview()) {
@@ -94,7 +94,7 @@ public class ActivePetsWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().activePets.active && (!store.isEmpty() || isEditorPreview());
+        return ConfigManager.get().activePets.active && (store.hasResolved() || isEditorPreview());
     }
 
     @Override
@@ -103,7 +103,7 @@ public class ActivePetsWidget extends AbstractWidget {
     }
 
     private int getUnscaledWidth() {
-        List<ActivePetInfo> pets = store.getAll();
+        List<ActivePetInfo> pets = store.getResolved();
         if (pets.isEmpty()) {
             return EMPTY_WIDTH;
         }
@@ -119,7 +119,7 @@ public class ActivePetsWidget extends AbstractWidget {
     }
 
     private int getUnscaledHeight() {
-        int count = store.getAll().size();
+        int count = store.getResolved().size();
         if (count == 0) {
             return EMPTY_HEIGHT;
         }

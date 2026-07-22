@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.ContainerScreen;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -15,6 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.wilyfox.client.recipe.PotionRecipeTracker;
 import ru.wilyfox.client.recipe.CraftRecipeTracker;
+import ru.wilyfox.client.alchemy.AutoBrewingCostOverlay;
 import ru.wilyfox.client.boss.BossMenuIconCollector;
 import ru.wilyfox.client.hud.widget.HudBlur;
 import ru.wilyfox.client.profiler.ModProfiler;
@@ -37,20 +39,30 @@ public abstract class AbstractContainerScreenMixin {
     @Shadow
     protected Slot hoveredSlot;
 
-    @Inject(method = "mouseClicked", at = @At("HEAD"))
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
     private void froghelper$inspectRecipes(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
         if (button != 1) {
             return;
         }
 
+        Screen screen = (Screen) (Object) this;
+        boolean isAlchemyPotionList = ru.wilyfox.client.hud.config.ConfigManager.get().potionRecipe.active
+                && screen instanceof ContainerScreen
+                && screen.getTitle().getString().contains(PotionRecipeTracker.ALCHEMY_POTION_LIST_TITLE);
+        if (isAlchemyPotionList && hoveredSlot != null && hoveredSlot.hasItem()) {
+            ItemStack stack = hoveredSlot.getItem();
+            if (PotionRecipeTracker.getInstance().inspect(stack, Minecraft.getInstance().player)) {
+                cir.setReturnValue(true);
+                return;
+            }
+        }
+
         if (hoveredSlot == null || !hoveredSlot.hasItem()) {
-            PotionRecipeTracker.getInstance().clear();
             CraftRecipeTracker.getInstance().clear();
             return;
         }
 
         ItemStack stack = hoveredSlot.getItem();
-        PotionRecipeTracker.getInstance().inspect(stack, Minecraft.getInstance().player);
         CraftRecipeTracker.getInstance().inspect(stack, Minecraft.getInstance().player);
     }
 
@@ -80,6 +92,16 @@ public abstract class AbstractContainerScreenMixin {
     private void froghelper$renderContainerOverlays(GuiGraphics context) {
         Screen screen = (Screen) (Object) this;
         BossMenuIconCollector.inspect(screen.getTitle(), menu);
+
+        AutoBrewingCostOverlay.OverlayData brewingCost = AutoBrewingCostOverlay.collect(
+                screen.getTitle().getString(),
+                menu,
+                Minecraft.getInstance().player
+        );
+        if (brewingCost != null) {
+            HudBlur.beginFrame(context);
+            AutoBrewingCostOverlay.render(context, leftPos + 184, topPos + 8, brewingCost);
+        }
 
         // Rune-set buff info now lives in the rune-bag window itself (moved off the player inventory).
         if (RuneSetEffectOverlay.isRuneBagScreen(screen.getTitle())) {

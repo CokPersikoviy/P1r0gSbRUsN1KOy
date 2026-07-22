@@ -72,6 +72,7 @@ final class ProtocolPayloadHandlers {
         try {
             DwBossTypesPacket packet = DwBossTypesDecoder.decode(data);
             state.bossTypes = new LinkedHashMap<>(packet.types());
+            state.capturedBossLevels = DwClanBossResolver.resolveLevels(state.clanInfo, state.bossTypes);
             if (state.bossRepository != null) {
                 packet.types().forEach((id, type) ->
                         state.bossRepository.updateProtocolMetadata(id, type.name(), type.level()));
@@ -313,34 +314,21 @@ final class ProtocolPayloadHandlers {
     static boolean handleStatisticInfo(ProtocolState state, byte[] data) {
         try {
             DwStatisticInfoPacket packet = DwStatisticInfoDecoder.decode(data);
-            List<ActivePetInfo> activePets = ProtocolPayloadSupport.extractActivePets(state, packet);
-            List<ActiveMinerInfo> activeMiners = ProtocolPayloadSupport.extractActiveMiners(state, packet);
+            java.util.Optional<List<ActivePetInfo>> activePetsUpdate = ProtocolPayloadSupport.extractActivePets(state, packet);
+            List<ActivePetInfo> activePets = activePetsUpdate.orElseGet(List::of);
+            java.util.Optional<List<ActiveMinerInfo>> activeMinersUpdate = ProtocolPayloadSupport.extractActiveMiners(state, packet);
+            List<ActiveMinerInfo> activeMiners = activeMinersUpdate.orElseGet(List::of);
             String keysPreview = packet.values().keySet().stream()
                     .sorted()
                     .collect(Collectors.joining(", "));
-            String gameLocation = ProtocolPayloadSupport.firstNonBlank(
-                    packet.values().get("gameLocation"),
-                    packet.values().get("location"),
-                    packet.values().get("loc")
-            );
-            if (gameLocation != null) {
-                state.currentGameLocation = ProtocolPayloadSupport.normalizeStatisticString(gameLocation);
-            }
+            updateGameLocation(state, packet);
 
             if (state.activePetsStore != null) {
-                if (packet.values().containsKey("pets")) {
-                    state.activePetsStore.replace(activePets);
-                } else {
-                    state.activePetsStore.merge(activePets);
-                }
+                activePetsUpdate.ifPresent(state.activePetsStore::replace);
             }
 
             if (state.activeMinersStore != null) {
-                if (packet.values().containsKey("miners")) {
-                    state.activeMinersStore.replace(activeMiners);
-                } else {
-                    state.activeMinersStore.merge(activeMiners);
-                }
+                activeMinersUpdate.ifPresent(state.activeMinersStore::replace);
             }
 
             if (state.levelProgressStore != null) {
@@ -366,7 +354,7 @@ final class ProtocolPayloadHandlers {
             );
             info(LOGGER, "DW protocol: statisticinfo keys=[{}]", keysPreview);
             if (state.currentGameLocation != null) {
-                info(LOGGER, "DW protocol: statisticinfo location candidate={}", state.currentGameLocation);
+                info(LOGGER, "DW protocol: statisticinfo location={}", state.currentGameLocation.id());
             }
             return true;
         } catch (Exception exception) {
@@ -375,13 +363,31 @@ final class ProtocolPayloadHandlers {
         }
     }
 
+    static void updateGameLocation(ProtocolState state, DwStatisticInfoPacket packet) {
+        String value = packet.values().get("gameLocation");
+        if (value == null) {
+            return;
+        }
+
+        DwGameLocation location = ProtocolPayloadSupport.parseGameLocation(value);
+        if (location != null) {
+            state.currentGameLocation = location;
+        }
+    }
+
     static boolean handleLevelInfo(ProtocolState state, byte[] data) {
         try {
             DwLevelInfoPacket packet = DwLevelInfoDecoder.decode(data);
 
             if (state.levelProgressStore != null) {
-                state.levelProgressStore.updateCurrent(packet.level(), packet.blocks(), packet.money());
-                state.levelProgressStore.updateRequirements(packet.requiredBlocks(), packet.requiredMoney(), packet.maxLevel());
+                state.levelProgressStore.updateFromLevelInfo(
+                        packet.level(),
+                        packet.blocks(),
+                        packet.money(),
+                        packet.requiredBlocks(),
+                        packet.requiredMoney(),
+                        packet.maxLevel()
+                );
             }
 
             info(
@@ -473,6 +479,37 @@ final class ProtocolPayloadHandlers {
             return true;
         } catch (Exception exception) {
             warn(LOGGER, "DW protocol: failed to parse spotnibbles payload", exception);
+            return false;
+        }
+    }
+
+    static boolean handleHourlyQuestTypes(ProtocolState state, byte[] data) {
+        try {
+            DwHourlyQuestTypesPacket packet = DwHourlyQuestTypesDecoder.decode(data);
+            state.hourlyQuestTypes.putAll(packet.types());
+            info(LOGGER, "DW protocol: hourlyquestypes parsed successfully, entries={}", packet.types().size());
+            return true;
+        } catch (Exception exception) {
+            warn(LOGGER, "DW protocol: failed to parse hourlyquestypes payload", exception);
+            return false;
+        }
+    }
+
+    static boolean handleHourlyQuestInfo(ProtocolState state, byte[] data) {
+        try {
+            DwHourlyQuestInfoPacket packet = DwHourlyQuestInfoDecoder.decode(data);
+            long receivedAt = System.currentTimeMillis();
+            Map<Integer, DwHourlyQuestProgress> progress = new LinkedHashMap<>();
+            for (DwHourlyQuestInfoPacket.Entry entry : packet.quests().values()) {
+                long remained = Math.max(0L, entry.remainedMillis());
+                long expiresAt = remained > Long.MAX_VALUE - receivedAt ? Long.MAX_VALUE : receivedAt + remained;
+                progress.put(entry.id(), new DwHourlyQuestProgress(entry.id(), entry.progress(), expiresAt));
+            }
+            state.hourlyQuestProgress = progress;
+            info(LOGGER, "DW protocol: hourlyquestinfo parsed successfully, entries={}", progress.size());
+            return true;
+        } catch (Exception exception) {
+            warn(LOGGER, "DW protocol: failed to parse hourlyquestinfo payload", exception);
             return false;
         }
     }
@@ -616,25 +653,18 @@ final class ProtocolPayloadHandlers {
     static boolean handleBossDamage(ProtocolState state, byte[] data) {
         try {
             DwBossDamagePacket packet = DwBossDamageDecoder.decode(data);
-            DwBossType type = state.bossTypes.get(packet.bossId());
-            String bossName = type != null ? type.name() : ProtocolPayloadSupport.prettifyId(packet.bossId());
-            int bossLevel = type != null ? type.level() : 0;
-
-            if (state.bossDamageStore != null) {
-                state.bossDamageStore.update(new BossDamageInfo(
-                        packet.bossId(),
-                        bossName,
-                        bossLevel,
-                        packet.damage(),
-                        System.currentTimeMillis()
-                ));
+            if (!applyBossDamage(state, packet, System.currentTimeMillis())) {
+                info(LOGGER, "DW protocol: bossdamage ignored for unknown boss id={}", packet.bossId());
+                return true;
             }
+
+            DwBossType type = state.bossTypes.get(packet.bossId());
 
             info(
                     LOGGER,
                     "DW protocol: bossdamage parsed successfully, boss={} [{}], damage={}",
-                    bossName,
-                    bossLevel,
+                    type.name(),
+                    type.level(),
                     packet.damage()
             );
             return true;
@@ -642,6 +672,24 @@ final class ProtocolPayloadHandlers {
             warn(LOGGER, "DW protocol: failed to parse bossdamage payload", exception);
             return false;
         }
+    }
+
+    static boolean applyBossDamage(ProtocolState state, DwBossDamagePacket packet, long updatedAt) {
+        DwBossType type = state.bossTypes.get(packet.bossId());
+        if (type == null) {
+            return false;
+        }
+
+        if (state.bossDamageStore != null) {
+            state.bossDamageStore.update(new BossDamageInfo(
+                    packet.bossId(),
+                    type.name(),
+                    type.level(),
+                    packet.damage(),
+                    updatedAt
+            ));
+        }
+        return true;
     }
 
     static boolean handleBossCollect(ProtocolState state, byte[] data) {
@@ -825,7 +873,8 @@ final class ProtocolPayloadHandlers {
     static boolean handleClanInfo(ProtocolState state, byte[] data) {
         try {
             DwClanInfoPacket packet = DwClanInfoDecoder.decode(data);
-            state.clanInfo = new LinkedHashMap<>(packet.values());
+            state.clanInfo = state.clanInfo.applyPartial(packet.values());
+            state.capturedBossLevels = DwClanBossResolver.resolveLevels(state.clanInfo, state.bossTypes);
 
             String preview = packet.values().entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
@@ -846,14 +895,29 @@ final class ProtocolPayloadHandlers {
         }
     }
 
+    static boolean handleClanSiegePosition(ProtocolState state, byte[] data) {
+        try {
+            state.clanSiegePosition = DwClanSiegePositionDecoder.decode(data);
+            info(
+                    LOGGER,
+                    "DW protocol: siegepos parsed successfully, x={}, y={}, available={}",
+                    state.clanSiegePosition.x(),
+                    state.clanSiegePosition.y(),
+                    state.clanSiegePosition.isAvailable()
+            );
+            return true;
+        } catch (Exception exception) {
+            warn(LOGGER, "DW protocol: failed to parse siegepos payload", exception);
+            return false;
+        }
+    }
+
     static boolean handleBoosters(ProtocolState state, byte[] data) {
         try {
             DwBoostersPacket packet = DwBoostersDecoder.decode(data);
 
             if (state.boosterStore != null) {
-                for (ru.wilyfox.client.booster.BoosterStore.Kind kind : ru.wilyfox.client.booster.BoosterStore.Kind.values()) {
-                    state.boosterStore.replace(kind, packet.boosters().get(kind));
-                }
+                state.boosterStore.replaceAll(packet.boosters());
             }
 
             long totalEntries = packet.boosters().values().stream()
@@ -900,4 +964,5 @@ final class ProtocolPayloadHandlers {
             state.bossRepository.upsertProtocol(bossId, bossName, now + entry.getValue(), level);
         }
     }
+
 }

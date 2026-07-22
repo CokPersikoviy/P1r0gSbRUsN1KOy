@@ -8,6 +8,7 @@ public record ActivePetInfo(
         ItemStack icon,
         int level,
         double exp,
-        double energy
+        double energy,
+        boolean resolved
 ) {
 }

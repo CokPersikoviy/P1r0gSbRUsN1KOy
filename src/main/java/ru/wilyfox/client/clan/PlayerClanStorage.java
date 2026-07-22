@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.chat.Component;
+import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 
 import java.io.Reader;
 import java.io.Writer;
@@ -43,6 +44,11 @@ public final class PlayerClanStorage {
         String normalized = normalize(playerName);
         if (normalized == null) {
             return null;
+        }
+
+        String protocolClan = DiamondWorldProtocolClient.getCurrentClanNameForMember(playerName);
+        if (protocolClan != null) {
+            return protocolClan;
         }
 
         ensureLoaded();

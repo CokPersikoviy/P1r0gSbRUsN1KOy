@@ -8,23 +8,36 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 
 public final class SellerCooldownStore {
     private final Map<String, Entry> entries = new LinkedHashMap<>();
+    private final LongSupplier monotonicNanos;
+
+    public SellerCooldownStore() {
+        this(System::nanoTime);
+    }
+
+    SellerCooldownStore(LongSupplier monotonicNanos) {
+        this.monotonicNanos = monotonicNanos;
+    }
 
     public void replace(List<DwSellerEntry> sellers) {
-        long now = System.currentTimeMillis();
+        long now = monotonicNanos.getAsLong();
         entries.clear();
 
         for (DwSellerEntry seller : sellers) {
-            long remaining = seller.remainingMillis();
-            boolean ready = remaining < 0L;
-            long clampedRemaining = Math.max(0L, remaining);
+            long remainingSeconds = seller.remainingMillis() < 0L
+                    ? 0L
+                    : seller.remainingMillis() / 1000L;
+            long durationNanos = saturatingMultiply(remainingSeconds, TimeUnit.SECONDS.toNanos(1L));
             entries.put(seller.id(), new Entry(
                     seller.id(),
                     sanitizeName(seller.name(), seller.id()),
-                    ready,
-                    now + clampedRemaining
+                    now,
+                    durationNanos,
+                    monotonicNanos
             ));
         }
     }
@@ -50,14 +63,63 @@ public final class SellerCooldownStore {
         return stripped.isBlank() ? fallbackId : stripped;
     }
 
-    public record Entry(
-            String id,
-            String name,
-            boolean ready,
-            long endsAt
-    ) {
+    private static long saturatingMultiply(long left, long right) {
+        try {
+            return Math.multiplyExact(left, right);
+        } catch (ArithmeticException ignored) {
+            return (left < 0L) == (right < 0L) ? Long.MAX_VALUE : Long.MIN_VALUE;
+        }
+    }
+
+    public static final class Entry {
+        private final String id;
+        private final String name;
+        private final long receivedAtNanos;
+        private final long durationNanos;
+        private final LongSupplier monotonicNanos;
+
+        private Entry(
+                String id,
+                String name,
+                long receivedAtNanos,
+                long durationNanos,
+                LongSupplier monotonicNanos
+        ) {
+            this.id = id;
+            this.name = name;
+            this.receivedAtNanos = receivedAtNanos;
+            this.durationNanos = durationNanos;
+            this.monotonicNanos = monotonicNanos;
+        }
+
+        public String id() {
+            return id;
+        }
+
+        public String name() {
+            return name;
+        }
+
+        public boolean ready() {
+            return readyAt(monotonicNanos.getAsLong());
+        }
+
+        boolean readyAt(long monotonicNowNanos) {
+            return elapsedNanos(monotonicNowNanos) >= durationNanos;
+        }
+
         public long remainingMillis() {
-            return Math.max(0L, endsAt - System.currentTimeMillis());
+            return remainingMillisAt(monotonicNanos.getAsLong());
+        }
+
+        long remainingMillisAt(long monotonicNowNanos) {
+            long remainingNanos = durationNanos - elapsedNanos(monotonicNowNanos);
+            return remainingNanos <= 0L ? 0L : TimeUnit.NANOSECONDS.toMillis(remainingNanos);
+        }
+
+        private long elapsedNanos(long monotonicNowNanos) {
+            long elapsed = monotonicNowNanos - receivedAtNanos;
+            return elapsed < 0L ? 0L : elapsed;
         }
     }
 }

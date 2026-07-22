@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.wilyfox.bridge.AccessoryArmorStandAccess;
+import ru.wilyfox.client.clan.ClanSiegeMap;
 import ru.wilyfox.client.hud.config.ConfigManager;
 
 /**
@@ -20,6 +21,10 @@ public abstract class EntityRendererMixin {
     @Inject(method = "shouldRender", at = @At("HEAD"), cancellable = true)
     private void froghelper$hideFirstPersonCosmetics(Entity entity, Frustum frustum, double x, double y, double z,
                                                      CallbackInfoReturnable<Boolean> cir) {
+        if (ClanSiegeMap.shouldHidePhysicalMap(entity)) {
+            cir.setReturnValue(false);
+            return;
+        }
         if (!ConfigManager.get().render.hideFirstPersonCosmetics) {
             return;
         }

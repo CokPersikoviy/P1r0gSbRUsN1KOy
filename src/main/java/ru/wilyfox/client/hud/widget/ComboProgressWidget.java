@@ -10,6 +10,8 @@ import ru.wilyfox.client.hud.layer.HudLayer;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 public final class ComboProgressWidget extends AbstractWidget {
@@ -44,25 +46,28 @@ public final class ComboProgressWidget extends AbstractWidget {
             return;
         }
 
-        String title = snapshot.maxed()
-                ? "Combo x" + formatMultiplier(snapshot.booster()) + " · MAX"
-                : "Combo x" + formatMultiplier(snapshot.booster()) + " -> x" + formatMultiplier(snapshot.nextBooster());
-        String progressLine = formatBlocks(snapshot.blocks()) + "/" + formatBlocks(snapshot.requiredBlocks());
-        int width = getUnscaledWidth(mc, title, progressLine);
-        int height = getUnscaledHeight(mc);
-        int progressColor = snapshot.progress() >= 1.0D ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_SECONDARY;
+        long now = System.currentTimeMillis();
+        List<RenderLine> lines = getLines(snapshot, now);
+        boolean showBar = shouldShowBar(snapshot);
+        int width = getUnscaledWidth(mc, lines);
+        int height = getUnscaledHeight(mc, lines.size(), showBar);
 
         context.pose().pushPose();
         context.pose().translate(startX, startY, 0);
         context.pose().scale(scale, scale, 1.0f);
 
         HudSurface.drawPanel(context, width, height);
-        context.drawString(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
-        context.drawString(mc.font, progressLine, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, progressColor);
+        int lineY = PADDING_Y;
+        for (RenderLine line : lines) {
+            context.drawString(mc.font, line.text(), PADDING_X, lineY, line.color());
+            lineY += mc.font.lineHeight + 2;
+        }
 
-        int barY = height - PADDING_Y - BAR_HEIGHT;
-        HudSurface.drawBar(context, PADDING_X, barY, width - PADDING_X * 2, BAR_HEIGHT,
-                (float) snapshot.progress(), WidgetTheme.BAR_FILL);
+        if (showBar) {
+            int barY = height - PADDING_Y - BAR_HEIGHT;
+            HudSurface.drawBar(context, PADDING_X, barY, width - PADDING_X * 2, BAR_HEIGHT,
+                    (float) snapshot.progress(), WidgetTheme.BAR_FILL);
+        }
 
         context.pose().popPose();
     }
@@ -75,17 +80,20 @@ public final class ComboProgressWidget extends AbstractWidget {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        String title = snapshot.maxed()
-                ? "Combo x" + formatMultiplier(snapshot.booster()) + " · MAX"
-                : "Combo x" + formatMultiplier(snapshot.booster()) + " -> x" + formatMultiplier(snapshot.nextBooster());
-        String progressLine = formatBlocks(snapshot.blocks()) + "/" + formatBlocks(snapshot.requiredBlocks());
-        return Math.round(getUnscaledWidth(mc, title, progressLine) * getScale());
+        List<RenderLine> lines = getLines(snapshot, System.currentTimeMillis());
+        return Math.round(getUnscaledWidth(mc, lines) * getScale());
     }
 
     @Override
     public int getHeight() {
         ComboProgressStore.Snapshot snapshot = store.getSnapshot();
-        int baseHeight = snapshot.available() ? getUnscaledHeight(Minecraft.getInstance()) : EMPTY_HEIGHT;
+        int baseHeight = snapshot.available()
+                ? getUnscaledHeight(
+                        Minecraft.getInstance(),
+                        getLines(snapshot, System.currentTimeMillis()).size(),
+                        shouldShowBar(snapshot)
+                )
+                : EMPTY_HEIGHT;
         return Math.round(baseHeight * getScale());
     }
 
@@ -99,13 +107,18 @@ public final class ComboProgressWidget extends AbstractWidget {
         return "Combo Progress";
     }
 
-    private int getUnscaledWidth(Minecraft mc, String title, String progressLine) {
-        int maxWidth = Math.max(mc.font.width(title), mc.font.width(progressLine));
+    private int getUnscaledWidth(Minecraft mc, List<RenderLine> lines) {
+        int maxWidth = 0;
+        for (RenderLine line : lines) {
+            maxWidth = Math.max(maxWidth, mc.font.width(line.text()));
+        }
         return maxWidth + PADDING_X * 2;
     }
 
-    private int getUnscaledHeight(Minecraft mc) {
-        return PADDING_Y * 2 + mc.font.lineHeight * 2 + 2 + BAR_HEIGHT + 2;
+    private int getUnscaledHeight(Minecraft mc, int lineCount, boolean showBar) {
+        int lineGaps = Math.max(0, lineCount - 1) * 2;
+        int barSpace = showBar ? BAR_HEIGHT + 2 : 0;
+        return PADDING_Y * 2 + mc.font.lineHeight * lineCount + lineGaps + barSpace;
     }
 
     private boolean isEditorPreview() {
@@ -129,7 +142,39 @@ public final class ComboProgressWidget extends AbstractWidget {
     }
 
     private String formatBlocks(int value) {
-        return String.format(Locale.US, "%,d", Math.max(0, value));
+        return String.format(Locale.US, "%,d", value);
+    }
+
+    private List<RenderLine> getLines(ComboProgressStore.Snapshot snapshot, long now) {
+        List<RenderLine> lines = new ArrayList<>(3);
+        if (snapshot.maxed()) {
+            lines.add(new RenderLine(
+                    "Combo x" + formatMultiplier(snapshot.booster()) + " | MAX",
+                    WidgetTheme.TITLE
+            ));
+            return lines;
+        }
+
+        lines.add(new RenderLine(
+                "Combo x" + formatMultiplier(snapshot.booster()) + " -> x" + formatMultiplier(snapshot.nextBooster()),
+                WidgetTheme.TITLE
+        ));
+        lines.add(new RenderLine(
+                formatBlocks(snapshot.blocks()) + "/" + formatBlocks(snapshot.requiredBlocks()),
+                snapshot.completed() ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_SECONDARY
+        ));
+
+        long remainingSeconds = snapshot.remainingSeconds(now);
+        if (remainingSeconds > 0L) {
+            lines.add(new RenderLine("Expires in " + remainingSeconds + "s", WidgetTheme.STATUS_ERROR));
+        }
+        return lines;
+    }
+
+    private boolean shouldShowBar(ComboProgressStore.Snapshot snapshot) {
+        return !snapshot.maxed() && ConfigManager.get().comboProgress.showBar;
+    }
+
+    private record RenderLine(String text, int color) {
     }
 }
-

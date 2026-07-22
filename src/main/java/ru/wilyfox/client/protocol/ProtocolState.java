@@ -51,12 +51,16 @@ final class ProtocolState {
 
     CurrentServerInfo currentServerInfo = CurrentServerInfo.unknown();
     DwGameEvent currentGameEvent = DwGameEvent.NONE;
-    Map<String, String> clanInfo = new LinkedHashMap<>();
+    DwClanState clanInfo = DwClanState.empty();
+    Set<Integer> capturedBossLevels = Set.of();
+    DwClanSiegePosition clanSiegePosition = DwClanSiegePosition.UNAVAILABLE;
     Map<String, Set<String>> bossCollectibles = new LinkedHashMap<>();
-    String currentGameLocation;
+    DwGameLocation currentGameLocation;
     Set<String> fishingLocationIds = new LinkedHashSet<>();
     Map<String, String> fishingLocationNames = new LinkedHashMap<>();
     Map<String, Double> fishingNibbles = new LinkedHashMap<>();
+    Map<Integer, DwHourlyQuestType> hourlyQuestTypes = new LinkedHashMap<>();
+    Map<Integer, DwHourlyQuestProgress> hourlyQuestProgress = new LinkedHashMap<>();
 
     void resetRuntimeState() {
         receivedEvoPlusPayload = false;
@@ -75,11 +79,15 @@ final class ProtocolState {
 
         currentServerInfo = CurrentServerInfo.unknown();
         currentGameEvent = DwGameEvent.NONE;
-        clanInfo = new LinkedHashMap<>();
+        clanInfo = DwClanState.empty();
+        capturedBossLevels = Set.of();
+        clanSiegePosition = DwClanSiegePosition.UNAVAILABLE;
         bossCollectibles = new LinkedHashMap<>();
         currentGameLocation = null;
         fishingLocationIds = new LinkedHashSet<>();
         fishingLocationNames = new LinkedHashMap<>();
         fishingNibbles = new LinkedHashMap<>();
+        hourlyQuestTypes = new LinkedHashMap<>();
+        hourlyQuestProgress = new LinkedHashMap<>();
     }
 }

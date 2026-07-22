@@ -1,22 +1,35 @@
 package ru.wilyfox.client.combo;
 
+import java.util.Objects;
+import java.util.function.LongSupplier;
+
 public final class ComboProgressStore {
+    private final LongSupplier clock;
     private volatile Snapshot snapshot = Snapshot.empty();
+
+    public ComboProgressStore() {
+        this(System::currentTimeMillis);
+    }
+
+    ComboProgressStore(LongSupplier clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
 
     public void updateCombo(double booster, double nextBooster, int blocks, int requiredBlocks) {
         snapshot = new Snapshot(
                 true,
                 Math.max(1.0D, booster),
-                Math.max(nextBooster, booster),
-                Math.max(0, blocks),
-                Math.max(0, requiredBlocks)
+                nextBooster,
+                blocks,
+                requiredBlocks,
+                0L
         );
     }
 
     public void updateBlocks(int blocks) {
         Snapshot current = snapshot;
         if (!current.available()) {
-            snapshot = new Snapshot(true, 1.0D, 1.1D, Math.max(0, blocks), 1000);
+            snapshot = new Snapshot(true, 1.0D, 1.1D, blocks, 1000, 0L);
             return;
         }
 
@@ -24,8 +37,24 @@ public final class ComboProgressStore {
                 true,
                 current.booster(),
                 current.nextBooster(),
-                Math.max(0, blocks),
-                current.requiredBlocks()
+                blocks,
+                current.requiredBlocks(),
+                0L
+        );
+    }
+
+    public void setRemainingSeconds(long remainingSeconds) {
+        Snapshot current = snapshot;
+        long expiryTimestamp = remainingSeconds <= 0L
+                ? 0L
+                : safeDeadline(clock.getAsLong(), remainingSeconds);
+        snapshot = new Snapshot(
+                current.available(),
+                current.booster(),
+                current.nextBooster(),
+                current.blocks(),
+                current.requiredBlocks(),
+                expiryTimestamp
         );
     }
 
@@ -42,23 +71,44 @@ public final class ComboProgressStore {
             double booster,
             double nextBooster,
             int blocks,
-            int requiredBlocks
+            int requiredBlocks,
+            long expiryTimestamp
     ) {
-        private static final double EPSILON = 0.0001D;
-
         public static Snapshot empty() {
-            return new Snapshot(false, 1.0D, 1.1D, 0, 1000);
+            return new Snapshot(false, 1.0D, 1.1D, 0, 1000, 0L);
         }
 
         public double progress() {
             if (requiredBlocks <= 0) {
                 return 0.0D;
             }
-            return Math.min(1.0D, blocks / (double) requiredBlocks);
+            return Math.max(0.0D, Math.min(1.0D, blocks / (double) requiredBlocks));
+        }
+
+        public boolean completed() {
+            return blocks >= requiredBlocks;
         }
 
         public boolean maxed() {
-            return nextBooster <= booster + EPSILON;
+            return booster == nextBooster;
         }
+
+        public long remainingSeconds(long now) {
+            if (expiryTimestamp == 0L || now > expiryTimestamp) {
+                return 0L;
+            }
+            return Math.max(0L, (expiryTimestamp - now) / 1000L);
+        }
+
+        public boolean expiring(long now) {
+            return remainingSeconds(now) > 0L;
+        }
+    }
+
+    private static long safeDeadline(long now, long remainingSeconds) {
+        if (remainingSeconds > (Long.MAX_VALUE - now) / 1000L) {
+            return Long.MAX_VALUE;
+        }
+        return now + remainingSeconds * 1000L;
     }
 }

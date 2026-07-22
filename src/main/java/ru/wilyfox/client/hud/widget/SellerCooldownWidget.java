@@ -5,11 +5,12 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.SellerCooldownFilter;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.seller.SellerCooldownStore;
-import ru.wilyfox.utils.Formatting;
 
 import java.util.List;
+import java.util.Locale;
 
 public final class SellerCooldownWidget extends AbstractWidget {
     private static final int PADDING_X = 6;
@@ -32,7 +33,7 @@ public final class SellerCooldownWidget extends AbstractWidget {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        List<SellerCooldownStore.Entry> entries = store.getEntries();
+        List<SellerCooldownStore.Entry> entries = getVisibleEntries();
 
         if (entries.isEmpty()) {
             if (!isEditorPreview()) {
@@ -59,8 +60,9 @@ public final class SellerCooldownWidget extends AbstractWidget {
         }
 
         for (SellerCooldownStore.Entry entry : entries) {
-            String state = entry.ready() ? "Ready" : Formatting.formatMillis(System.currentTimeMillis() + entry.remainingMillis());
-            int stateColor = entry.ready() ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_SECONDARY;
+            boolean ready = entry.ready();
+            String state = ready ? "Ready" : formatRemaining(entry.remainingMillis());
+            int stateColor = ready ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_SECONDARY;
             int stateWidth = mc.font.width(state);
 
             context.drawString(mc.font, entry.name() + ":", PADDING_X, y, WidgetTheme.TEXT_SOFT);
@@ -73,17 +75,17 @@ public final class SellerCooldownWidget extends AbstractWidget {
 
     @Override
     public int getWidth() {
-        return Math.round(getUnscaledWidth(Minecraft.getInstance(), store.getEntries()) * getScale());
+        return Math.round(getUnscaledWidth(Minecraft.getInstance(), getVisibleEntries()) * getScale());
     }
 
     @Override
     public int getHeight() {
-        return Math.round(getUnscaledHeight(Minecraft.getInstance(), store.getEntries().size()) * getScale());
+        return Math.round(getUnscaledHeight(Minecraft.getInstance(), getVisibleEntries().size()) * getScale());
     }
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().sellerCooldown.active && (store.hasEntries() || isEditorPreview());
+        return ConfigManager.get().sellerCooldown.active && (!getVisibleEntries().isEmpty() || isEditorPreview());
     }
 
     @Override
@@ -98,7 +100,7 @@ public final class SellerCooldownWidget extends AbstractWidget {
 
         int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Sellers") : 0;
         for (SellerCooldownStore.Entry entry : entries) {
-            String state = entry.ready() ? "Ready" : Formatting.formatMillis(System.currentTimeMillis() + entry.remainingMillis());
+            String state = entry.ready() ? "Ready" : formatRemaining(entry.remainingMillis());
             maxWidth = Math.max(maxWidth, mc.font.width(entry.name() + ": " + state));
         }
         return maxWidth + PADDING_X * 2;
@@ -117,6 +119,28 @@ public final class SellerCooldownWidget extends AbstractWidget {
         return Minecraft.getInstance().screen instanceof HudEditingScreen;
     }
 
+    private List<SellerCooldownStore.Entry> getVisibleEntries() {
+        SellerCooldownFilter filter = ConfigManager.get().sellerCooldown.filter;
+        if (filter == null) {
+            filter = SellerCooldownFilter.ALL;
+        }
+        SellerCooldownFilter selectedFilter = filter;
+        return store.getEntries().stream()
+                .filter(entry -> selectedFilter.matches(entry.ready()))
+                .toList();
+    }
+
+    private static String formatRemaining(long remainingMillis) {
+        long totalSeconds = Math.max(0L, remainingMillis) / 1000L;
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        long seconds = totalSeconds % 60L;
+
+        return hours > 0L
+                ? String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes, seconds)
+                : String.format(Locale.ROOT, "%02d:%02d", minutes, seconds);
+    }
+
     private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
         context.pose().pushPose();
         context.pose().translate(startX, startY, 0);
@@ -129,4 +153,3 @@ public final class SellerCooldownWidget extends AbstractWidget {
         context.pose().popPose();
     }
 }
-

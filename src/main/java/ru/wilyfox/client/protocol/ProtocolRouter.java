@@ -42,6 +42,8 @@ final class ProtocolRouter {
             case "statisticinfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleStatisticInfo(state, body), state);
             case "fishingpots" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleFishingSpots(state, body), state);
             case "spotnibbles" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleSpotNibbles(state, body), state);
+            case "hourlyquestypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleHourlyQuestTypes(state, body), state);
+            case "hourlyquestinfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleHourlyQuestInfo(state, body), state);
             case "stafftypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleStaffTypes(state, body), state);
             case "stafftimers" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleStaffTimers(state, body), state);
             case "abilitytypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleAbilityTypes(state, body), state);
@@ -57,6 +59,7 @@ final class ProtocolRouter {
             case "boosters" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleBoosters(state, body), state);
             case "gameevent" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleGameEvent(state, body), state);
             case "claninfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleClanInfo(state, body), state);
+            case "siegepos" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleClanSiegePosition(state, body), state);
             default -> {
                 state.diagnostics.onUnknownType(typeId, body.length);
                 ProtocolDebugLogger.logUnknownPayloadBody("unknown typeId=" + typeId, typeId, body);

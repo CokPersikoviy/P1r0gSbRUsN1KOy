@@ -4,12 +4,13 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.phys.Vec3;
-import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.client.hud.widget.WidgetUtils;
 import ru.wilyfox.utils.WorldToScreen;
 
 public final class AlchemyIngredientOverlayRenderer {
-    private static final long LIFETIME_MS = 1000L;
+    private static final long LIFETIME_MS = 2_000L;
+    private static final int MARKER_RED = 0xFFE34B4B;
+    private static final double WORLD_MARKER_SIZE = 1.5;
     private AlchemyIngredientOverlayRenderer() {
     }
 
@@ -31,38 +32,32 @@ public final class AlchemyIngredientOverlayRenderer {
             }
 
             double distance = cameraPos.distanceTo(renderPos);
-            int size = getPulsingMarkerSize(spot, distance);
-            int alpha = getMarkerAlpha(spot.particleCount(), now - spot.latestTimestamp());
+            int size = getMarkerSize(mc, distance);
+            int alpha = getMarkerAlpha(now - spot.createdAtMillis());
             if (alpha <= 8) {
                 continue;
             }
 
             int half = size / 2;
-            int color = withAlpha(WidgetTheme.STATUS_SUCCESS, alpha);
+            int color = withAlpha(MARKER_RED, alpha);
             WidgetUtils.drawCorners(context, point.x() - half, point.y() - half, size, size, color);
         }
     }
 
-    private static int getMarkerAlpha(int particleCount, long ageMs) {
-        float particleFactor = Math.max(0.0f, Math.min(1.0f, particleCount / 16.0f));
-        float ageFactor = 1.0f - Math.max(0.0f, Math.min(1.0f, ageMs / (float) LIFETIME_MS));
-        ageFactor = 0.35f + ageFactor * 0.65f;
-        return Math.round(255.0f * particleFactor * ageFactor);
+    private static int getMarkerAlpha(long ageMs) {
+        float fade = 1.0f - Math.max(0.0f, Math.min(1.0f, (ageMs - 1_600L) / 400.0f));
+        return Math.round(255.0f * fade);
     }
 
     private static int withAlpha(int rgb, int alpha) {
         return ((alpha & 0xFF) << 24) | (rgb & 0xFFFFFF);
     }
 
-    private static int getPulsingMarkerSize(AlchemyIngredientSpot spot, double distance) {
-        float t = (float) Math.max(0.0, Math.min(1.0, (distance - 2.0) / 18.0));
-        float baseSize = 22.0f - t * 10.0f;
-
-        double time = System.currentTimeMillis() / 1000.0;
-        double phase = (spot.center().x + spot.center().z) * 0.65;
-        double pulse = Math.sin(time * 2.0 + phase);
-
-        float amplitude = 1.6f - t * 0.4f;
-        return Math.max(7, Math.round(baseSize + (float) pulse * amplitude));
+    private static int getMarkerSize(Minecraft minecraft, double distance) {
+        double safeDistance = Math.max(0.25, distance);
+        double halfFov = Math.toRadians(minecraft.options.fov().get() / 2.0);
+        double projected = WORLD_MARKER_SIZE * minecraft.getWindow().getGuiScaledHeight()
+                / (2.0 * safeDistance * Math.tan(halfFov));
+        return Math.max(6, Math.min(minecraft.getWindow().getGuiScaledHeight(), (int) Math.round(projected)));
     }
 }

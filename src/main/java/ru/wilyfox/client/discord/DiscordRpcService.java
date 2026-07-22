@@ -16,6 +16,7 @@ import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.protocol.CurrentServerInfo;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import ru.wilyfox.client.protocol.DwGameEvent;
+import ru.wilyfox.client.protocol.DwGameLocation;
 import ru.wilyfox.utils.Formatting;
 
 import java.io.IOException;
@@ -284,6 +285,7 @@ public final class DiscordRpcService {
         String serverName = formatServer(currentServer, config);
         return switch (rpcMode) {
             case NEUTRAL -> "FrogHelper";
+            case LOCATION -> serverName.isBlank() ? "Playing on DiamondWorld" : "Playing on " + serverName;
             case HUB -> serverName.isBlank() ? "In the hub" : "In the hub of " + serverName;
             case MINE -> serverName.isBlank() ? "Mining" : "Mining on " + serverName;
             case DUNGEON -> "Exploring a dungeon";
@@ -306,7 +308,7 @@ public final class DiscordRpcService {
                     parts.add(serverName);
                 }
             }
-            case MINE, DUNGEON, SIEGE, FISHING -> addCommonProgress(parts, config);
+            case LOCATION, MINE, DUNGEON, SIEGE, FISHING -> addCommonProgress(parts, config);
             case BOSS -> {
                 addBossState(parts);
                 addCommonProgress(parts, config);
@@ -393,11 +395,7 @@ public final class DiscordRpcService {
             }
         }
 
-        String locationId = normalizeLocationId(DiamondWorldProtocolClient.getCurrentGameLocation());
-        String locationName = locationId == null ? "" : DiamondWorldProtocolClient.getFishingLocationName(locationId);
-        if (locationName.isBlank()) {
-            locationName = formatLocation(DiamondWorldProtocolClient.getCurrentGameLocation());
-        }
+        String locationName = formatLocation(DiamondWorldProtocolClient.getCurrentGameLocation());
         if (!locationName.isBlank()) {
             return "Fighting at " + locationName;
         }
@@ -436,34 +434,7 @@ public final class DiscordRpcService {
     }
 
     private static String formatLocation(String locationId) {
-        String normalizedLocationId = normalizeLocationId(locationId);
-        if (normalizedLocationId != null) {
-            String protocolName = DiamondWorldProtocolClient.getFishingLocationName(normalizedLocationId);
-            if (!protocolName.isBlank() && !protocolName.equals(normalizedLocationId)) {
-                return Formatting.sanitize(protocolName);
-            }
-        }
-
-        String sanitized = Formatting.sanitize(locationId);
-        if (sanitized.isBlank()) {
-            return "";
-        }
-
-        String[] words = sanitized.replace('_', ' ').split("\\s+");
-        StringBuilder builder = new StringBuilder();
-        for (String word : words) {
-            if (word.isBlank()) {
-                continue;
-            }
-            if (!builder.isEmpty()) {
-                builder.append(' ');
-            }
-            builder.append(Character.toUpperCase(word.charAt(0)));
-            if (word.length() > 1) {
-                builder.append(word.substring(1).toLowerCase(Locale.ROOT));
-            }
-        }
-        return builder.toString();
+        return Formatting.sanitize(DiamondWorldProtocolClient.getGameLocationDisplayName(locationId));
     }
 
     private static String formatGameEvent(DwGameEvent gameEvent) {
@@ -475,104 +446,40 @@ public final class DiscordRpcService {
     }
 
     private static RpcMode resolveMode(Minecraft minecraft) {
-        String locationId = normalizeLocationId(DiamondWorldProtocolClient.getCurrentGameLocation());
+        DwGameLocation location = DiamondWorldProtocolClient.getCurrentGameLocationData();
         if (isDeathMode(minecraft)) {
             return RpcMode.DEATH;
         }
         if (isBossMode()) {
             return RpcMode.BOSS;
         }
-        RpcMode exactMode = DiscordLocationRegistry.resolveExact(locationId);
-        if (exactMode != null) {
-            return exactMode;
+        if (location == null) {
+            return RpcMode.NEUTRAL;
         }
-        if (DiamondWorldProtocolClient.isDungeonLocation()) {
+        if (location.isBoss()) {
+            return RpcMode.BOSS;
+        }
+        if (location.isAnyDungeon()) {
             return RpcMode.DUNGEON;
         }
-        if (DiamondWorldProtocolClient.isSiegeLocation()) {
+        if (location.isSiege()) {
             return RpcMode.SIEGE;
         }
-        if (looksLikeFishingLocation(locationId)) {
+        if (location.isFishing()) {
             return RpcMode.FISHING;
         }
-        if (looksLikeBossLocation(locationId)) {
-            return RpcMode.BOSS;
+        if (location.isMine()) {
+            return RpcMode.MINE;
         }
 
         CurrentServerInfo serverInfo = DiamondWorldProtocolClient.getCurrentServerInfo();
         if ("HUB".equals(serverInfo.family())) {
             return RpcMode.HUB;
         }
-
-        if (looksLikeHubLocation(locationId)) {
+        if (location.isSpawn()) {
             return RpcMode.HUB;
         }
-
-        if (looksLikeMineLocation(locationId)) {
-            return RpcMode.MINE;
-        }
-
-        return RpcMode.NEUTRAL;
-    }
-
-    private static boolean looksLikeFishingLocation(String locationId) {
-        if (locationId == null) {
-            return false;
-        }
-
-        if (DiamondWorldProtocolClient.getFishingLocationIds().contains(locationId)) {
-            return true;
-        }
-
-        return locationId.contains("fish") || locationId.contains("fishing");
-    }
-
-    private static boolean looksLikeBossLocation(String locationId) {
-        if (locationId == null) {
-            return false;
-        }
-
-        if (DiscordLocationRegistry.isBoss(locationId)) {
-            return true;
-        }
-
-        return locationId.contains("boss")
-                || locationId.contains("kriger")
-                || locationId.contains("guardian");
-    }
-
-    private static boolean looksLikeHubLocation(String locationId) {
-        if (locationId == null) {
-            return false;
-        }
-
-        if (DiscordLocationRegistry.isHub(locationId)) {
-            return true;
-        }
-
-        return locationId.contains("hub")
-                || locationId.contains("spawn")
-                || locationId.contains("lobby");
-    }
-
-    private static boolean looksLikeMineLocation(String locationId) {
-        if (locationId == null) {
-            return false;
-        }
-
-        return locationId.contains("mine")
-                || locationId.contains("shaft")
-                || locationId.contains("quarry")
-                || locationId.contains("cave");
-    }
-
-    private static String normalizeLocationId(String value) {
-        if (value == null) {
-            return null;
-        }
-
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
-        return normalized.isBlank() ? null : normalized;
+        return RpcMode.LOCATION;
     }
 
     private static boolean isBossMode() {
@@ -796,6 +703,7 @@ public final class DiscordRpcService {
 
     enum RpcMode {
         NEUTRAL("froghelper", "FrogHelper"),
+        LOCATION("froghelper", "DiamondWorld"),
         HUB("hub", "Hub"),
         MINE("mine", "Mine"),
         DUNGEON("dungeon", "Dungeon"),

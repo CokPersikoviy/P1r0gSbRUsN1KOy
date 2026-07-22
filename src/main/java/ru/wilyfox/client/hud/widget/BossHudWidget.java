@@ -433,15 +433,22 @@ public class BossHudWidget extends AbstractWidget {
 
     /** Boss name shown in the timer — captured bosses get a cross, raid bosses a star (mythic event). */
     private String bossDisplayName(BossInfo boss) {
+        String prefix = "";
         // Captured (clan holds it / location busy) takes priority over the raid-event star.
         if (DiamondWorldProtocolClient.getCapturedBossLevels().contains(boss.getLevel())) {
-            return CAPTURE_MARKER + boss.getName();
-        }
-        if (DiamondWorldProtocolClient.isMythicalEventActive()
+            prefix = CAPTURE_MARKER;
+        } else if (DiamondWorldProtocolClient.isMythicalEventActive()
                 && DiamondWorldProtocolClient.isRaidBossLevel(boss.getLevel())) {
-            return RAID_MARKER + boss.getName();
+            prefix = RAID_MARKER;
         }
-        return boss.getName();
+
+        if (!ConfigManager.get().bossWidget.showCollectibles) {
+            return prefix + boss.getName();
+        }
+
+        Boolean collected = DiamondWorldProtocolClient.hasBossCollectibleByLevel(boss.getLevel());
+        String collectionMarker = collected == null ? "" : collected ? " ✔" : " ✘";
+        return prefix + boss.getName() + collectionMarker;
     }
 
     private boolean isExpiredSpawned(BossInfo boss) {
@@ -547,4 +554,3 @@ public class BossHudWidget extends AbstractWidget {
         return ResourceLocation.withDefaultNamespace(normalized);
     }
 }
-
