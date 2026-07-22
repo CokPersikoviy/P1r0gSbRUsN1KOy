@@ -52,8 +52,8 @@ public final class FhCommands {
         });
     }
 
-    /** Fallback executor — the ChatScreenMixin intercept normally handles these first. Each handler
-     *  only acts on its own prefix, so calling all four is safe. */
+    /** Fallback executor - the ChatScreenMixin intercept normally handles these first. Each handler
+     *  only acts on its own prefix. */
     private static int run(String command) {
         if (BossShareService.handleOutgoingCommand(command, false)
                 || ProtocolDebugCommand.handleOutgoingCommand(command, false)

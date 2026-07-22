@@ -140,7 +140,6 @@ tasks.register("prepareObfuscationConfig") {
 -keep enum * { *; }
 -keepclassmembernames class ru.wilyfox.client.hud.config.** { <fields>; }
 -keepclassmembernames class ru.wilyfox.client.quickaccess.** { <fields>; }
--keepclassmembernames class ru.wilyfox.client.target.TargetListConfig { <fields>; }
 -keepclassmembernames class ru.wilyfox.client.clan.PlayerClanEntry { <fields>; }
 -keepclassmembernames class ru.wilyfox.client.clan.PlayerClanStorageFile { <fields>; }
 -keepclassmembers class * implements net.minecraft.network.protocol.common.custom.CustomPacketPayload { *; }

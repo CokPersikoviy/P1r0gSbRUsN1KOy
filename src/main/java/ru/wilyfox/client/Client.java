@@ -21,6 +21,7 @@ import ru.wilyfox.client.combo.ComboTimerChatTracker;
 import ru.wilyfox.client.dungeon.DungeonDecorationHighlightRenderHook;
 import ru.wilyfox.client.dungeon.DungeonMapTracker;
 import ru.wilyfox.client.discord.DiscordRpcService;
+import ru.wilyfox.client.discord.JoinWebhookNotifier;
 import ru.wilyfox.client.event.ClientEntityEventHandler;
 import ru.wilyfox.client.highlight.UsefulWorldHighlightRenderHook;
 import ru.wilyfox.client.hud.HudRenderer;
@@ -170,6 +171,7 @@ public class Client {
         DiscordRpcService.bindComboProgressStore(comboProgressStore);
         DiscordRpcService.bindBossDamageStore(bossDamageStore);
         DiscordRpcService.register();
+        JoinWebhookNotifier.register();
         final ResourceLocation FrogHelperLayer = ResourceLocation.fromNamespaceAndPath(MOD_ID, "hud-froghelper-layer");
         final ResourceLocation FrogHelperSettingsLayer = ResourceLocation.fromNamespaceAndPath(MOD_ID, "hud-froghelper-settings-layer");
 
