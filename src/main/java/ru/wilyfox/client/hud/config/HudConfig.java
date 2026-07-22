@@ -4,7 +4,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import ru.wilyfox.client.quickaccess.QuickAccessConfig;
-import ru.wilyfox.client.target.TargetListConfig;
 
 public class HudConfig {
     public Integer lastWindowWidth;
@@ -42,10 +41,7 @@ public class HudConfig {
     public BoostersConfig boosters = new BoostersConfig();
     public BossRespawnMessagesConfig bossRespawnMessages = new BossRespawnMessagesConfig();
     public DiscordRpcConfig discordRpc = new DiscordRpcConfig();
-    public WayPointsConfig wayPoints = new WayPointsConfig();
     public QuickAccessConfig quickAccess = new QuickAccessConfig();
-    public SocialConfig social = new SocialConfig();
-    public TargetListConfig targets = new TargetListConfig();
     public ThemeConfig theme = new ThemeConfig();
     public Map<String, WidgetLayoutConfig> widgetLayouts = new LinkedHashMap<>();
 }

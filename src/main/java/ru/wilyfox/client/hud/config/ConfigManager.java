@@ -7,7 +7,6 @@ import net.minecraft.client.Minecraft;
 import ru.wilyfox.client.hud.widget.AbstractWidget;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.client.quickaccess.QuickAccessConfig;
-import ru.wilyfox.client.target.TargetListConfig;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -154,14 +153,11 @@ public class ConfigManager {
         if (sanitized.boosters == null) sanitized.boosters = new BoostersConfig();
         if (sanitized.bossRespawnMessages == null) sanitized.bossRespawnMessages = new BossRespawnMessagesConfig();
         if (sanitized.discordRpc == null) sanitized.discordRpc = new DiscordRpcConfig();
-        if (sanitized.wayPoints == null) sanitized.wayPoints = new WayPointsConfig();
         if (sanitized.quickAccess == null) sanitized.quickAccess = new QuickAccessConfig();
-        if (sanitized.targets == null) sanitized.targets = new TargetListConfig();
         if (sanitized.theme == null) sanitized.theme = new ThemeConfig();
         if (sanitized.widgetLayouts == null) sanitized.widgetLayouts = new java.util.LinkedHashMap<>();
         if (sanitized.quickAccess.sections == null) sanitized.quickAccess.sections = QuickAccessConfig.createDefaultSections();
         if (sanitized.quickAccess.sections.isEmpty()) sanitized.quickAccess.sections = QuickAccessConfig.createDefaultSections();
-        if (sanitized.targets.players == null) sanitized.targets.players = new java.util.ArrayList<>();
         if (sanitized.autoMessages.entries == null) {
             sanitized.autoMessages.entries = AutoMessagesConfig.createDefaultEntries();
         }

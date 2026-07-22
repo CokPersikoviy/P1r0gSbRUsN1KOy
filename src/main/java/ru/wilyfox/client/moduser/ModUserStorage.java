@@ -60,7 +60,7 @@ public final class ModUserStorage {
 
         String raw = component.getString();
         if (raw.contains("{fh")) {
-            return; // FrogHelper protocol line ({fhmu:/{fhb:/{fhping:) — not a normal player message
+            return; // FrogHelper protocol lines are not normal player messages.
         }
 
         String sender = PlayerClanChatParser.senderNameLenient(component);

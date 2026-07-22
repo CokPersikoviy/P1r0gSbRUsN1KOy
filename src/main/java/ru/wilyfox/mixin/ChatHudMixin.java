@@ -16,7 +16,6 @@ import ru.wilyfox.client.chat.BossShareService;
 import ru.wilyfox.client.chat.ChatDispatchQueue;
 import ru.wilyfox.client.chat.ChatMessageDecorator;
 import ru.wilyfox.client.chat.ChatTabManager;
-import ru.wilyfox.client.chat.FrogChatProtocol;
 import ru.wilyfox.client.chat.HigherBitingNotifier;
 import ru.wilyfox.client.chat.PrivateMessagePopUpNotifier;
 import ru.wilyfox.client.chat.VisibilityStatusTracker;
@@ -46,11 +45,6 @@ public class ChatHudMixin {
         // stripped for display) so detection still sees the raw marker.
 
         if (BossShareService.handleIncomingShare(component)) {
-            ci.cancel();
-            return;
-        }
-
-        if (FrogChatProtocol.handleIncomingProtocol(component)) {
             ci.cancel();
             return;
         }

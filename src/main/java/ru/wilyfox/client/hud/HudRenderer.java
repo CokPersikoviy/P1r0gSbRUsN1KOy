@@ -21,7 +21,6 @@ import ru.wilyfox.client.hud.indicators.ScreenAnchor;
 import ru.wilyfox.client.hud.indicators.CornerSnapIndicator;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.hud.menu.HudSettingsPanel;
-import ru.wilyfox.client.ping.PingMarkerOverlayRenderer;
 import ru.wilyfox.client.hud.widget.AbstractWidget;
 import ru.wilyfox.client.hud.widget.BossHudWidget;
 import ru.wilyfox.client.hud.widget.HudBlur;
@@ -367,9 +366,6 @@ public class HudRenderer {
                 }
             }
 
-            // try (ModProfiler.Scope pingOverlayScope = ModProfiler.getInstance().scope("hud/PingMarkerOverlayRenderer")) {
-            //     PingMarkerOverlayRenderer.render(context, tickCounter.getGameTimeDeltaPartialTick(true));
-            // }
         }
     }
 

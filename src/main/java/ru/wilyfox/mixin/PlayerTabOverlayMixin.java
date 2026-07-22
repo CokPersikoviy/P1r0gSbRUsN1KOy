@@ -21,7 +21,6 @@ import ru.wilyfox.client.clan.PlayerClanNameFormatter;
 import ru.wilyfox.client.moduser.ModUserBadge;
 import ru.wilyfox.client.moduser.ModUserStorage;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
-import ru.wilyfox.client.target.TargetListStore;
 import ru.wilyfox.client.potion.PotionStore;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.utils.Formatting;
@@ -62,10 +61,6 @@ public abstract class PlayerTabOverlayMixin {
         }
 
         base = PlayerClanNameFormatter.apply(base, name);
-
-        if (TargetListStore.isTarget(name)) {
-            base = base.copy().withStyle(style -> style.withColor(0xFF3030).withBold(true));
-        }
 
         if (ConfigManager.get().render.modUserBadge && ModUserStorage.isKnown(name)) {
             base = ModUserBadge.prefix(base);

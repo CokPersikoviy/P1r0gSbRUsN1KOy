@@ -18,7 +18,6 @@ import ru.wilyfox.client.chat.ChatTabOverlay;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.profiler.ProfilerDebugCommand;
 import ru.wilyfox.client.protocol.ProtocolDebugCommand;
-import ru.wilyfox.client.target.TargetListCommand;
 
 @Mixin(ChatScreen.class)
 public abstract class ChatScreenMixin extends Screen {
@@ -76,7 +75,6 @@ public abstract class ChatScreenMixin extends Screen {
     @Inject(method = "handleChatInput", at = @At("HEAD"), cancellable = true)
     private void froghelper$handleBossShareCommand(String input, boolean addToHistory, CallbackInfo ci) {
         if (BossShareService.handleOutgoingCommand(input, addToHistory)
-                || TargetListCommand.handleOutgoingCommand(input, addToHistory)
                 || ProtocolDebugCommand.handleOutgoingCommand(input, addToHistory)
                 || ProfilerDebugCommand.handleOutgoingCommand(input, addToHistory)) {
             ci.cancel();

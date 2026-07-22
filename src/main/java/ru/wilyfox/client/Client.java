@@ -14,7 +14,6 @@ import ru.wilyfox.client.chat.BossShareService;
 import ru.wilyfox.client.chat.AutoBossAnnouncer;
 import ru.wilyfox.client.chat.AutoMessageScheduler;
 import ru.wilyfox.client.chat.ChatDispatchQueue;
-import ru.wilyfox.client.chat.FrogChatProtocol;
 import ru.wilyfox.client.chat.VisibilityStatusTracker;
 import ru.wilyfox.client.clan.PlayerClanStorage;
 import ru.wilyfox.client.combo.ComboProgressStore;
@@ -62,8 +61,6 @@ import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import ru.wilyfox.client.miner.ActiveMinersStore;
 import ru.wilyfox.client.pet.ActivePetsStore;
 import ru.wilyfox.client.potion.PotionStore;
-import ru.wilyfox.client.ping.PingMarkerManager;
-import ru.wilyfox.client.ping.PingMarkerRenderHook;
 import ru.wilyfox.client.popup.PopUpEventNotifier;
 import ru.wilyfox.client.performance.EstimatedTpsMonitor;
 import ru.wilyfox.client.quickaccess.QuickAccessInputHandler;
@@ -74,7 +71,6 @@ import ru.wilyfox.client.utility.Clicker;
 import ru.wilyfox.client.utility.AutoFish;
 import ru.wilyfox.client.utility.HudInputHandler;
 import ru.wilyfox.client.utility.MouseInputHandler;
-import ru.wilyfox.client.utility.MousePingInputHandler;
 import ru.wilyfox.client.visibility.VisibilityStatusStore;
 import ru.wilyfox.client.wand.WandCooldownTracker;
 
@@ -125,15 +121,12 @@ public class Client {
         new ClientEntityEventHandler(this.bossTracker).register();
         new HudInputHandler(hudRenderer).register();
         new MouseInputHandler(hudRenderer).register();
-        // new MousePingInputHandler().register();
         new QuickAccessInputHandler().register();
         DungeonMapTracker.getInstance().register();
 
         PlayerHealthBarRenderHook.register();
         DungeonDecorationHighlightRenderHook.register();
         UsefulWorldHighlightRenderHook.register();
-        // PingMarkerManager.init();
-        // PingMarkerRenderHook.register();
         EstimatedTpsMonitor.register();
         KeyBinds.register();
         RuneSetSwitcher.register();
@@ -159,7 +152,6 @@ public class Client {
         BossShareService.bindRepository(repository);
         VisibilityStatusTracker.bindStore(visibilityStatusStore);
         ComboTimerChatTracker.bindStore(comboProgressStore);
-        FrogChatProtocol.init();
         BossMenuIconCollector.bindRepository(repository);
         DiamondWorldProtocolClient.bindBossRepository(repository);
         DiamondWorldProtocolClient.bindActiveRunesStore(activeRunesStore);
@@ -190,10 +182,6 @@ public class Client {
         hudRenderer.registerWidget(
                 new BossHudWidget(5, 5, HudLayer.CONTENT, repository),
                 ScreenAnchor.TOP_LEFT
-        );
-        hudRenderer.registerWidget(
-                new ru.wilyfox.client.hud.widget.GroupHudWidget(60, 60, HudLayer.CONTENT),
-                ScreenAnchor.TOP_RIGHT
         );
         hudRenderer.registerWidget(
                 new BlocksPerSecondWidget(100, 100, HudLayer.CONTENT),

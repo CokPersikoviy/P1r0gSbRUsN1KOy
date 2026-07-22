@@ -7,7 +7,6 @@ public enum SettingsCategory {
     BOSS_RESPAWN_MESSAGES("Boss Messages"),
     PLAYER_HEALTH_BARS("HP Bars"),
     FISHING("Fishing"),
-    // WAYPOINTS("WayPoints"),
     POP_UPS("Pop-Ups"),
     DISCORD("Discord"),
     THEME("Theme"),

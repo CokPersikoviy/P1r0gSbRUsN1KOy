@@ -6,7 +6,6 @@ import net.minecraft.commands.SharedSuggestionProvider;
 import ru.wilyfox.client.chat.BossShareService;
 import ru.wilyfox.client.profiler.ProfilerDebugCommand;
 import ru.wilyfox.client.protocol.ProtocolDebugCommand;
-import ru.wilyfox.client.target.TargetListCommand;
 
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
@@ -44,19 +43,6 @@ public final class FhCommands {
                     .then(literal("anomalies").executes(ctx -> run("/fhproto anomalies")))
                     .then(literal("reset").executes(ctx -> run("/fhproto reset"))));
 
-            // /fhtarget <add|remove|list> [nick]
-            dispatcher.register(literal("fhtarget")
-                    .executes(ctx -> run("/fhtarget"))
-                    .then(literal("list").executes(ctx -> run("/fhtarget list")))
-                    .then(literal("add")
-                            .then(argument("nick", StringArgumentType.word())
-                                    .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(ctx.getSource().getOnlinePlayerNames(), builder))
-                                    .executes(ctx -> run("/fhtarget add " + StringArgumentType.getString(ctx, "nick")))))
-                    .then(literal("remove")
-                            .then(argument("nick", StringArgumentType.word())
-                                    .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(ctx.getSource().getOnlinePlayerNames(), builder))
-                                    .executes(ctx -> run("/fhtarget remove " + StringArgumentType.getString(ctx, "nick"))))));
-
             // /fhshare <nick>
             dispatcher.register(literal("fhshare")
                     .executes(ctx -> run("/fhshare"))
@@ -70,7 +56,6 @@ public final class FhCommands {
      *  only acts on its own prefix, so calling all four is safe. */
     private static int run(String command) {
         if (BossShareService.handleOutgoingCommand(command, false)
-                || TargetListCommand.handleOutgoingCommand(command, false)
                 || ProtocolDebugCommand.handleOutgoingCommand(command, false)
                 || ProfilerDebugCommand.handleOutgoingCommand(command, false)) {
             return 1;
