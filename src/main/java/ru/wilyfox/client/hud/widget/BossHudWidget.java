@@ -43,8 +43,10 @@ public class BossHudWidget extends AbstractWidget {
     private static final int PADDING_X = 6;
     private static final int PADDING_Y = 5;
     private static final int LINE_GAP = 1;
+    private static final int ICON_ROW_GAP = 2;
     private static final int COLUMN_GAP = 6;
-    private static final int ICON_SIZE = 16;
+    private static final int NATIVE_ICON_SIZE = 16;
+    private static final int ICON_SIZE = 14;
     private static final int ICON_TEXT_GAP = 4;
     private static final int ICON_Y_OFFSET = -3;
     private static final int EMPTY_WIDTH = 110;
@@ -93,7 +95,8 @@ public class BossHudWidget extends AbstractWidget {
 
         int maxNameWidth = fullAlignment && showName ? getMaxNameWidth(visibleBosses, mc) : 0;
         int maxLevelWidth = fullAlignment && showLevel ? getMaxLevelWidth(visibleBosses, mc) : 0;
-        int lineStep = mc.font.lineHeight + LINE_GAP;
+        int compactMarkerWidth = !showName ? getMaxCompactMarkerWidth(visibleBosses, mc) : 0;
+        int lineStep = getLineStep(mc);
 
         context.pose().pushPose();
         context.pose().translate(startX, startY, 0);
@@ -104,7 +107,7 @@ public class BossHudWidget extends AbstractWidget {
         int contentY = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
             context.drawString(mc.font, "Boss Timers", PADDING_X, contentY, WidgetTheme.TITLE);
-            contentY += lineStep + 2;
+            contentY += mc.font.lineHeight + LINE_GAP + 2;
         }
 
         for (int line = 0; line < visibleBosses.size(); line++) {
@@ -114,6 +117,7 @@ public class BossHudWidget extends AbstractWidget {
             long displayRespawnAt = getDisplayRespawnAt(boss);
 
             String nameText = bossDisplayName(boss);
+            String compactMarkerText = showName ? "" : bossCompactMarkers(boss);
             String levelText = "[" + boss.getLevel() + "]";
             String timerText = spawned ? formatMillisSigned(displayRespawnAt) : formatMillis(displayRespawnAt);
 
@@ -124,11 +128,22 @@ public class BossHudWidget extends AbstractWidget {
             int iconY = y + Math.max(0, (mc.font.lineHeight - ICON_SIZE) / 2) + ICON_Y_OFFSET;
 
             if (showIcons) {
-                context.renderItem(getBossIcon(boss), currentX, iconY);
+                renderBossIcon(context, getBossIcon(boss), currentX, iconY);
                 currentX += ICON_SIZE;
 
                 if (showName || showLevel || showTimer) {
                     currentX += ICON_TEXT_GAP;
+                }
+            }
+
+            if (!showName && compactMarkerWidth > 0) {
+                if (!compactMarkerText.isEmpty()) {
+                    context.drawString(mc.font, compactMarkerText, currentX, y, nameColor);
+                }
+                currentX += compactMarkerWidth;
+
+                if (showLevel || showTimer) {
+                    currentX += COLUMN_GAP;
                 }
             }
 
@@ -156,10 +171,6 @@ public class BossHudWidget extends AbstractWidget {
             }
 
             if (showTimer) {
-                if (!showName && !showLevel) {
-                    currentX = PADDING_X;
-                }
-
                 context.drawString(mc.font, timerText, currentX, y, timerColor);
             }
         }
@@ -258,10 +269,10 @@ public class BossHudWidget extends AbstractWidget {
             return -1;
         }
 
-        int lineStep = Minecraft.getInstance().font.lineHeight + LINE_GAP;
+        int lineStep = getLineStep(Minecraft.getInstance());
         int contentY = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            contentY += lineStep + 2;
+            contentY += Minecraft.getInstance().font.lineHeight + LINE_GAP + 2;
         }
 
         for (int i = 0; i < bosses.size(); i++) {
@@ -293,6 +304,7 @@ public class BossHudWidget extends AbstractWidget {
 
         int maxNameWidth = fullAlignment && showName ? getMaxNameWidth(visibleBosses, mc) : 0;
         int maxLevelWidth = fullAlignment && showLevel ? getMaxLevelWidth(visibleBosses, mc) : 0;
+        int compactMarkerWidth = !showName ? getMaxCompactMarkerWidth(visibleBosses, mc) : 0;
         int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Boss Timers") : 0;
 
         for (BossInfo boss : visibleBosses) {
@@ -309,6 +321,14 @@ public class BossHudWidget extends AbstractWidget {
 
                 if (showName || showLevel || showTimer) {
                     rowWidth += ICON_TEXT_GAP;
+                }
+            }
+
+            if (!showName && compactMarkerWidth > 0) {
+                rowWidth += compactMarkerWidth;
+
+                if (showLevel || showTimer) {
+                    rowWidth += COLUMN_GAP;
                 }
             }
 
@@ -349,8 +369,10 @@ public class BossHudWidget extends AbstractWidget {
             return EMPTY_HEIGHT;
         }
 
-        int lineStep = Minecraft.getInstance().font.lineHeight + LINE_GAP;
-        int titleBlock = WidgetUtils.showWidgetTitles() ? lineStep + 2 : 0;
+        int lineStep = getLineStep(Minecraft.getInstance());
+        int titleBlock = WidgetUtils.showWidgetTitles()
+                ? Minecraft.getInstance().font.lineHeight + LINE_GAP + 2
+                : 0;
         return PADDING_Y * 2 + 2 + titleBlock + rendered * lineStep;
     }
 
@@ -407,6 +429,16 @@ public class BossHudWidget extends AbstractWidget {
         return max;
     }
 
+    private int getMaxCompactMarkerWidth(List<BossInfo> bosses, Minecraft mc) {
+        int max = 0;
+
+        for (BossInfo boss : bosses) {
+            max = Math.max(max, mc.font.width(bossCompactMarkers(boss)));
+        }
+
+        return max;
+    }
+
     private int getMaxLevelWidth(List<BossInfo> bosses, Minecraft mc) {
         int max = 0;
 
@@ -421,6 +453,22 @@ public class BossHudWidget extends AbstractWidget {
         return Minecraft.getInstance().screen instanceof HudEditingScreen;
     }
 
+    private int getLineStep(Minecraft minecraft) {
+        if (ConfigManager.get().bossWidget.showIcons) {
+            return Math.max(minecraft.font.lineHeight, ICON_SIZE) + ICON_ROW_GAP;
+        }
+        return minecraft.font.lineHeight + LINE_GAP;
+    }
+
+    private void renderBossIcon(GuiGraphics context, ItemStack stack, int x, int y) {
+        float iconScale = ICON_SIZE / (float) NATIVE_ICON_SIZE;
+        context.pose().pushPose();
+        context.pose().translate(x, y, 0.0F);
+        context.pose().scale(iconScale, iconScale, 1.0F);
+        context.renderItem(stack, 0, 0);
+        context.pose().popPose();
+    }
+
     private boolean isSpawned(BossInfo boss) {
         return getDisplayRespawnAt(boss) < System.currentTimeMillis();
     }
@@ -433,22 +481,40 @@ public class BossHudWidget extends AbstractWidget {
 
     /** Boss name shown in the timer — captured bosses get a cross, raid bosses a star (mythic event). */
     private String bossDisplayName(BossInfo boss) {
-        String prefix = "";
+        return bossStatusPrefix(boss) + boss.getName() + bossCollectibleSuffix(boss);
+    }
+
+    private String bossCompactMarkers(BossInfo boss) {
+        String status = bossStatusPrefix(boss).trim();
+        String collectible = bossCollectibleSuffix(boss).trim();
+        if (status.isEmpty()) {
+            return collectible;
+        }
+        if (collectible.isEmpty()) {
+            return status;
+        }
+        return status + " " + collectible;
+    }
+
+    private String bossStatusPrefix(BossInfo boss) {
         // Captured (clan holds it / location busy) takes priority over the raid-event star.
         if (DiamondWorldProtocolClient.getCapturedBossLevels().contains(boss.getLevel())) {
-            prefix = CAPTURE_MARKER;
-        } else if (DiamondWorldProtocolClient.isMythicalEventActive()
-                && DiamondWorldProtocolClient.isRaidBossLevel(boss.getLevel())) {
-            prefix = RAID_MARKER;
+            return CAPTURE_MARKER;
         }
+        if (DiamondWorldProtocolClient.isMythicalEventActive()
+                && DiamondWorldProtocolClient.isRaidBossLevel(boss.getLevel())) {
+            return RAID_MARKER;
+        }
+        return "";
+    }
 
+    private String bossCollectibleSuffix(BossInfo boss) {
         if (!ConfigManager.get().bossWidget.showCollectibles) {
-            return prefix + boss.getName();
+            return "";
         }
 
         Boolean collected = DiamondWorldProtocolClient.hasBossCollectibleByLevel(boss.getLevel());
-        String collectionMarker = collected == null ? "" : collected ? " ✔" : " ✘";
-        return prefix + boss.getName() + collectionMarker;
+        return Boolean.TRUE.equals(collected) ? " ✔" : "";
     }
 
     private boolean isExpiredSpawned(BossInfo boss) {

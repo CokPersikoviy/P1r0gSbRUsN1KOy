@@ -155,6 +155,7 @@ public class ConfigManager {
         if (sanitized.discordRpc == null) sanitized.discordRpc = new DiscordRpcConfig();
         if (sanitized.quickAccess == null) sanitized.quickAccess = new QuickAccessConfig();
         if (sanitized.theme == null) sanitized.theme = new ThemeConfig();
+        if (sanitized.theme.preset == null) sanitized.theme.preset = ThemePreset.LINGONBERRY_PIE;
         if (sanitized.widgetLayouts == null) sanitized.widgetLayouts = new java.util.LinkedHashMap<>();
         if (sanitized.quickAccess.sections == null) sanitized.quickAccess.sections = QuickAccessConfig.createDefaultSections();
         if (sanitized.quickAccess.sections.isEmpty()) sanitized.quickAccess.sections = QuickAccessConfig.createDefaultSections();
@@ -205,6 +206,12 @@ public class ConfigManager {
         if (sanitized.runesBag.setSelectorKeys == null || sanitized.runesBag.setSelectorKeys.length != 7) {
             sanitized.runesBag.setSelectorKeys = RunesBagConfig.defaultSelectorKeys();
         }
+        sanitized.theme.customAccentRed = clampColorChannel(sanitized.theme.customAccentRed);
+        sanitized.theme.customAccentGreen = clampColorChannel(sanitized.theme.customAccentGreen);
+        sanitized.theme.customAccentBlue = clampColorChannel(sanitized.theme.customAccentBlue);
+        sanitized.theme.customSecondaryRed = clampColorChannel(sanitized.theme.customSecondaryRed);
+        sanitized.theme.customSecondaryGreen = clampColorChannel(sanitized.theme.customSecondaryGreen);
+        sanitized.theme.customSecondaryBlue = clampColorChannel(sanitized.theme.customSecondaryBlue);
         sanitized.theme.hardAccentRed = Math.max(0, Math.min(255, sanitized.theme.hardAccentRed));
         sanitized.theme.hardAccentGreen = Math.max(0, Math.min(255, sanitized.theme.hardAccentGreen));
         sanitized.theme.hardAccentBlue = Math.max(0, Math.min(255, sanitized.theme.hardAccentBlue));
@@ -214,5 +221,9 @@ public class ConfigManager {
 
         WidgetTheme.syncConfiguredTheme();
         return sanitized;
+    }
+
+    private static int clampColorChannel(int value) {
+        return Math.max(0, Math.min(255, value));
     }
 }

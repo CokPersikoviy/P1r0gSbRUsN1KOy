@@ -81,17 +81,18 @@ public final class JoinWebhookNotifier {
             return;
         }
 
+        boolean changed = session.updateLevel(DiamondWorldProtocolClient.getCurrentLevel());
         String locationId = DiamondWorldProtocolClient.getCurrentGameLocation();
-        if (locationId == null || locationId.isBlank()) {
-            return;
+        if (locationId != null && !locationId.isBlank()) {
+            String displayName = DiamondWorldProtocolClient.getGameLocationDisplayName(locationId);
+            if (displayName == null || displayName.isBlank()) {
+                displayName = locationId;
+            }
+
+            changed |= session.updateLocation(locationId, displayName);
         }
 
-        String displayName = DiamondWorldProtocolClient.getGameLocationDisplayName(locationId);
-        if (displayName == null || displayName.isBlank()) {
-            displayName = locationId;
-        }
-
-        if (session.updateLocation(locationId, displayName)) {
+        if (changed) {
             EXECUTOR.execute(() -> updateMessage(session));
         }
     }
@@ -176,6 +177,7 @@ public final class JoinWebhookNotifier {
 
         private String locationId = "";
         private String locationName = "Waiting for location";
+        private int level;
         private Instant loggedOutAt;
         private long revision;
         private String messageId;
@@ -203,6 +205,16 @@ public final class JoinWebhookNotifier {
             return true;
         }
 
+        synchronized boolean updateLevel(int newLevel) {
+            if (loggedOutAt != null || newLevel <= 0 || level == newLevel) {
+                return false;
+            }
+
+            level = newLevel;
+            revision++;
+            return true;
+        }
+
         synchronized boolean markLoggedOut(Instant timestamp) {
             if (loggedOutAt != null) {
                 return false;
@@ -217,6 +229,7 @@ public final class JoinWebhookNotifier {
             return new SessionSnapshot(
                     playerName,
                     playerId,
+                    level,
                     joinedAt,
                     locationName,
                     loggedOutAt,
@@ -244,6 +257,7 @@ public final class JoinWebhookNotifier {
     record SessionSnapshot(
             String playerName,
             UUID playerId,
+            int level,
             Instant joinedAt,
             String locationName,
             Instant loggedOutAt,

@@ -121,6 +121,13 @@ class WandCooldownTrackerTest {
     }
 
     @Test
+    void localWindRemainsVisibleThroughFinalSecond() {
+        assertTrue(WandCooldownTracker.isLocalWindVisible(50_000L, 49_000L));
+        assertTrue(WandCooldownTracker.isLocalWindVisible(50_000L, 49_999L));
+        assertFalse(WandCooldownTracker.isLocalWindVisible(50_000L, 50_000L));
+    }
+
+    @Test
     void serverRefreshReplacesDeadlineExactly() {
         AtomicLong now = new AtomicLong(50_000L);
         WandCooldownTracker tracker = new WandCooldownTracker(now::get);

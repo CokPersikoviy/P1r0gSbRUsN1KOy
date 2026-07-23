@@ -173,7 +173,7 @@ public final class WandCooldownTracker {
         for (Map.Entry<WindStaffVariant, LocalWindCooldown> entry : localWindEntries.entrySet()) {
             WindStaffVariant variant = entry.getKey();
             LocalWindCooldown local = entry.getValue();
-            if (!isVisibleStaffWindow(local.window(), now, includeFinalSecond)) {
+            if (!isLocalWindVisible(local.window().endsAt(), now)) {
                 continue;
             }
 
@@ -217,7 +217,7 @@ public final class WandCooldownTracker {
                 staffTypes.containsKey(entry.getKey()) && isVisibleStaffWindow(entry.getValue(), now, includeFinalSecond)
         );
         boolean hasLocalWind = localWindEntries.values().stream().anyMatch(entry ->
-                isVisibleStaffWindow(entry.window(), now, includeFinalSecond)
+                isLocalWindVisible(entry.window().endsAt(), now)
         );
         return hasProtocol || hasLocalWind || !specialEntries.isEmpty();
     }
@@ -269,6 +269,10 @@ public final class WandCooldownTracker {
     private static boolean isVisibleStaffWindow(CooldownState window, long now, boolean includeFinalSecond) {
         long remaining = window.endsAt() - now;
         return remaining > (includeFinalSecond ? 0L : READY_WINDOW_MILLIS);
+    }
+
+    static boolean isLocalWindVisible(long endsAt, long now) {
+        return endsAt > now;
     }
 
     private static WandCooldownEntry toLocalEntry(WindStaffVariant variant, LocalWindCooldown local) {

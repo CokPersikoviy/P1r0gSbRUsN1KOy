@@ -32,6 +32,8 @@ final class ProtocolPayloadHandlers {
     private static final int BOOSTER_PREVIEW_LIMIT = 6;
     private static final int BOSSCOLLECT_GROUP_PREVIEW_LIMIT = 6;
     private static final int BOSSCOLLECT_VALUE_PREVIEW_LIMIT = 4;
+    private static final long RUNE_SET_COOLDOWN_MILLIS = 10_000L;
+    private static final long RUNE_SET_COOLDOWN_REDUCTION_MILLIS = 500L;
 
     private ProtocolPayloadHandlers() {
     }
@@ -607,7 +609,7 @@ final class ProtocolPayloadHandlers {
             long now = System.currentTimeMillis();
             boolean swapTriggered = ProtocolPayloadSupport.shouldTriggerRuneSetCooldown(state, packet.timers(), now);
             if (swapTriggered) {
-                RuneSetCooldownStore.update(10_000L);
+                RuneSetCooldownStore.update(RUNE_SET_COOLDOWN_MILLIS - RUNE_SET_COOLDOWN_REDUCTION_MILLIS);
             }
 
             // TEMP diagnostic (render.debug) for T5 "first wind-rune press doesn't start the swap cd":

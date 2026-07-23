@@ -35,89 +35,34 @@ public final class WidgetTheme {
 
     public static void syncConfiguredTheme() {
         ThemeConfig config = ConfigManager.get() != null ? ConfigManager.get().theme : null;
-        ThemePreset preset = config != null && config.preset != null ? config.preset : ThemePreset.FROG;
+        ThemePreset preset = config != null && config.preset != null
+                ? config.preset
+                : ThemePreset.LINGONBERRY_PIE;
 
         switch (preset) {
-            case MINT -> applyPalette(
-                    0x12201B,
-                    0x1A2C25,
-                    0x9FD7C4,
-                    0xF0FFF8,
-                    0xDCEFE7,
-                    0xB7CEC3,
-                    0x8EA69B,
-                    0xF6FFFB,
-                    0xBEEBDD,
-                    0xC8E8DC,
-                    0xD7F1DE,
-                    0xF0E3BF,
-                    0xF2D3D0,
-                    0x08110E,
-                    0x7CCDB1
-            );
-            case EMBER -> applyPalette(
-                    0x231716,
-                    0x332120,
-                    0xD9A07A,
-                    0xFFF2EB,
-                    0xF0D6C9,
-                    0xD5B1A2,
-                    0xA7867C,
-                    0xFFF7F2,
-                    0xFFD0B5,
-                    0xF2D9C6,
-                    0xE3C6A7,
-                    0xF0D6A5,
-                    0xE5B6B0,
-                    0x140909,
-                    0xD78A5F
-            );
-            case OCEAN -> applyPalette(
-                    0x111A25,
-                    0x192636,
-                    0x8FB7D9,
-                    0xEEF7FF,
-                    0xD7E6F2,
-                    0xADC3D5,
-                    0x8096A8,
-                    0xF5FBFF,
-                    0xB9D9F3,
-                    0xC9DCEF,
-                    0xCBE8D8,
-                    0xE7DEBC,
-                    0xE2C8CE,
-                    0x07111A,
-                    0x76A8D4
-            );
             case CUSTOM -> {
-                int accentRgb = config != null
+                int primaryRgb = config != null
                         ? rgb(config.customAccentRed, config.customAccentGreen, config.customAccentBlue)
-                        : ThemePreset.CUSTOM.getAccentRgb();
-                applyCustomPalette(accentRgb);
+                        : ThemePreset.CUSTOM.getPrimaryRgb();
+                int secondaryRgb = config != null
+                        ? rgb(config.customSecondaryRed, config.customSecondaryGreen, config.customSecondaryBlue)
+                        : ThemePreset.CUSTOM.getSecondaryRgb();
+                applyCustomPalette(primaryRgb, secondaryRgb);
             }
-            case FROG -> applyPalette(
-                    0x131313,
-                    0x1B1B1B,
-                    0xD0D0D0,
-                    0xE4E4E4,
-                    0xD8D8D8,
-                    0xBBBBBB,
-                    0x9A9A9A,
-                    0xEDEDED,
-                    0xE6DDD0,
-                    0xD8D8D8,
-                    0xD7E3D7,
-                    0xE3DBC9,
-                    0xE1CFCF,
-                    0x000000,
-                    0xD6D6D6
-            );
+            case LINGONBERRY_PIE, WILD_FOX, SWAMP_FROG, PICK_ME ->
+                    applyPresetPalette(preset, config != null && config.swapPresetColors);
         }
 
         // Hard accent is preset-independent (a user-set critical colour), applied after the palette.
         if (config != null) {
             HARD_ACCENT = 0xFF000000 | rgb(config.hardAccentRed, config.hardAccentGreen, config.hardAccentBlue);
         }
+    }
+
+    private static void applyPresetPalette(ThemePreset preset, boolean swapped) {
+        int primaryRgb = swapped ? preset.getSecondaryRgb() : preset.getPrimaryRgb();
+        int secondaryRgb = swapped ? preset.getPrimaryRgb() : preset.getSecondaryRgb();
+        applyCustomPalette(primaryRgb, secondaryRgb);
     }
 
     private static int rgb(int red, int green, int blue) {
@@ -165,10 +110,47 @@ public final class WidgetTheme {
             int barBgRgb,
             int barFillRgb
     ) {
+        applyPalette(
+                panelBgRgb,
+                panelSoftRgb,
+                accentRgb,
+                titleRgb,
+                primaryRgb,
+                secondaryRgb,
+                mutedRgb,
+                softRgb,
+                accentTextRgb,
+                statusInfoRgb,
+                statusSuccessRgb,
+                statusWarningRgb,
+                statusErrorRgb,
+                barBgRgb,
+                barFillRgb,
+                getWidgetBackgroundOpacityPercent()
+        );
+    }
+
+    private static void applyPalette(
+            int panelBgRgb,
+            int panelSoftRgb,
+            int accentRgb,
+            int titleRgb,
+            int primaryRgb,
+            int secondaryRgb,
+            int mutedRgb,
+            int softRgb,
+            int accentTextRgb,
+            int statusInfoRgb,
+            int statusSuccessRgb,
+            int statusWarningRgb,
+            int statusErrorRgb,
+            int barBgRgb,
+            int barFillRgb,
+            int opacityPercent
+    ) {
         PANEL_BG = 0x90000000 | panelBgRgb;
         PANEL_BG_SOFT = 0x7A000000 | panelSoftRgb;
         ACCENT_LINE = 0xC0000000 | accentRgb;
-        int opacityPercent = getWidgetBackgroundOpacityPercent();
         WIDGET_PANEL_BG = withOpacityPercent(PANEL_BG, opacityPercent);
         WIDGET_PANEL_BG_SOFT = withOpacityPercent(PANEL_BG_SOFT, opacityPercent);
         WIDGET_ACCENT_LINE = withOpacityPercent(ACCENT_LINE, opacityPercent);
@@ -185,35 +167,40 @@ public final class WidgetTheme {
         BAR_BG = 0xA0000000 | barBgRgb;
         BAR_FILL = 0xE0000000 | barFillRgb;
         OUTLINE_ACTIVE = withAlpha(TITLE, 0xFF);
-        OUTLINE_SOFT = withAlpha(TEXT_SOFT, 0xFF);
+        OUTLINE_SOFT = withAlpha(TEXT_SECONDARY, 0xFF);
         TOOLTIP_BG = withAlpha(PANEL_BG, 0xA0);
         TOOLTIP_TEXT = withAlpha(TEXT_SOFT, 0xFF);
         GRID_LINE = withAlpha(TEXT_MUTED, 0x33);
     }
 
-    private static void applyCustomPalette(int accentRgb) {
-        int panelBgRgb = darken(accentRgb, 0.88f);
-        int panelSoftRgb = darken(accentRgb, 0.80f);
-        int titleRgb = lighten(accentRgb, 0.78f);
-        int primaryRgb = lighten(accentRgb, 0.66f);
-        int secondaryRgb = lighten(accentRgb, 0.46f);
-        int mutedRgb = lighten(accentRgb, 0.24f);
-        int softRgb = lighten(accentRgb, 0.86f);
-        int accentTextRgb = lighten(accentRgb, 0.58f);
-        int statusInfoRgb = lighten(accentRgb, 0.58f);
-        int statusSuccessRgb = lighten(accentRgb, 0.70f);
-        int statusWarningRgb = lighten(accentRgb, 0.50f);
-        int statusErrorRgb = lighten(accentRgb, 0.38f);
-        int barBgRgb = darken(accentRgb, 0.92f);
-        int barFillRgb = lighten(accentRgb, 0.12f);
+    private static void applyCustomPalette(int primarySourceRgb, int secondarySourceRgb) {
+        applyCustomPalette(primarySourceRgb, secondarySourceRgb, getWidgetBackgroundOpacityPercent());
+    }
+
+    static void applyCustomPalette(int primarySourceRgb, int secondarySourceRgb, int opacityPercent) {
+        // Primary owns active/foreground states. Secondary owns surfaces and supporting content.
+        int panelBgRgb = darken(secondarySourceRgb, 0.88f);
+        int panelSoftRgb = darken(secondarySourceRgb, 0.80f);
+        int titleRgb = lighten(primarySourceRgb, 0.78f);
+        int primaryTextRgb = lighten(primarySourceRgb, 0.66f);
+        int secondaryTextRgb = lighten(secondarySourceRgb, 0.46f);
+        int mutedRgb = lighten(secondarySourceRgb, 0.24f);
+        int softRgb = lighten(primarySourceRgb, 0.86f);
+        int accentTextRgb = lighten(primarySourceRgb, 0.58f);
+        int statusInfoRgb = lighten(primarySourceRgb, 0.58f);
+        int statusSuccessRgb = lighten(primarySourceRgb, 0.70f);
+        int statusWarningRgb = lighten(primarySourceRgb, 0.50f);
+        int statusErrorRgb = lighten(primarySourceRgb, 0.38f);
+        int barBgRgb = darken(secondarySourceRgb, 0.92f);
+        int barFillRgb = lighten(primarySourceRgb, 0.12f);
 
         applyPalette(
                 panelBgRgb,
                 panelSoftRgb,
-                accentRgb,
+                primarySourceRgb,
                 titleRgb,
-                primaryRgb,
-                secondaryRgb,
+                primaryTextRgb,
+                secondaryTextRgb,
                 mutedRgb,
                 softRgb,
                 accentTextRgb,
@@ -222,7 +209,8 @@ public final class WidgetTheme {
                 statusWarningRgb,
                 statusErrorRgb,
                 barBgRgb,
-                barFillRgb
+                barFillRgb,
+                opacityPercent
         );
     }
 

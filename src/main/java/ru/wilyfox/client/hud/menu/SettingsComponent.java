@@ -104,6 +104,9 @@ public abstract class SettingsComponent implements MenuElement {
         return false;
     }
 
+    public void onClickOutside() {
+    }
+
     @Override
     public abstract void render(GuiGraphics context, int mouseX, int mouseY);
 

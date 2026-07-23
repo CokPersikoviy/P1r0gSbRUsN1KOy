@@ -60,6 +60,22 @@ public class HudSettingsPanel {
         return Math.max(BossWidgetConfig.MAX_LEVEL_CEILING, DiamondWorldProtocolClient.getHighestKnownBossLevel());
     }
 
+    private static int rgb(int red, int green, int blue) {
+        return (red & 0xFF) << 16 | (green & 0xFF) << 8 | blue & 0xFF;
+    }
+
+    private static int red(int color) {
+        return color >> 16 & 0xFF;
+    }
+
+    private static int green(int color) {
+        return color >> 8 & 0xFF;
+    }
+
+    private static int blue(int color) {
+        return color & 0xFF;
+    }
+
     public void render(GuiGraphics context, double mouseX, double mouseY) {
         ensureInitialized();
 
@@ -571,6 +587,15 @@ public class HudSettingsPanel {
         );
 
         componentsByCategory.get(SettingsCategory.PLAYER_HEALTH_BARS).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Show numeric HP",
+                        () -> ConfigManager.get().playerHealthBars.showNumericHp,
+                        value -> ConfigManager.get().playerHealthBars.showNumericHp = value
+                )
+        );
+
+        componentsByCategory.get(SettingsCategory.PLAYER_HEALTH_BARS).add(
                 new SliderSettingsComponent(
                         0, 0, 0, 0,
                         "Offset",
@@ -739,61 +764,50 @@ public class HudSettingsPanel {
         }
 
         componentsByCategory.get(SettingsCategory.THEME).add(
-                new SliderSettingsComponent(
-                        0, 0, 0, 0,
-                        "Custom red",
-                        () -> ConfigManager.get().theme.customAccentRed,
-                        value -> ConfigManager.get().theme.customAccentRed = value,
-                        0, 255
+                new ColorPickerSettingsComponent(
+                        "Primary color",
+                        () -> rgb(
+                                ConfigManager.get().theme.customAccentRed,
+                                ConfigManager.get().theme.customAccentGreen,
+                                ConfigManager.get().theme.customAccentBlue
+                        ),
+                        color -> {
+                            ConfigManager.get().theme.customAccentRed = red(color);
+                            ConfigManager.get().theme.customAccentGreen = green(color);
+                            ConfigManager.get().theme.customAccentBlue = blue(color);
+                        }
                 )
         );
-
         componentsByCategory.get(SettingsCategory.THEME).add(
-                new SliderSettingsComponent(
-                        0, 0, 0, 0,
-                        "Custom green",
-                        () -> ConfigManager.get().theme.customAccentGreen,
-                        value -> ConfigManager.get().theme.customAccentGreen = value,
-                        0, 255
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.THEME).add(
-                new SliderSettingsComponent(
-                        0, 0, 0, 0,
-                        "Custom blue",
-                        () -> ConfigManager.get().theme.customAccentBlue,
-                        value -> ConfigManager.get().theme.customAccentBlue = value,
-                        0, 255
+                new ColorPickerSettingsComponent(
+                        "Secondary color",
+                        () -> rgb(
+                                ConfigManager.get().theme.customSecondaryRed,
+                                ConfigManager.get().theme.customSecondaryGreen,
+                                ConfigManager.get().theme.customSecondaryBlue
+                        ),
+                        color -> {
+                            ConfigManager.get().theme.customSecondaryRed = red(color);
+                            ConfigManager.get().theme.customSecondaryGreen = green(color);
+                            ConfigManager.get().theme.customSecondaryBlue = blue(color);
+                        }
                 )
         );
 
         componentsByCategory.get(SettingsCategory.THEME).add(new BreakLineSettingsComponent("Hard Accent"));
         componentsByCategory.get(SettingsCategory.THEME).add(
-                new SliderSettingsComponent(
-                        0, 0, 0, 0,
-                        "Hard accent red",
-                        () -> ConfigManager.get().theme.hardAccentRed,
-                        value -> ConfigManager.get().theme.hardAccentRed = value,
-                        0, 255
-                )
-        );
-        componentsByCategory.get(SettingsCategory.THEME).add(
-                new SliderSettingsComponent(
-                        0, 0, 0, 0,
-                        "Hard accent green",
-                        () -> ConfigManager.get().theme.hardAccentGreen,
-                        value -> ConfigManager.get().theme.hardAccentGreen = value,
-                        0, 255
-                )
-        );
-        componentsByCategory.get(SettingsCategory.THEME).add(
-                new SliderSettingsComponent(
-                        0, 0, 0, 0,
-                        "Hard accent blue",
-                        () -> ConfigManager.get().theme.hardAccentBlue,
-                        value -> ConfigManager.get().theme.hardAccentBlue = value,
-                        0, 255
+                new ColorPickerSettingsComponent(
+                        "Hard accent",
+                        () -> rgb(
+                                ConfigManager.get().theme.hardAccentRed,
+                                ConfigManager.get().theme.hardAccentGreen,
+                                ConfigManager.get().theme.hardAccentBlue
+                        ),
+                        color -> {
+                            ConfigManager.get().theme.hardAccentRed = red(color);
+                            ConfigManager.get().theme.hardAccentGreen = green(color);
+                            ConfigManager.get().theme.hardAccentBlue = blue(color);
+                        }
                 )
         );
 
@@ -1675,6 +1689,12 @@ public class HudSettingsPanel {
     }
 
     public boolean mousePressed(double mouseX, double mouseY, int button) {
+        for (SettingsComponent component : getInteractiveComponents()) {
+            if (!component.isHovered(mouseX, mouseY)) {
+                component.onClickOutside();
+            }
+        }
+
         if (!isInside(mouseX, mouseY)) {
             return false;
         }

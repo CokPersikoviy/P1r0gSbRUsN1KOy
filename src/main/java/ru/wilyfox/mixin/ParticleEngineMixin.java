@@ -83,7 +83,8 @@ public class ParticleEngineMixin {
 
     private boolean isFishingBubbleParticle(ParticleOptions options) {
         return options.getType() == ParticleTypes.BUBBLE
-                || options.getType() == ParticleTypes.LAVA
-                || options.getType() == ParticleTypes.DUST;
+                || options.getType() == ParticleTypes.BUBBLE_POP
+                || options.getType() == ParticleTypes.BUBBLE_COLUMN_UP
+                || options.getType() == ParticleTypes.LAVA;
     }
 }

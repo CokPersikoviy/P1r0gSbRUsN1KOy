@@ -24,7 +24,7 @@ final class DiscordSessionEmbed {
         embed.add("thumbnail", thumbnail);
 
         JsonArray fields = new JsonArray();
-        fields.add(field("Nickname", session.playerName(), true));
+        fields.add(field("Nickname", playerLabel(session), true));
         fields.add(field("Timestamp", discordTimestamp(session.joinedAt()), true));
         fields.add(field("Location", session.locationName(), false));
         if (session.loggedOutAt() == null) {
@@ -44,6 +44,11 @@ final class DiscordSessionEmbed {
         payload.add("embeds", embeds);
         payload.add("allowed_mentions", allowedMentions);
         return payload;
+    }
+
+    private static String playerLabel(JoinWebhookNotifier.SessionSnapshot session) {
+        String level = session.level() > 0 ? Integer.toString(session.level()) : "?";
+        return session.playerName() + " [" + level + "]";
     }
 
     private static JsonObject field(String name, String value, boolean inline) {

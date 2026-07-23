@@ -18,10 +18,10 @@ class DiscordSessionEmbedTest {
     @Test
     void onlineEmbedContainsPlayerLocationAndOnlineField() {
         JsonObject embed = embed(new JoinWebhookNotifier.SessionSnapshot(
-                "WilyFox", PLAYER_ID, JOINED_AT, "Spawn", null, 0L
+                "WilyFox", PLAYER_ID, 148, JOINED_AT, "Spawn", null, 0L
         ));
 
-        assertEquals("WilyFox", fieldValue(embed, "Nickname"));
+        assertEquals("WilyFox [148]", fieldValue(embed, "Nickname"));
         assertEquals("<t:1700000000:F>", fieldValue(embed, "Timestamp"));
         assertEquals("Spawn", fieldValue(embed, "Location"));
         assertEquals("Yes", fieldValue(embed, "Online"));
@@ -36,12 +36,21 @@ class DiscordSessionEmbedTest {
     void logoutEmbedReplacesOnlineFieldWithLogoutTimestamp() {
         Instant loggedOutAt = Instant.ofEpochSecond(1_700_000_900L);
         JsonObject embed = embed(new JoinWebhookNotifier.SessionSnapshot(
-                "WilyFox", PLAYER_ID, JOINED_AT, "Mine 12", loggedOutAt, 2L
+                "WilyFox", PLAYER_ID, 148, JOINED_AT, "Mine 12", loggedOutAt, 2L
         ));
 
         assertFalse(hasField(embed, "Online"));
         assertEquals("<t:1700000900:F>", fieldValue(embed, "Logout timestamp"));
         assertEquals(loggedOutAt.toString(), embed.get("timestamp").getAsString());
+    }
+
+    @Test
+    void unknownLevelUsesPlaceholderUntilProtocolUpdateArrives() {
+        JsonObject embed = embed(new JoinWebhookNotifier.SessionSnapshot(
+                "WilyFox", PLAYER_ID, 0, JOINED_AT, "Waiting for location", null, 0L
+        ));
+
+        assertEquals("WilyFox [?]", fieldValue(embed, "Nickname"));
     }
 
     private static JsonObject embed(JoinWebhookNotifier.SessionSnapshot snapshot) {

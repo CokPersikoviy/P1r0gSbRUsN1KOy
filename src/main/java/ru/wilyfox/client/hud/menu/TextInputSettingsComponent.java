@@ -163,6 +163,11 @@ public class TextInputSettingsComponent extends SettingsComponent {
         return true;
     }
 
+    @Override
+    public void onClickOutside() {
+        focused = false;
+    }
+
     private void insertText(String raw) {
         if (raw == null || raw.isEmpty()) {
             return;

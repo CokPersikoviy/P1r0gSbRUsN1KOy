@@ -4,6 +4,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
@@ -27,6 +29,7 @@ public final class PlayerHealthBarRenderer {
     private static final float PANEL_Z = 0.0f;
     private static final float ACCENT_Z = 0.001f;
     private static final float FILL_Z = 0.002f;
+    private static final float TEXT_Z = 0.004f;
     private static final double BAR_Y_OFFSET = 0.85;
     private static final double FADE_START_DISTANCE = 8.0;
     private static final double FADE_END_DISTANCE = 20.0;
@@ -186,7 +189,87 @@ public final class PlayerHealthBarRenderer {
         if (fillWidth > 0) {
             fillQuad(vertexConsumer, matrix, fillStartX, y1, x2, y2, FILL_Z, fillColor);
         }
+
+        if (config.showNumericHp) {
+            renderHealthText(
+                    poseStack,
+                    bufferSource,
+                    health,
+                    maxHealth,
+                    progress,
+                    barWidth,
+                    barHeight,
+                    y1,
+                    finalAlpha
+            );
         }
+        }
+    }
+
+    private static void renderHealthText(
+            PoseStack poseStack,
+            MultiBufferSource.BufferSource bufferSource,
+            float health,
+            float maxHealth,
+            float progress,
+            int barWidth,
+            int barHeight,
+            int barY,
+            float alpha
+    ) {
+        Minecraft minecraft = Minecraft.getInstance();
+        Font font = minecraft.font;
+        String text = formatHealth(health, maxHealth);
+        int textWidth = font.width(text);
+        if (textWidth <= 0) {
+            return;
+        }
+
+        float availableWidth = Math.max(1.0F, barWidth - 2.0F);
+        float availableHeight = Math.max(1.0F, barHeight - 1.0F);
+        float textScale = Math.min(
+                availableWidth / textWidth,
+                availableHeight / font.lineHeight
+        );
+        if (textScale <= 0.0F) {
+            return;
+        }
+
+        float renderedWidth = textWidth * textScale;
+        float renderedHeight = font.lineHeight * textScale;
+        float textX = -renderedWidth / 2.0F;
+        float textY = barY + (barHeight - renderedHeight) / 2.0F;
+        int textColor = getHealthTextColor(progress, alpha);
+
+        poseStack.pushPose();
+        poseStack.translate(textX, textY, TEXT_Z);
+        poseStack.scale(textScale, textScale, 1.0F);
+        font.drawInBatch(
+                text,
+                0.0F,
+                0.0F,
+                textColor,
+                true,
+                poseStack.last().pose(),
+                bufferSource,
+                Font.DisplayMode.NORMAL,
+                0,
+                LightTexture.FULL_BRIGHT
+        );
+        poseStack.popPose();
+    }
+
+    static String formatHealth(float health, float maxHealth) {
+        int current = Math.max(0, Mth.ceil(health));
+        int maximum = Math.max(1, Mth.ceil(maxHealth));
+        return current + "/" + maximum;
+    }
+
+    private static int getHealthTextColor(float progress, float alpha) {
+        int themeColor = progress >= 0.5F
+                ? WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0xFF)
+                : WidgetTheme.TEXT_SOFT;
+        return applyAlpha(themeColor, alpha);
     }
 
     private static void fillQuad(VertexConsumer vertexConsumer, Matrix4f matrix, int x1, int y1, int x2, int y2, float z, int argb) {
