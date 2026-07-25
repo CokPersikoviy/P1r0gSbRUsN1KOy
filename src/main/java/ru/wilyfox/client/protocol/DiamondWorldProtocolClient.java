@@ -13,6 +13,7 @@ import ru.wilyfox.client.pet.ActivePetsStore;
 import ru.wilyfox.client.potion.PotionStore;
 import ru.wilyfox.client.rune.ActiveRunesStore;
 import ru.wilyfox.client.seller.SellerCooldownStore;
+import ru.wilyfox.client.statistic.DailyBlocksStore;
 import ru.wilyfox.client.wand.WandCooldownTracker;
 
 import java.util.Locale;
@@ -59,6 +60,10 @@ public final class DiamondWorldProtocolClient {
 
     public static void bindLevelProgressStore(LevelProgressStore store) {
         STATE.levelProgressStore = store;
+    }
+
+    public static void bindDailyBlocksStore(DailyBlocksStore store) {
+        STATE.dailyBlocksStore = store;
     }
 
     public static void bindPotionStore(PotionStore store) {
@@ -217,7 +222,7 @@ public final class DiamondWorldProtocolClient {
     }
 
     public static boolean isDungeonOrSiegeLocation() {
-        return isDungeonLocation() || isSiegeLocation();
+        return isAnyDungeonLocation() || isSiegeLocation();
     }
 
     public static Set<String> getFishingLocationIds() {

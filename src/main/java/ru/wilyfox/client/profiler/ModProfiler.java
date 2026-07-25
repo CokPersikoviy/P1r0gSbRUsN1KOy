@@ -1,12 +1,18 @@
 package ru.wilyfox.client.profiler;
 
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ServerData;
+import ru.wilyfox.client.chat.ChatTabManager;
 
 import java.io.IOException;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryUsage;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static ru.wilyfox.FrogHelper.MOD_ID;
 
@@ -34,15 +41,30 @@ public final class ModProfiler {
     private static final int CALL_TREE_DEPTH_LIMIT = 6;
     private static final int SAMPLE_HISTORY_LIMIT = 256;
     private static final int SAMPLE_REPORT_LIMIT = 25;
+    private static final long WATCHDOG_POLL_MILLIS = 250L;
+    private static final long STALL_THRESHOLD_NANOS = 750_000_000L;
+    private static final int STALL_HISTORY_LIMIT = 12;
+    private static final int TIMELINE_HISTORY_LIMIT = 128;
+    private static final int STACK_TRACE_LIMIT = 48;
+    private static final int DIAGNOSTIC_THREAD_LIMIT = 8;
 
     private final Map<String, SectionStats> statsBySection = new LinkedHashMap<>();
     private final Map<String, CounterStats> countersByName = new LinkedHashMap<>();
     private final Map<String, CallTreeNodeStats> rootNodes = new LinkedHashMap<>();
     private final Deque<ScopeSample> recentSamples = new ArrayDeque<>();
+    private final Deque<StallCapture> stallCaptures = new ArrayDeque<>();
+    private final Deque<TimelineEvent> connectionTimeline = new ArrayDeque<>();
     private final ThreadLocal<Deque<ActiveScope>> activeScopes = ThreadLocal.withInitial(ArrayDeque::new);
+    private final AtomicBoolean diagnosticsRegistered = new AtomicBoolean();
     private boolean enabled;
     private long sessionStartedAt;
     private long sessionStoppedAt;
+    private long lastClientHeartbeatNanos;
+    private long lastClientHeartbeatAtMs;
+    private long lastProtocolPayloadAtMs;
+    private Thread clientThread;
+    private StallCapture activeStall;
+    private String observedDimension = "";
 
     private ModProfiler() {
     }
@@ -51,15 +73,51 @@ public final class ModProfiler {
         return INSTANCE;
     }
 
+    public void registerDiagnostics() {
+        if (!diagnosticsRegistered.compareAndSet(false, true)) {
+            return;
+        }
+
+        ClientTickEvents.START_CLIENT_TICK.register(this::heartbeat);
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            recordTimelineEvent("connection/join", handler.getLocalGameProfile().getName());
+            observeDimension(client, true);
+        });
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            recordTimelineEvent("connection/disconnect", currentDimension(client));
+            synchronized (this) {
+                observedDimension = "";
+                lastProtocolPayloadAtMs = 0L;
+            }
+        });
+
+        Thread watchdog = new Thread(this::runWatchdog, "froghelper-profiler-watchdog");
+        watchdog.setDaemon(true);
+        watchdog.start();
+    }
+
     public synchronized void start() {
         enabled = true;
         sessionStartedAt = System.currentTimeMillis();
         sessionStoppedAt = 0L;
+        lastClientHeartbeatNanos = System.nanoTime();
+        lastClientHeartbeatAtMs = sessionStartedAt;
+        lastProtocolPayloadAtMs = 0L;
+        activeStall = null;
+        recordTimelineEventLocked("profiler/start", currentDimension(Minecraft.getInstance()));
     }
 
     public synchronized void stop() {
+        long now = System.currentTimeMillis();
+        if (activeStall != null) {
+            activeStall.recoveredAtMs = now;
+            activeStall = null;
+        }
+        if (enabled) {
+            recordTimelineEventLocked("profiler/stop", currentDimension(Minecraft.getInstance()));
+        }
         enabled = false;
-        sessionStoppedAt = System.currentTimeMillis();
+        sessionStoppedAt = now;
     }
 
     public synchronized void reset() {
@@ -67,12 +125,212 @@ public final class ModProfiler {
         countersByName.clear();
         rootNodes.clear();
         recentSamples.clear();
+        stallCaptures.clear();
+        connectionTimeline.clear();
         sessionStartedAt = enabled ? System.currentTimeMillis() : 0L;
         sessionStoppedAt = 0L;
+        lastClientHeartbeatNanos = enabled ? System.nanoTime() : 0L;
+        lastClientHeartbeatAtMs = enabled ? sessionStartedAt : 0L;
+        lastProtocolPayloadAtMs = 0L;
+        activeStall = null;
+        observedDimension = "";
     }
 
     public synchronized boolean isEnabled() {
         return enabled;
+    }
+
+    public void recordProtocolHandshake(String phase) {
+        recordTimelineEvent("protocol/handshake/" + safeTimelineValue(phase), currentDimension(Minecraft.getInstance()));
+    }
+
+    public synchronized void recordProtocolPayloadReceived(int payloadBytes) {
+        if (!enabled) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        if (lastProtocolPayloadAtMs <= 0L || now - lastProtocolPayloadAtMs >= 1_000L) {
+            recordTimelineEventLocked(
+                    "protocol/payload-batch",
+                    payloadBytes + " bytes on " + Thread.currentThread().getName()
+            );
+        }
+        lastProtocolPayloadAtMs = now;
+    }
+
+    private void heartbeat(Minecraft minecraft) {
+        long nowNanos = System.nanoTime();
+        long nowMs = System.currentTimeMillis();
+        synchronized (this) {
+            clientThread = Thread.currentThread();
+            if (enabled && activeStall != null) {
+                activeStall.recoveredAtMs = nowMs;
+                recordTimelineEventLocked(
+                        "watchdog/recovered",
+                        Math.max(0L, nowMs - activeStall.startedAtMs) + " ms"
+                );
+                activeStall = null;
+            }
+            lastClientHeartbeatNanos = nowNanos;
+            lastClientHeartbeatAtMs = nowMs;
+        }
+        observeDimension(minecraft, false);
+    }
+
+    private void observeDimension(Minecraft minecraft, boolean force) {
+        String dimension = currentDimension(minecraft);
+        synchronized (this) {
+            if (!enabled || !force && dimension.equals(observedDimension)) {
+                return;
+            }
+
+            String previous = observedDimension;
+            observedDimension = dimension;
+            lastProtocolPayloadAtMs = 0L;
+            recordTimelineEventLocked(
+                    previous.isBlank() ? "dimension/observed" : "dimension/change",
+                    previous.isBlank() || previous.equals("n/a")
+                            ? dimension
+                            : previous + " -> " + dimension
+            );
+        }
+    }
+
+    private void runWatchdog() {
+        while (true) {
+            try {
+                Thread.sleep(WATCHDOG_POLL_MILLIS);
+                inspectForClientStall();
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Throwable ignored) {
+                // Diagnostics must never destabilize the game client.
+            }
+        }
+    }
+
+    private void inspectForClientStall() {
+        StallCapture capture;
+        Thread targetThread;
+        synchronized (this) {
+            if (!enabled
+                    || lastClientHeartbeatNanos <= 0L
+                    || activeStall != null
+                    || System.nanoTime() - lastClientHeartbeatNanos < STALL_THRESHOLD_NANOS) {
+                return;
+            }
+
+            long detectedAtMs = System.currentTimeMillis();
+            capture = new StallCapture(lastClientHeartbeatAtMs, detectedAtMs);
+            activeStall = capture;
+            stallCaptures.addLast(capture);
+            while (stallCaptures.size() > STALL_HISTORY_LIMIT) {
+                stallCaptures.removeFirst();
+            }
+            targetThread = clientThread;
+            recordTimelineEventLocked(
+                    "watchdog/stall-detected",
+                    Math.max(0L, detectedAtMs - lastClientHeartbeatAtMs) + " ms without client tick"
+            );
+        }
+
+        List<ThreadStackView> stacks = captureRelevantThreadStacks(targetThread);
+        synchronized (this) {
+            capture.threadStacks = stacks;
+        }
+    }
+
+    private List<ThreadStackView> captureRelevantThreadStacks(Thread targetThread) {
+        Map<Thread, StackTraceElement[]> allStacks = Thread.getAllStackTraces();
+        List<ThreadStackView> captured = new ArrayList<>();
+        if (targetThread != null) {
+            addThreadStack(captured, targetThread, allStacks.get(targetThread));
+        }
+
+        int diagnosticThreads = 0;
+        List<Thread> threads = allStacks.keySet().stream()
+                .sorted(Comparator.comparingInt(this::diagnosticThreadPriority).thenComparing(Thread::getName))
+                .toList();
+        for (Thread thread : threads) {
+            if (thread == targetThread || !isRelevantDiagnosticThread(thread.getName())) {
+                continue;
+            }
+            addThreadStack(captured, thread, allStacks.get(thread));
+            if (++diagnosticThreads >= DIAGNOSTIC_THREAD_LIMIT) {
+                break;
+            }
+        }
+        return List.copyOf(captured);
+    }
+
+    private void addThreadStack(
+            List<ThreadStackView> target,
+            Thread thread,
+            StackTraceElement[] stackTrace
+    ) {
+        if (thread == null) {
+            return;
+        }
+        List<String> frames = stackTrace == null
+                ? List.of()
+                : java.util.Arrays.stream(stackTrace)
+                        .limit(STACK_TRACE_LIMIT)
+                        .map(StackTraceElement::toString)
+                        .toList();
+        target.add(new ThreadStackView(thread.getName(), thread.getState().name(), frames));
+    }
+
+    private boolean isRelevantDiagnosticThread(String threadName) {
+        String normalized = threadName == null ? "" : threadName.toLowerCase(Locale.ROOT);
+        return normalized.contains("netty")
+                || normalized.contains("client io")
+                || normalized.contains("server connector")
+                || normalized.contains("network")
+                || normalized.contains("resource")
+                || normalized.contains("download")
+                || normalized.contains("worker-main")
+                || normalized.contains("forkjoinpool");
+    }
+
+    private int diagnosticThreadPriority(Thread thread) {
+        String normalized = thread.getName().toLowerCase(Locale.ROOT);
+        return normalized.contains("netty")
+                || normalized.contains("client io")
+                || normalized.contains("server connector")
+                || normalized.contains("network")
+                ? 0
+                : 1;
+    }
+
+    private void recordTimelineEvent(String event, String detail) {
+        synchronized (this) {
+            if (enabled) {
+                recordTimelineEventLocked(event, detail);
+            }
+        }
+    }
+
+    private void recordTimelineEventLocked(String event, String detail) {
+        connectionTimeline.addLast(new TimelineEvent(
+                System.currentTimeMillis(),
+                safeTimelineValue(event),
+                safeTimelineValue(detail)
+        ));
+        while (connectionTimeline.size() > TIMELINE_HISTORY_LIMIT) {
+            connectionTimeline.removeFirst();
+        }
+    }
+
+    private static String currentDimension(Minecraft minecraft) {
+        return minecraft != null && minecraft.level != null
+                ? minecraft.level.dimension().location().toString()
+                : "n/a";
+    }
+
+    private static String safeTimelineValue(String value) {
+        return value == null || value.isBlank() ? "n/a" : value;
     }
 
     public Scope scope(String section) {
@@ -107,12 +365,19 @@ public final class ModProfiler {
 
     public synchronized List<String> buildReportLines(String prefixFilter) {
         ReportSnapshot snapshot = filterSnapshot(snapshot(), prefixFilter);
+        RuntimeDiagnostics runtime = snapshot.runtimeDiagnostics();
         if (snapshot.sections().isEmpty()) {
-            return List.of("No profiler samples collected.");
+            return List.of(
+                    "No profiler timing samples collected.",
+                    formatRuntimeLine(runtime),
+                    formatWatchdogLine(snapshot.stalls())
+            );
         }
 
         List<String> lines = new ArrayList<>();
         lines.add("Enabled: " + snapshot.enabled() + ", sections: " + snapshot.sections().size() + ", sessionMs: " + snapshot.sessionDurationMs());
+        lines.add(formatRuntimeLine(runtime));
+        lines.add(formatWatchdogLine(snapshot.stalls()));
         if (snapshot.focusPrefix() != null) {
             lines.add("Focus prefix: " + snapshot.focusPrefix());
         }
@@ -156,6 +421,7 @@ public final class ModProfiler {
         return "Profiler " + (enabled ? "enabled" : "disabled")
                 + ", sections=" + statsBySection.size()
                 + ", counters=" + countersByName.size()
+                + ", stalls=" + stallCaptures.size()
                 + ", sessionMs=" + sessionDurationMs();
     }
 
@@ -209,18 +475,29 @@ public final class ModProfiler {
                 ))
                 .toList();
 
+        long snapshotAtMs = System.currentTimeMillis();
+        List<StallView> stalls = stallCaptures.stream()
+                .map(capture -> capture.toView(snapshotAtMs))
+                .toList();
+        List<TimelineEventView> timeline = connectionTimeline.stream()
+                .map(event -> new TimelineEventView(event.timestampMs, event.event, event.detail))
+                .toList();
+
         return new ReportSnapshot(
                 enabled,
                 sessionStartedAt,
                 sessionStoppedAt,
                 sessionDurationMs(),
-                System.currentTimeMillis(),
+                snapshotAtMs,
                 measuredNanos,
                 sections,
                 counters,
                 callTreeRoots,
                 samples,
                 SessionContext.capture(),
+                RuntimeDiagnostics.capture(),
+                stalls,
+                timeline,
                 null
         );
     }
@@ -296,9 +573,16 @@ public final class ModProfiler {
         return Math.max(0L, end - sessionStartedAt);
     }
 
-    private String buildMarkdownReport(ReportSnapshot snapshot) {
+    String buildMarkdownReport(ReportSnapshot snapshot) {
         if (snapshot.sections().isEmpty()) {
-            return "# FrogHelper Profiler Report\n\n> No profiler samples collected.\n";
+            StringBuilder markdown = new StringBuilder(1024);
+            appendReportHeader(markdown, snapshot);
+            appendSessionContext(markdown, snapshot.context());
+            appendRuntimeDiagnostics(markdown, snapshot.runtimeDiagnostics());
+            appendStallWatchdog(markdown, snapshot.stalls());
+            appendConnectionTimeline(markdown, snapshot);
+            markdown.append("> No profiler timing samples collected. Runtime diagnostics are still current.\n");
+            return markdown.toString();
         }
 
         List<SectionView> sectionsByTotal = snapshot.sections().stream()
@@ -315,21 +599,12 @@ public final class ModProfiler {
         SectionView topSpike = sectionsBySpike.get(0);
 
         StringBuilder markdown = new StringBuilder(8192);
-        markdown.append("# FrogHelper Profiler Report\n\n");
-        markdown.append("> Generated by `/fhprof dump` for local client-side diagnostics.\n\n");
-        if (snapshot.focusPrefix() != null) {
-            markdown.append("> Focused view for prefix: <code>").append(escapeHtml(snapshot.focusPrefix())).append("</code>\n\n");
-        }
-        markdown.append("<table>\n");
-        markdown.append("  <tr><td><strong>Generated</strong></td><td><code>").append(REPORT_TIMESTAMP_FORMAT.format(Instant.ofEpochMilli(snapshot.generatedAtMs()))).append("</code></td></tr>\n");
-        markdown.append("  <tr><td><strong>Enabled At Dump</strong></td><td><code>").append(snapshot.enabled()).append("</code></td></tr>\n");
-        markdown.append("  <tr><td><strong>Session Duration</strong></td><td><code>").append(snapshot.sessionDurationMs()).append(" ms</code></td></tr>\n");
-        markdown.append("  <tr><td><strong>Measured Time</strong></td><td><code>").append(formatMillis(snapshot.measuredNanos())).append(" ms</code></td></tr>\n");
-        markdown.append("  <tr><td><strong>Section Count</strong></td><td><code>").append(snapshot.sections().size()).append("</code></td></tr>\n");
-        markdown.append("  <tr><td><strong>Counter Count</strong></td><td><code>").append(snapshot.counters().size()).append("</code></td></tr>\n");
-        markdown.append("</table>\n\n");
+        appendReportHeader(markdown, snapshot);
 
         appendSessionContext(markdown, snapshot.context());
+        appendRuntimeDiagnostics(markdown, snapshot.runtimeDiagnostics());
+        appendStallWatchdog(markdown, snapshot.stalls());
+        appendConnectionTimeline(markdown, snapshot);
 
         markdown.append("## Summary\n\n");
         markdown.append("- Hotspot by total time: <code>").append(escapeHtml(topSection.name())).append("</code> with <code>")
@@ -345,6 +620,11 @@ public final class ModProfiler {
                     .append(" ms/frame</code> avg over <code>").append(hudRender.calls())
                     .append("</code> frames (peak <code>").append(formatMillis(hudRender.maxNanos())).append(" ms</code>).\n");
         }
+        snapshot.stalls().stream()
+                .max(Comparator.comparingLong(StallView::durationMs))
+                .ifPresent(stall -> markdown.append("- Client watchdog: <code>")
+                        .append(snapshot.stalls().size()).append("</code> stall(s), longest <code>")
+                        .append(stall.durationMs()).append(" ms</code>.\n"));
         markdown.append("\n");
 
         appendHudFrameBreakdown(markdown, snapshot);
@@ -380,6 +660,40 @@ public final class ModProfiler {
         markdown.append("- <code>total</code> in counter tables: accumulated work units, not time.\n");
         markdown.append("</details>\n");
         return markdown.toString();
+    }
+
+    private void appendReportHeader(StringBuilder markdown, ReportSnapshot snapshot) {
+        markdown.append("# FrogHelper Profiler Report\n\n");
+        markdown.append("> Generated by `/fhprof dump` for local client-side diagnostics.\n\n");
+        if (snapshot.focusPrefix() != null) {
+            markdown.append("> Focused view for prefix: <code>").append(escapeHtml(snapshot.focusPrefix())).append("</code>\n\n");
+        }
+        markdown.append("<table>\n");
+        markdown.append("  <tr><td><strong>Generated</strong></td><td><code>").append(REPORT_TIMESTAMP_FORMAT.format(Instant.ofEpochMilli(snapshot.generatedAtMs()))).append("</code></td></tr>\n");
+        markdown.append("  <tr><td><strong>Enabled At Dump</strong></td><td><code>").append(snapshot.enabled()).append("</code></td></tr>\n");
+        markdown.append("  <tr><td><strong>Session Duration</strong></td><td><code>").append(snapshot.sessionDurationMs()).append(" ms</code></td></tr>\n");
+        markdown.append("  <tr><td><strong>Measured Time</strong></td><td><code>").append(formatMillis(snapshot.measuredNanos())).append(" ms</code></td></tr>\n");
+        markdown.append("  <tr><td><strong>Section Count</strong></td><td><code>").append(snapshot.sections().size()).append("</code></td></tr>\n");
+        markdown.append("  <tr><td><strong>Counter Count</strong></td><td><code>").append(snapshot.counters().size()).append("</code></td></tr>\n");
+        markdown.append("</table>\n\n");
+    }
+
+    private static String formatRuntimeLine(RuntimeDiagnostics runtime) {
+        return String.format(
+                Locale.ROOT,
+                "Runtime: heap=%s/%s, gc=%d collections (%dms), chat=%d/%d",
+                formatMib(runtime.heapUsedBytes()),
+                formatMib(runtime.heapMaxBytes()),
+                runtime.gcCollections(),
+                runtime.gcTimeMs(),
+                runtime.chatMessages(),
+                runtime.chatHistoryLimit()
+        );
+    }
+
+    private static String formatWatchdogLine(List<StallView> stalls) {
+        long longest = stalls.stream().mapToLong(StallView::durationMs).max().orElse(0L);
+        return "Watchdog: stalls=" + stalls.size() + ", longest=" + longest + "ms";
     }
 
     /**
@@ -572,12 +886,100 @@ public final class ModProfiler {
         markdown.append("\n");
     }
 
+    private void appendRuntimeDiagnostics(StringBuilder markdown, RuntimeDiagnostics runtime) {
+        markdown.append("## Runtime Diagnostics\n\n");
+        markdown.append("| Metric | Value |\n");
+        markdown.append("| --- | ---: |\n");
+        appendContextRow(markdown, "JVM uptime", runtime.jvmUptimeMs() + " ms");
+        appendContextRow(markdown, "Heap used", formatMib(runtime.heapUsedBytes()));
+        appendContextRow(markdown, "Heap committed", formatMib(runtime.heapCommittedBytes()));
+        appendContextRow(markdown, "Heap max", formatMib(runtime.heapMaxBytes()));
+        appendContextRow(markdown, "GC collections", Long.toString(runtime.gcCollections()));
+        appendContextRow(markdown, "GC time", runtime.gcTimeMs() + " ms");
+        appendContextRow(markdown, "Chat messages retained", Integer.toString(runtime.chatMessages()));
+        appendContextRow(markdown, "Chat tab references", Integer.toString(runtime.chatTabReferences()));
+        appendContextRow(markdown, "Chat history limit", Integer.toString(runtime.chatHistoryLimit()));
+        appendContextRow(markdown, "Chat reconnect limit", Integer.toString(runtime.chatReconnectLimit()));
+        markdown.append("\n");
+    }
+
+    private void appendStallWatchdog(StringBuilder markdown, List<StallView> stalls) {
+        markdown.append("## Client Stall Watchdog\n\n");
+        if (stalls.isEmpty()) {
+            markdown.append("> No client tick stalls of 750 ms or longer were captured.\n\n");
+            return;
+        }
+
+        markdown.append("| Started | Duration | State | Captured Threads |\n");
+        markdown.append("| --- | ---: | --- | ---: |\n");
+        for (StallView stall : stalls) {
+            markdown.append("| <code>").append(REPORT_TIMESTAMP_FORMAT.format(Instant.ofEpochMilli(stall.startedAtMs())))
+                    .append("</code> | <code>").append(stall.durationMs()).append(" ms</code> | ")
+                    .append(stall.recovered() ? "recovered" : "active at dump")
+                    .append(" | <code>").append(stall.threadStacks().size()).append("</code> |\n");
+        }
+        markdown.append("\n");
+
+        for (int stallIndex = 0; stallIndex < stalls.size(); stallIndex++) {
+            StallView stall = stalls.get(stallIndex);
+            markdown.append("<details>\n");
+            markdown.append("<summary><strong>Stall ").append(stallIndex + 1)
+                    .append("</strong>: ").append(stall.durationMs()).append(" ms</summary>\n\n");
+            if (stall.threadStacks().isEmpty()) {
+                markdown.append("> Thread stacks were unavailable.\n\n");
+            }
+            for (ThreadStackView thread : stall.threadStacks()) {
+                markdown.append("### <code>").append(escapeHtml(thread.threadName())).append("</code> (")
+                        .append(escapeHtml(thread.state())).append(")\n\n");
+                markdown.append("```text\n");
+                if (thread.frames().isEmpty()) {
+                    markdown.append("<empty stack>\n");
+                } else {
+                    for (String frame : thread.frames()) {
+                        markdown.append("at ").append(frame).append("\n");
+                    }
+                }
+                markdown.append("```\n\n");
+            }
+            markdown.append("</details>\n\n");
+        }
+    }
+
+    private void appendConnectionTimeline(StringBuilder markdown, ReportSnapshot snapshot) {
+        markdown.append("## Connection Timeline\n\n");
+        if (snapshot.timeline().isEmpty()) {
+            markdown.append("> No connection lifecycle events were captured.\n\n");
+            return;
+        }
+
+        markdown.append("| Time | Session +ms | Event | Detail |\n");
+        markdown.append("| --- | ---: | --- | --- |\n");
+        for (TimelineEventView event : snapshot.timeline()) {
+            long sessionOffset = snapshot.sessionStartedAtMs() <= 0L
+                    ? 0L
+                    : Math.max(0L, event.timestampMs() - snapshot.sessionStartedAtMs());
+            markdown.append("| <code>").append(REPORT_TIMESTAMP_FORMAT.format(Instant.ofEpochMilli(event.timestampMs())))
+                    .append("</code> | <code>").append(sessionOffset)
+                    .append("</code> | <code>").append(escapePipe(event.event()))
+                    .append("</code> | <code>").append(escapePipe(event.detail()))
+                    .append("</code> |\n");
+        }
+        markdown.append("\n");
+    }
+
     private void appendContextRow(StringBuilder markdown, String name, String value) {
         markdown.append("| ").append(name).append(" | <code>").append(escapePipe(value)).append("</code> |\n");
     }
 
     private String formatMillis(long nanos) {
         return String.format(Locale.ROOT, "%.3f", nanosToMillis(nanos));
+    }
+
+    private static String formatMib(long bytes) {
+        if (bytes < 0L) {
+            return "n/a";
+        }
+        return String.format(Locale.ROOT, "%.1f MiB", bytes / 1_048_576.0);
     }
 
     private double nanosToMillis(long nanos) {
@@ -624,6 +1026,9 @@ public final class ModProfiler {
                 callTreeRoots,
                 samples,
                 snapshot.context(),
+                snapshot.runtimeDiagnostics(),
+                snapshot.stalls(),
+                snapshot.timeline(),
                 normalizedPrefix
         );
     }
@@ -742,6 +1147,30 @@ public final class ModProfiler {
     ) {
     }
 
+    public record ThreadStackView(
+            String threadName,
+            String state,
+            List<String> frames
+    ) {
+    }
+
+    public record StallView(
+            long startedAtMs,
+            long detectedAtMs,
+            long recoveredAtMs,
+            long durationMs,
+            boolean recovered,
+            List<ThreadStackView> threadStacks
+    ) {
+    }
+
+    public record TimelineEventView(
+            long timestampMs,
+            String event,
+            String detail
+    ) {
+    }
+
     public record SessionContext(
             String modVersion,
             String minecraftVersion,
@@ -786,6 +1215,47 @@ public final class ModProfiler {
         }
     }
 
+    public record RuntimeDiagnostics(
+            long jvmUptimeMs,
+            long heapUsedBytes,
+            long heapCommittedBytes,
+            long heapMaxBytes,
+            long gcCollections,
+            long gcTimeMs,
+            int chatMessages,
+            int chatTabReferences,
+            int chatHistoryLimit,
+            int chatReconnectLimit
+    ) {
+        private static RuntimeDiagnostics capture() {
+            MemoryUsage heap = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
+            long gcCollections = 0L;
+            long gcTimeMs = 0L;
+            for (GarbageCollectorMXBean collector : ManagementFactory.getGarbageCollectorMXBeans()) {
+                if (collector.getCollectionCount() >= 0L) {
+                    gcCollections += collector.getCollectionCount();
+                }
+                if (collector.getCollectionTime() >= 0L) {
+                    gcTimeMs += collector.getCollectionTime();
+                }
+            }
+
+            ChatTabManager.ArchiveSnapshot chat = ChatTabManager.getInstance().archiveSnapshot();
+            return new RuntimeDiagnostics(
+                    ManagementFactory.getRuntimeMXBean().getUptime(),
+                    heap.getUsed(),
+                    heap.getCommitted(),
+                    heap.getMax(),
+                    gcCollections,
+                    gcTimeMs,
+                    chat.uniqueMessages(),
+                    chat.tabReferences(),
+                    chat.historyLimit(),
+                    chat.reconnectLimit()
+            );
+        }
+    }
+
     public record ReportSnapshot(
             boolean enabled,
             long sessionStartedAtMs,
@@ -798,6 +1268,9 @@ public final class ModProfiler {
             List<CallTreeNodeView> callTreeRoots,
             List<ScopeSampleView> samples,
             SessionContext context,
+            RuntimeDiagnostics runtimeDiagnostics,
+            List<StallView> stalls,
+            List<TimelineEventView> timeline,
             String focusPrefix
     ) {
     }
@@ -852,5 +1325,33 @@ public final class ModProfiler {
             this.endedAtMs = endedAtMs;
             this.threadName = threadName;
         }
+    }
+
+    private static final class StallCapture {
+        private final long startedAtMs;
+        private final long detectedAtMs;
+        private long recoveredAtMs;
+        private List<ThreadStackView> threadStacks = List.of();
+
+        private StallCapture(long startedAtMs, long detectedAtMs) {
+            this.startedAtMs = startedAtMs;
+            this.detectedAtMs = detectedAtMs;
+        }
+
+        private StallView toView(long snapshotAtMs) {
+            boolean recovered = recoveredAtMs > 0L;
+            long end = recovered ? recoveredAtMs : snapshotAtMs;
+            return new StallView(
+                    startedAtMs,
+                    detectedAtMs,
+                    recoveredAtMs,
+                    Math.max(0L, end - startedAtMs),
+                    recovered,
+                    threadStacks
+            );
+        }
+    }
+
+    private record TimelineEvent(long timestampMs, String event, String detail) {
     }
 }

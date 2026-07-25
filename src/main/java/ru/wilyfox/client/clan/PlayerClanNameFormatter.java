@@ -2,10 +2,9 @@ package ru.wilyfox.client.clan;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 public final class PlayerClanNameFormatter {
-    private static final int CLAN_COLOR = 0xFF7FD0A6;
-
     private PlayerClanNameFormatter() {
     }
 
@@ -16,7 +15,7 @@ public final class PlayerClanNameFormatter {
         }
 
         MutableComponent result = Component.empty();
-        result.append(Component.literal("[" + clanName + "] ").withColor(CLAN_COLOR));
+        result.append(Component.literal("[" + clanName + "] ").withColor(WidgetTheme.TEXT_ACCENT));
         result.append(baseComponent != null ? baseComponent.copy() : Component.literal(playerName));
         return result;
     }

@@ -326,6 +326,9 @@ final class ProtocolPayloadHandlers {
                     .sorted()
                     .collect(Collectors.joining(", "));
             updateGameLocation(state, packet);
+            Integer currentBlocks = packet.values().containsKey("blocks")
+                    ? ProtocolPayloadSupport.getInt(packet.values(), "blocks")
+                    : null;
 
             if (state.activePetsStore != null) {
                 activePetsUpdate.ifPresent(state.activePetsStore::replace);
@@ -338,8 +341,15 @@ final class ProtocolPayloadHandlers {
             if (state.levelProgressStore != null) {
                 state.levelProgressStore.updateCurrent(
                         packet.values().containsKey("level") ? ProtocolPayloadSupport.getInt(packet.values(), "level") : null,
-                        packet.values().containsKey("blocks") ? ProtocolPayloadSupport.getInt(packet.values(), "blocks") : null,
+                        currentBlocks,
                         packet.values().containsKey("balance") ? ProtocolPayloadSupport.getDouble(packet.values(), "balance") : null
+                );
+            }
+
+            if (state.dailyBlocksStore != null) {
+                state.dailyBlocksStore.update(
+                        currentBlocks,
+                        ProtocolPayloadSupport.extractBlocksMinedIn24Hours(packet)
                 );
             }
 
@@ -392,6 +402,10 @@ final class ProtocolPayloadHandlers {
                         packet.requiredMoney(),
                         packet.maxLevel()
                 );
+            }
+
+            if (state.dailyBlocksStore != null) {
+                state.dailyBlocksStore.update(packet.blocks(), java.util.OptionalInt.empty());
             }
 
             info(

@@ -1,5 +1,6 @@
 package ru.wilyfox.client.hud.healthbar;
 
+import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
@@ -30,6 +31,10 @@ public final class PlayerHealthBarRenderer {
     private static final float ACCENT_Z = 0.001f;
     private static final float FILL_Z = 0.002f;
     private static final float TEXT_Z = 0.004f;
+    private static final ByteBufferBuilder HEALTH_TEXT_BUFFER = new ByteBufferBuilder(16 * 1024);
+    private static final MultiBufferSource.BufferSource HEALTH_TEXT_SOURCE =
+            MultiBufferSource.immediate(HEALTH_TEXT_BUFFER);
+    private static boolean numericTextQueued;
     private static final double BAR_Y_OFFSET = 0.85;
     private static final double FADE_START_DISTANCE = 8.0;
     private static final double FADE_END_DISTANCE = 20.0;
@@ -119,7 +124,7 @@ public final class PlayerHealthBarRenderer {
                 poseStack.pushPose();
                 poseStack.translate(x - cameraPos.x, y - cameraPos.y, z - cameraPos.z);
                 poseStack.mulPose(dispatcher.cameraOrientation());
-                poseStack.scale(-WORLD_SCALE, -WORLD_SCALE, WORLD_SCALE);
+                poseStack.scale(WORLD_SCALE, -WORLD_SCALE, WORLD_SCALE);
 
                 try (ModProfiler.Scope renderBarScope = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderer/renderBar")) {
                     renderHealthBar(poseStack, bufferSource, target, distanceAlpha);
@@ -170,7 +175,7 @@ public final class PlayerHealthBarRenderer {
         int x2 = x1 + barWidth;
         int y2 = y1 + barHeight;
         int fillWidth = Math.round(barWidth * progress);
-        int fillStartX = x2 - fillWidth;
+        int fillEndX = x1 + fillWidth;
 
         Matrix4f matrix = poseStack.last().pose();
         VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.debugQuads());
@@ -187,16 +192,15 @@ public final class PlayerHealthBarRenderer {
         fillQuad(vertexConsumer, matrix, x1 - bgPadding, y1 - bgPadding, x2 + bgPadding, y1 - bgPadding + accentHeight, ACCENT_Z, accentColor);
 
         if (fillWidth > 0) {
-            fillQuad(vertexConsumer, matrix, fillStartX, y1, x2, y2, FILL_Z, fillColor);
+            fillQuad(vertexConsumer, matrix, x1, y1, fillEndX, y2, FILL_Z, fillColor);
         }
 
         if (config.showNumericHp) {
+            ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/numeric/enabled");
             renderHealthText(
                     poseStack,
-                    bufferSource,
                     health,
                     maxHealth,
-                    progress,
                     barWidth,
                     barHeight,
                     y1,
@@ -208,10 +212,8 @@ public final class PlayerHealthBarRenderer {
 
     private static void renderHealthText(
             PoseStack poseStack,
-            MultiBufferSource.BufferSource bufferSource,
             float health,
             float maxHealth,
-            float progress,
             int barWidth,
             int barHeight,
             int barY,
@@ -239,37 +241,58 @@ public final class PlayerHealthBarRenderer {
         float renderedHeight = font.lineHeight * textScale;
         float textX = -renderedWidth / 2.0F;
         float textY = barY + (barHeight - renderedHeight) / 2.0F;
-        int textColor = getHealthTextColor(progress, alpha);
+        int textColor = applyAlpha(WidgetTheme.TEXT_SOFT, alpha);
 
         poseStack.pushPose();
         poseStack.translate(textX, textY, TEXT_Z);
         poseStack.scale(textScale, textScale, 1.0F);
+        Matrix4f textMatrix = poseStack.last().pose();
+        font.drawInBatch(
+                text,
+                0.0F,
+                0.0F,
+                textColor,
+                false,
+                textMatrix,
+                HEALTH_TEXT_SOURCE,
+                Font.DisplayMode.SEE_THROUGH,
+                0,
+                LightTexture.FULL_BRIGHT
+        );
         font.drawInBatch(
                 text,
                 0.0F,
                 0.0F,
                 textColor,
                 true,
-                poseStack.last().pose(),
-                bufferSource,
+                textMatrix,
+                HEALTH_TEXT_SOURCE,
                 Font.DisplayMode.NORMAL,
                 0,
                 LightTexture.FULL_BRIGHT
         );
         poseStack.popPose();
+        numericTextQueued = true;
+        ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/numeric/queued");
+    }
+
+    public static void flushNumericText() {
+        if (!numericTextQueued) {
+            return;
+        }
+
+        try {
+            HEALTH_TEXT_SOURCE.endBatch();
+            ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/numeric/flushed");
+        } finally {
+            numericTextQueued = false;
+        }
     }
 
     static String formatHealth(float health, float maxHealth) {
         int current = Math.max(0, Mth.ceil(health));
         int maximum = Math.max(1, Mth.ceil(maxHealth));
         return current + "/" + maximum;
-    }
-
-    private static int getHealthTextColor(float progress, float alpha) {
-        int themeColor = progress >= 0.5F
-                ? WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0xFF)
-                : WidgetTheme.TEXT_SOFT;
-        return applyAlpha(themeColor, alpha);
     }
 
     private static void fillQuad(VertexConsumer vertexConsumer, Matrix4f matrix, int x1, int y1, int x2, int y2, float z, int argb) {

@@ -43,7 +43,6 @@ public class BossHudWidget extends AbstractWidget {
     private static final int PADDING_X = 6;
     private static final int PADDING_Y = 5;
     private static final int LINE_GAP = 1;
-    private static final int ICON_ROW_GAP = 2;
     private static final int COLUMN_GAP = 6;
     private static final int NATIVE_ICON_SIZE = 16;
     private static final int ICON_SIZE = 14;
@@ -455,7 +454,7 @@ public class BossHudWidget extends AbstractWidget {
 
     private int getLineStep(Minecraft minecraft) {
         if (ConfigManager.get().bossWidget.showIcons) {
-            return Math.max(minecraft.font.lineHeight, ICON_SIZE) + ICON_ROW_GAP;
+            return Math.max(minecraft.font.lineHeight, ICON_SIZE);
         }
         return minecraft.font.lineHeight + LINE_GAP;
     }
@@ -514,7 +513,10 @@ public class BossHudWidget extends AbstractWidget {
         }
 
         Boolean collected = DiamondWorldProtocolClient.hasBossCollectibleByLevel(boss.getLevel());
-        return Boolean.TRUE.equals(collected) ? " ✔" : "";
+        if (collected == null) {
+            return "";
+        }
+        return collected ? " ✔" : " ◇";
     }
 
     private boolean isExpiredSpawned(BossInfo boss) {

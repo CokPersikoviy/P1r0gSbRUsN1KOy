@@ -21,13 +21,60 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
 import static ru.wilyfox.client.debug.DebugLogger.info;
 
 final class ProtocolPayloadSupport {
+    private static final String BLOCKS_MINED_IN_24H = "BLOCKS_MINED_IN_24H";
+    private static final int BLOCKS_MINED_IN_24H_ORDINAL = 24;
+
     private ProtocolPayloadSupport() {
+    }
+
+    static OptionalInt extractBlocksMinedIn24Hours(DwStatisticInfoPacket packet) {
+        String statisticJson = packet.values().get("statistic");
+        if (statisticJson == null) {
+            return OptionalInt.empty();
+        }
+        if (statisticJson.isBlank()) {
+            throw new IllegalArgumentException("statisticinfo statistic value is blank");
+        }
+
+        JsonElement parsed = JsonParser.parseString(statisticJson);
+        if (parsed.isJsonNull()) {
+            return OptionalInt.empty();
+        }
+
+        JsonElement value = null;
+        if (parsed.isJsonObject()) {
+            JsonObject object = parsed.getAsJsonObject();
+            value = object.get(BLOCKS_MINED_IN_24H);
+            if (value == null) {
+                for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
+                    if (BLOCKS_MINED_IN_24H.equalsIgnoreCase(entry.getKey())) {
+                        value = entry.getValue();
+                        break;
+                    }
+                }
+            }
+        } else if (parsed.isJsonArray() && parsed.getAsJsonArray().size() > BLOCKS_MINED_IN_24H_ORDINAL) {
+            value = parsed.getAsJsonArray().get(BLOCKS_MINED_IN_24H_ORDINAL);
+        } else {
+            throw new IllegalArgumentException("statisticinfo statistic value must be a JSON object or array");
+        }
+
+        if (value == null || value.isJsonNull()) {
+            return OptionalInt.empty();
+        }
+        if (!value.isJsonPrimitive()) {
+            throw new IllegalArgumentException("BLOCKS_MINED_IN_24H must be numeric");
+        }
+
+        double numericValue = value.getAsDouble();
+        return OptionalInt.of(Math.max(0, (int) numericValue));
     }
 
     static Optional<List<ActivePetInfo>> extractActivePets(ProtocolState state, DwStatisticInfoPacket packet) {

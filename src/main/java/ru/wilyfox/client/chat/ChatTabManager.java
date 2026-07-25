@@ -1,11 +1,14 @@
 package ru.wilyfox.client.chat;
 
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.Component;
+import ru.wilyfox.client.hud.config.ConfigManager;
 
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -13,20 +16,28 @@ import java.util.Map;
 public final class ChatTabManager {
     private static final ChatTabManager INSTANCE = new ChatTabManager();
 
-    private final List<ChatMessageEntry> allMessages = new ArrayList<>();
-    private final Map<ChatTab, List<ChatMessageEntry>> messagesByTab = new EnumMap<>(ChatTab.class);
+    private final Map<ChatTab, Deque<ChatMessageEntry>> messagesByTab = new EnumMap<>(ChatTab.class);
 
     private ChatTab activeTab = ChatTab.ALL;
     private boolean rebuilding = false;
+    private boolean registered;
 
     private ChatTabManager() {
         for (ChatTab tab : ChatTab.values()) {
-            messagesByTab.put(tab, new ArrayList<>());
+            messagesByTab.put(tab, new ArrayDeque<>());
         }
     }
 
     public static ChatTabManager getInstance() {
         return INSTANCE;
+    }
+
+    public void register() {
+        if (registered) {
+            return;
+        }
+        registered = true;
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> trimForReconnect());
     }
 
     public ChatTab getActiveTab() {
@@ -37,20 +48,25 @@ public final class ChatTabManager {
         return rebuilding;
     }
 
-    public void captureIncoming(Component component) {
+    public synchronized void captureIncoming(Component component) {
+        captureIncoming(component, historyLimit());
+    }
+
+    synchronized void captureIncoming(Component component, int limit) {
         if (component == null || rebuilding) {
             return;
         }
 
         ChatMessageEntry entry = new ChatMessageEntry(component.copy(), Instant.now());
 
-        allMessages.add(entry);
-        messagesByTab.get(ChatTab.ALL).add(entry);
+        messagesByTab.get(ChatTab.ALL).addLast(entry);
 
         ChatTab resolved = ChatPrefixRouter.resolve(component);
         if (resolved != ChatTab.ALL) {
-            messagesByTab.get(resolved).add(entry);
+            messagesByTab.get(resolved).addLast(entry);
         }
+
+        trimToLimit(limit);
     }
 
     public void setActiveTab(ChatTab tab) {
@@ -62,12 +78,9 @@ public final class ChatTabManager {
         rebuildVanillaChat();
     }
 
-    public List<ChatMessageEntry> getMessages(ChatTab tab) {
-        if (tab == ChatTab.ALL) {
-            return List.copyOf(allMessages);
-        }
-
-        return List.copyOf(messagesByTab.getOrDefault(tab, List.of()));
+    public synchronized List<ChatMessageEntry> getMessages(ChatTab tab) {
+        Deque<ChatMessageEntry> messages = messagesByTab.get(tab);
+        return messages == null ? List.of() : List.copyOf(messages);
     }
 
     public ChatTab getNextTab() {
@@ -85,12 +98,20 @@ public final class ChatTabManager {
         return values[prev];
     }
 
-    public void clearAll() {
-        allMessages.clear();
-
-        for (ChatTab tab : ChatTab.values()) {
-            messagesByTab.get(tab).clear();
+    public synchronized void clearAll() {
+        for (Deque<ChatMessageEntry> messages : messagesByTab.values()) {
+            messages.clear();
         }
+    }
+
+    public synchronized ArchiveSnapshot archiveSnapshot() {
+        int references = messagesByTab.values().stream().mapToInt(Deque::size).sum();
+        return new ArchiveSnapshot(
+                messagesByTab.get(ChatTab.ALL).size(),
+                references,
+                historyLimit(),
+                reconnectLimit()
+        );
     }
 
     public void rebuildVanillaChat() {
@@ -122,5 +143,38 @@ public final class ChatTabManager {
 
         ChatTab resolved = ChatPrefixRouter.resolve(component);
         return resolved == active;
+    }
+
+    private synchronized void trimForReconnect() {
+        trimForReconnect(historyLimit());
+    }
+
+    synchronized void trimForReconnect(int configuredLimit) {
+        trimToLimit(Math.min(300, Math.max(0, configuredLimit)));
+    }
+
+    private void trimToLimit(int limit) {
+        int safeLimit = Math.max(0, limit);
+        for (Deque<ChatMessageEntry> messages : messagesByTab.values()) {
+            while (messages.size() > safeLimit) {
+                messages.removeFirst();
+            }
+        }
+    }
+
+    private static int historyLimit() {
+        return Math.max(0, ConfigManager.get().render.extraChatHistoryLines);
+    }
+
+    private static int reconnectLimit() {
+        return Math.min(300, historyLimit());
+    }
+
+    public record ArchiveSnapshot(
+            int uniqueMessages,
+            int tabReferences,
+            int historyLimit,
+            int reconnectLimit
+    ) {
     }
 }

@@ -13,6 +13,7 @@ public class HudConfig {
     public BossWidgetConfig bossWidget = new BossWidgetConfig();
     public ClickerConfig clicker = new ClickerConfig();
     public BlocksPerSecondWidgetConfig blocksPerSecondWidget = new BlocksPerSecondWidgetConfig();
+    public DailyBlocksConfig dailyBlocks = new DailyBlocksConfig();
     public EstimatedTpsConfig estimatedTps = new EstimatedTpsConfig();
     public FishingConfig fishing = new FishingConfig();
     public BossBarConfig bossBar = new BossBarConfig();

@@ -14,6 +14,7 @@ import ru.wilyfox.client.chat.BossShareService;
 import ru.wilyfox.client.chat.AutoBossAnnouncer;
 import ru.wilyfox.client.chat.AutoMessageScheduler;
 import ru.wilyfox.client.chat.ChatDispatchQueue;
+import ru.wilyfox.client.chat.ChatTabManager;
 import ru.wilyfox.client.chat.VisibilityStatusTracker;
 import ru.wilyfox.client.clan.PlayerClanStorage;
 import ru.wilyfox.client.combo.ComboProgressStore;
@@ -41,6 +42,7 @@ import ru.wilyfox.client.hud.widget.BossHudWidget;
 import ru.wilyfox.client.hud.widget.BoostersWidget;
 import ru.wilyfox.client.hud.widget.ComboProgressWidget;
 import ru.wilyfox.client.hud.widget.CraftRecipeWidget;
+import ru.wilyfox.client.hud.widget.DailyBlocksWidget;
 import ru.wilyfox.client.hud.widget.EntityInspectWidget;
 import ru.wilyfox.client.hud.widget.EstimatedTpsWidget;
 import ru.wilyfox.client.hud.widget.FishingNibblesWidget;
@@ -64,10 +66,12 @@ import ru.wilyfox.client.pet.ActivePetsStore;
 import ru.wilyfox.client.potion.PotionStore;
 import ru.wilyfox.client.popup.PopUpEventNotifier;
 import ru.wilyfox.client.performance.EstimatedTpsMonitor;
+import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.quickaccess.QuickAccessInputHandler;
 import ru.wilyfox.client.rune.ActiveRunesStore;
 import ru.wilyfox.client.rune.RuneSetSwitcher;
 import ru.wilyfox.client.seller.SellerCooldownStore;
+import ru.wilyfox.client.statistic.DailyBlocksStore;
 import ru.wilyfox.client.utility.Clicker;
 import ru.wilyfox.client.utility.AutoFish;
 import ru.wilyfox.client.utility.HudInputHandler;
@@ -89,6 +93,7 @@ public class Client {
     private final BossDamageStore bossDamageStore = new BossDamageStore();
     private final VisibilityStatusStore visibilityStatusStore = new VisibilityStatusStore();
     private final LevelProgressStore levelProgressStore = new LevelProgressStore();
+    private final DailyBlocksStore dailyBlocksStore = new DailyBlocksStore();
     private final BoosterStore boosterStore = new BoosterStore();
     private final PotionStore potionStore = new PotionStore();
     private final SellerCooldownStore sellerCooldownStore = new SellerCooldownStore();
@@ -118,6 +123,7 @@ public class Client {
     }
 
     public void init() {
+        ModProfiler.getInstance().registerDiagnostics();
         ru.wilyfox.client.command.FhCommands.register();
         new ClientEntityEventHandler(this.bossTracker).register();
         new HudInputHandler(hudRenderer).register();
@@ -135,6 +141,7 @@ public class Client {
         AutoFish.register();
         AlchemyBrewingTracker.register();
         ChatDispatchQueue.init();
+        ChatTabManager.getInstance().register();
         AutoMessageScheduler.getInstance().register();
         AutoBossAnnouncer.bindRepository(repository);
         AutoBossAnnouncer.register();
@@ -161,6 +168,7 @@ public class Client {
         DiamondWorldProtocolClient.bindAbilityCooldownStore(abilityCooldownStore);
         DiamondWorldProtocolClient.bindBossDamageStore(bossDamageStore);
         DiamondWorldProtocolClient.bindLevelProgressStore(levelProgressStore);
+        DiamondWorldProtocolClient.bindDailyBlocksStore(dailyBlocksStore);
         DiamondWorldProtocolClient.bindPotionStore(potionStore);
         DiamondWorldProtocolClient.bindSellerCooldownStore(sellerCooldownStore);
         DiamondWorldProtocolClient.bindComboProgressStore(comboProgressStore);
@@ -187,6 +195,10 @@ public class Client {
         );
         hudRenderer.registerWidget(
                 new BlocksPerSecondWidget(100, 100, HudLayer.CONTENT),
+                ScreenAnchor.HOTBAR_LEFT
+        );
+        hudRenderer.registerWidget(
+                new DailyBlocksWidget(100, 115, HudLayer.CONTENT, dailyBlocksStore),
                 ScreenAnchor.HOTBAR_LEFT
         );
         hudRenderer.registerWidget(

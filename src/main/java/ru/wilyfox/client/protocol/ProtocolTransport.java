@@ -34,6 +34,7 @@ final class ProtocolTransport {
         PayloadTypeRegistry.playS2C().register(DwEvoPlusPayload.TYPE, DwEvoPlusPayload.STREAM_CODEC);
 
         ClientPlayNetworking.registerGlobalReceiver(DwEvoPlusPayload.TYPE, (payload, context) -> {
+            ModProfiler.getInstance().recordProtocolPayloadReceived(payload.data().length);
             byte[] data = payload.data().clone();
             context.client().execute(() -> {
                 state.receivedEvoPlusPayload = true;
@@ -86,6 +87,9 @@ final class ProtocolTransport {
         if (state.levelProgressStore != null) {
             state.levelProgressStore.clear();
         }
+        if (state.dailyBlocksStore != null) {
+            state.dailyBlocksStore.clear();
+        }
         if (state.potionStore != null) {
             state.potionStore.clear();
         }
@@ -132,8 +136,10 @@ final class ProtocolTransport {
     }
 
     private static void sendHandshake() {
+        ModProfiler.getInstance().recordProtocolHandshake("start");
         String fingerprint = DwHandshakeFingerprint.generate();
         info(LOGGER, "DW protocol: sending handshake on channel dw:handshake, fingerprint={}", fingerprint);
         ClientPlayNetworking.send(new DwHandshakePayload(fingerprint));
+        ModProfiler.getInstance().recordProtocolHandshake("sent");
     }
 }

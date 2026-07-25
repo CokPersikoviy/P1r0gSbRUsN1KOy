@@ -17,19 +17,9 @@ import ru.wilyfox.client.profiler.ModProfiler;
  * </ul>
  *
  * All geometry is plain {@link GuiGraphics#fill}; the frosted look is the blurred backdrop composited
- * by {@link HudBlur} under a light tint. Colour is inherited from the approved Frost spec.
+ * by {@link HudBlur} under a tint derived from the active theme.
  */
 public final class HudSurface {
-    // ---- Frost surface palette (approved "Frost" spec; cool tint, not the theme grey) ----
-    /** Cool glass hue (rgb 20,24,32). Its alpha is the theme's BG Opacity slider (0..50%). */
-    private static final int FROST_RGB = 0x141820;
-    /** Solid chrome: heavier cool tint for very bright scenes. rgba(10,12,16,0.86). */
-    private static final int SOLID_TINT = 0xDB0A0C10;
-    /** Native renderer: flat, near-opaque cool tint (no blur). rgba(13,15,20,0.82). */
-    private static final int NATIVE_TINT = 0xD10D0F14;
-
-    private static final int FILL_LIT = 0x30FFFFFF;   // lit top of a progress fill
-
     private HudSurface() {
     }
 
@@ -82,7 +72,8 @@ public final class HudSurface {
         WidgetChrome chrome = chrome();
         if (chrome == WidgetChrome.BARE) {
             int corner = nativeRenderer() ? WidgetMetrics.CHAMFER : WidgetMetrics.RADIUS;
-            strokeEdges(context, 0, 0, w, h, corner, 0x40FFFFFF, 0x40FFFFFF);
+            int outline = WidgetTheme.withAlpha(WidgetTheme.OUTLINE_SOFT, 0x40);
+            strokeEdges(context, 0, 0, w, h, corner, outline, outline);
             return;
         }
         drawPanel(context, 0, 0, w, h, chrome, nativeRenderer());
@@ -114,7 +105,7 @@ public final class HudSurface {
         } else {
             fillRounded(context, x, y, fillW, h, corner, fillColor);
         }
-        context.fill(x, y, x + fillW, y + 1, FILL_LIT);
+        context.fill(x, y, x + fillW, y + 1, WidgetTheme.withAlpha(WidgetTheme.TEXT_SOFT, 0x30));
     }
 
     // ---- geometry helpers (pure GuiGraphics.fill) ----
@@ -232,17 +223,14 @@ public final class HudSurface {
 
     private static int panelTint(WidgetChrome chrome, boolean useNative) {
         if (chrome == WidgetChrome.SOLID) {
-            return SOLID_TINT;
+            return WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0xDB);
         }
-        // FROST + native fallback (no blur) stays a heavier flat tint so text reads without the blur.
         if (useNative) {
-            return NATIVE_TINT;
+            return WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0xD1);
         }
-        // FROST: cool glass over the live blur; opacity is the theme's BG Opacity slider (0..50%).
-        // For a heavier surface the Solid mode exists separately, so the slider is capped low.
         int pct = Math.max(0, Math.min(50, ConfigManager.get().theme.widgetBackgroundOpacityPercent));
         int alpha = Math.round(pct / 100.0f * 255.0f);
-        return (alpha << 24) | FROST_RGB;
+        return WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, alpha);
     }
 
     private static float clamp01(float value) {

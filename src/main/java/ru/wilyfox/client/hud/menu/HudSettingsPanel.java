@@ -986,6 +986,15 @@ public class HudSettingsPanel {
                 )
         );
 
+        componentsByCategory.get(SettingsCategory.POP_UPS).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Event: Barrel found",
+                        () -> ConfigManager.get().popUps.barrelFoundEvent,
+                        value -> ConfigManager.get().popUps.barrelFoundEvent = value
+                )
+        );
+
         componentsByCategory.get(SettingsCategory.DISCORD).add(
                 new StatusSettingsComponent(
                         "RPC status",
@@ -1298,6 +1307,14 @@ public class HudSettingsPanel {
                         "Show Block Counter Widget",
                         () -> ConfigManager.get().blocksPerSecondWidget.active,
                         value -> ConfigManager.get().blocksPerSecondWidget.active = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Show Daily Blocks Widget",
+                        () -> ConfigManager.get().dailyBlocks.active,
+                        value -> ConfigManager.get().dailyBlocks.active = value
                 )
         );
         componentsByCategory.get(SettingsCategory.WIDGET).add(

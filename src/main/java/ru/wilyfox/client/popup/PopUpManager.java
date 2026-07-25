@@ -1,14 +1,19 @@
 package ru.wilyfox.client.popup;
 
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.utils.Formatting;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public final class PopUpManager {
     private static final int MAX_BUFFER_SIZE = 32;
+    private static final Pattern LEGACY_AMPERSAND_FORMATTING = Pattern.compile(
+            "(?i)&x(?:&[0-9a-f]){6}|&[0-9a-fk-or]"
+    );
     private static final PopUpManager INSTANCE = new PopUpManager();
 
     private final Deque<PopUpNotification> notifications = new ArrayDeque<>();
@@ -36,8 +41,8 @@ public final class PopUpManager {
 
         notifications.addFirst(new PopUpNotification(
                 source,
-                sanitize(request.title(), "Notification"),
-                sanitize(request.message(), ""),
+                sanitizeText(request.title(), "Notification"),
+                sanitizeText(request.message(), ""),
                 request.severity() != null ? request.severity() : PopUpSeverity.INFO,
                 System.currentTimeMillis(),
                 Math.max(0, fadeIn),
@@ -89,6 +94,7 @@ public final class PopUpManager {
             case PopUpSource.RUNE_SET_READY -> ConfigManager.get().popUps.runeSetReadyEvent;
             case PopUpSource.POTION_EXPIRED -> ConfigManager.get().popUps.potionExpiredEvent;
             case PopUpSource.BOOSTER_EXPIRED -> ConfigManager.get().popUps.boosterExpiredEvent;
+            case PopUpSource.BARREL_FOUND -> ConfigManager.get().popUps.barrelFoundEvent;
             default -> true;
         };
     }
@@ -98,12 +104,20 @@ public final class PopUpManager {
         notifications.removeIf(notification -> notification.expiresAtMs() <= now);
     }
 
-    private static String sanitize(String value, String fallback) {
+    static String sanitizeText(String value, String fallback) {
         if (value == null) {
             return fallback;
         }
 
-        String normalized = value.replace('\n', ' ').replace('\r', ' ').trim();
+        String normalized = LEGACY_AMPERSAND_FORMATTING.matcher(
+                        Formatting.stripMinecraftFormatting(value)
+                )
+                .replaceAll("")
+                .replace('\n', ' ')
+                .replace('\r', ' ')
+                .replace('\u00A0', ' ')
+                .replaceAll("\\s+", " ")
+                .trim();
         return normalized.isEmpty() ? fallback : normalized;
     }
 }

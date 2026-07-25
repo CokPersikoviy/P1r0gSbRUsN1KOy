@@ -4,12 +4,12 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.phys.Vec3;
+import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.client.hud.widget.WidgetUtils;
 import ru.wilyfox.utils.WorldToScreen;
 
 public final class AlchemyIngredientOverlayRenderer {
     private static final long LIFETIME_MS = 2_000L;
-    private static final int MARKER_RED = 0xFFE34B4B;
     private static final double WORLD_MARKER_SIZE = 1.5;
     private AlchemyIngredientOverlayRenderer() {
     }
@@ -39,7 +39,7 @@ public final class AlchemyIngredientOverlayRenderer {
             }
 
             int half = size / 2;
-            int color = withAlpha(MARKER_RED, alpha);
+            int color = WidgetTheme.withAlpha(WidgetTheme.HARD_ACCENT, alpha);
             WidgetUtils.drawCorners(context, point.x() - half, point.y() - half, size, size, color);
         }
     }
@@ -47,10 +47,6 @@ public final class AlchemyIngredientOverlayRenderer {
     private static int getMarkerAlpha(long ageMs) {
         float fade = 1.0f - Math.max(0.0f, Math.min(1.0f, (ageMs - 1_600L) / 400.0f));
         return Math.round(255.0f * fade);
-    }
-
-    private static int withAlpha(int rgb, int alpha) {
-        return ((alpha & 0xFF) << 24) | (rgb & 0xFFFFFF);
     }
 
     private static int getMarkerSize(Minecraft minecraft, double distance) {

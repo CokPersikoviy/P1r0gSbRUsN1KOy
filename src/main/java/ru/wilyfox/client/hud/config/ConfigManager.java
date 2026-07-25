@@ -116,6 +116,7 @@ public class ConfigManager {
         if (sanitized.bossWidget == null) sanitized.bossWidget = new BossWidgetConfig();
         if (sanitized.clicker == null) sanitized.clicker = new ClickerConfig();
         if (sanitized.blocksPerSecondWidget == null) sanitized.blocksPerSecondWidget = new BlocksPerSecondWidgetConfig();
+        if (sanitized.dailyBlocks == null) sanitized.dailyBlocks = new DailyBlocksConfig();
         if (sanitized.estimatedTps == null) sanitized.estimatedTps = new EstimatedTpsConfig();
         if (sanitized.fishing == null) sanitized.fishing = new FishingConfig();
         if (sanitized.fishing.nibblesVisibility == null) sanitized.fishing.nibblesVisibility = FishingWidgetVisibility.FISHING_WARP;

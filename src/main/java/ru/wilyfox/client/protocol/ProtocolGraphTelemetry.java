@@ -34,7 +34,7 @@ public final class ProtocolGraphTelemetry {
         registerRoute("combo", "DwComboDecoder", "handleCombo", outputs(store("comboProgressStore"), widget("ComboProgressWidget")));
         registerRoute("comboblocks", "DwComboBlocksDecoder", "handleComboBlocks", outputs(store("comboProgressStore"), widget("ComboProgressWidget")));
         registerRoute("potiontimers", "DwPotionTimersDecoder", "handlePotionTimers", outputs(store("potionStore")));
-        registerRoute("statisticinfo", "DwStatisticInfoDecoder", "handleStatisticInfo", outputs(store("activePetsStore"), store("activeMinersStore"), state("currentGameLocation")));
+        registerRoute("statisticinfo", "DwStatisticInfoDecoder", "handleStatisticInfo", outputs(store("activePetsStore"), store("activeMinersStore"), store("dailyBlocksStore"), state("currentGameLocation"), widget("DailyBlocksWidget")));
         registerRoute("fishingpots", "DwFishingSpotsDecoder", "handleFishingSpots", outputs(state("fishingLocationIds"), widget("FishingNibblesWidget")));
         registerRoute("spotnibbles", "DwSpotNibblesDecoder", "handleSpotNibbles", outputs(state("fishingNibbles"), widget("FishingNibblesWidget")));
         registerRoute("hourlyquestypes", "DwHourlyQuestTypesDecoder", "handleHourlyQuestTypes", outputs(state("hourlyQuestTypes"), widget("FishingQuestsWidget")));
@@ -45,7 +45,7 @@ public final class ProtocolGraphTelemetry {
         registerRoute("abilitytimers", "DwAbilityTimersDecoder", "handleAbilityTimers", outputs(store("abilityCooldownStore"), widget("AbilityCooldownWidget")));
         registerRoute("bossdamage", "DwBossDamageDecoder", "handleBossDamage", outputs(store("bossDamageStore"), widget("BossDamageWidget")));
         registerRoute("bosscollect", "DwBossCollectDecoder", "handleBossCollect", outputs(state("bossCollectibles"), widget("BossHudWidget")));
-        registerRoute("levelinfo", "DwLevelInfoDecoder", "handleLevelInfo", outputs(store("levelProgressStore"), widget("LevelProgressWidget")));
+        registerRoute("levelinfo", "DwLevelInfoDecoder", "handleLevelInfo", outputs(store("levelProgressStore"), store("dailyBlocksStore"), widget("LevelProgressWidget"), widget("DailyBlocksWidget")));
         registerRoute("harpooncd", "DwCooldownValueDecoder", "handleHarpoonCooldown", outputs(store("WandCooldownTracker"), widget("WandCooldownWidget")));
         registerRoute("marketcd", "DwCooldownValueDecoder", "handleNamedCooldown", outputs(state("externalCooldowns")));
         registerRoute("gourmetcd", "DwCooldownValueDecoder", "handleGourmetCooldown", outputs(store("abilityCooldownStore"), widget("AbilityCooldownWidget")));

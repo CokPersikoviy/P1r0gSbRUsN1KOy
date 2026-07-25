@@ -2,6 +2,8 @@ package ru.wilyfox.client.discord;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import net.fabricmc.loader.api.FabricLoader;
+import ru.wilyfox.FrogHelper;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -14,6 +16,14 @@ final class DiscordSessionEmbed {
     }
 
     static JsonObject build(JoinWebhookNotifier.SessionSnapshot session) {
+        String version = FabricLoader.getInstance()
+                .getModContainer(FrogHelper.MOD_ID)
+                .map(container -> container.getMetadata().getVersion().getFriendlyString())
+                .orElse("Unknown");
+        return build(session, version);
+    }
+
+    static JsonObject build(JoinWebhookNotifier.SessionSnapshot session, String version) {
         JsonObject embed = new JsonObject();
         embed.addProperty("title", "Player session");
         embed.addProperty("color", session.loggedOutAt() == null ? ONLINE_COLOR : OFFLINE_COLOR);
@@ -25,6 +35,7 @@ final class DiscordSessionEmbed {
 
         JsonArray fields = new JsonArray();
         fields.add(field("Nickname", playerLabel(session), true));
+        fields.add(field("Version", version, true));
         fields.add(field("Timestamp", discordTimestamp(session.joinedAt()), true));
         fields.add(field("Location", session.locationName(), false));
         if (session.loggedOutAt() == null) {

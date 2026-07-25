@@ -35,6 +35,10 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.popup.PopUpManager;
+import ru.wilyfox.client.popup.PopUpRequest;
+import ru.wilyfox.client.popup.PopUpSeverity;
+import ru.wilyfox.client.popup.PopUpSource;
 import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.protocol.CurrentServerInfo;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
@@ -288,6 +292,7 @@ public final class UsefulWorldHighlightRenderHook {
         try (ModProfiler.Scope ignored = profile("scanChunk")) {
             long scanStartedAt = System.nanoTime();
             Map<Long, ColoredBox> boxesByBlockPos = new HashMap<>();
+            Map<Long, HighlightBlockType> barrelsByBlockPos = new HashMap<>();
             BlockPos playerPos = mc.player.blockPosition();
             int worldMinY = mc.level.dimensionType().minY();
             int worldMaxY = worldMinY + mc.level.dimensionType().height() - 1;
@@ -322,7 +327,11 @@ public final class UsefulWorldHighlightRenderHook {
                             }
 
                             highlightedBlocks++;
-                            boxesByBlockPos.put(cursor.asLong(), new ColoredBox(blockType.createBox(cursor, blockState), blockType.red, blockType.green, blockType.blue));
+                            long blockPos = cursor.asLong();
+                            boxesByBlockPos.put(blockPos, new ColoredBox(blockType.createBox(cursor, blockState), blockType.red, blockType.green, blockType.blue));
+                            if (blockType.isBarrel()) {
+                                barrelsByBlockPos.put(blockPos, blockType);
+                            }
                         }
                     }
                 }
@@ -331,7 +340,7 @@ public final class UsefulWorldHighlightRenderHook {
             count("scanChunk/highlightedBlocks", highlightedBlocks);
             count("scanChunk/outputBoxes", boxesByBlockPos.size());
             recordChunkScanSample(System.nanoTime() - scanStartedAt);
-            return new ChunkScanResult(boxesByBlockPos);
+            return new ChunkScanResult(boxesByBlockPos, barrelsByBlockPos);
         }
     }
 
@@ -368,10 +377,10 @@ public final class UsefulWorldHighlightRenderHook {
 
                     Set<Long> dirtyPositions = DIRTY_BLOCK_POSITIONS.getOrDefault(chunkKey, Set.of());
                     if (shouldDoFullDirtyRescan(dirtyPositions)) {
-                        BLOCK_CHUNK_CACHE.put(chunkKey, scanChunk(mc, chunk));
+                        updateChunkScanResult(chunkKey, scanChunk(mc, chunk));
                         escalatedFullScan++;
                     } else {
-                        BLOCK_CHUNK_CACHE.put(chunkKey, rescanDirtyPositions(mc, chunk, dirtyPositions));
+                        updateChunkScanResult(chunkKey, rescanDirtyPositions(mc, chunk, dirtyPositions));
                         locallyPatched++;
                     }
 
@@ -423,7 +432,7 @@ public final class UsefulWorldHighlightRenderHook {
                         continue;
                     }
 
-                    BLOCK_CHUNK_CACHE.put(chunkKey, scanChunk(mc, chunk));
+                    updateChunkScanResult(chunkKey, scanChunk(mc, chunk));
                     completedChunkKeys.add(chunkKey);
                     scanned++;
                     if (scanned >= scanBudget) {
@@ -452,6 +461,29 @@ public final class UsefulWorldHighlightRenderHook {
             }
             count("rebuildBlockBoxes/cacheEntries", cacheEntries);
             count("rebuildBlockBoxes/outputBoxes", BLOCK_BOXES.size());
+        }
+    }
+
+    private static void updateChunkScanResult(long chunkKey, ChunkScanResult next) {
+        ChunkScanResult previous = BLOCK_CHUNK_CACHE.put(chunkKey, next);
+        Map<Long, HighlightBlockType> previousBarrels = previous == null
+                ? Map.of()
+                : previous.barrelsByBlockPos;
+
+        for (Map.Entry<Long, HighlightBlockType> entry : next.barrelsByBlockPos.entrySet()) {
+            if (previousBarrels.get(entry.getKey()) == entry.getValue()) {
+                continue;
+            }
+
+            BlockPos position = BlockPos.of(entry.getKey());
+            PopUpManager.getInstance().publish(PopUpRequest.of(
+                    PopUpSource.BARREL_FOUND,
+                    "Barrel found",
+                    entry.getValue().barrelDisplayName()
+                            + " at " + position.getX() + ", " + position.getY() + ", " + position.getZ(),
+                    PopUpSeverity.SUCCESS
+            ));
+            count("barrelFound/published");
         }
     }
 
@@ -529,7 +561,10 @@ public final class UsefulWorldHighlightRenderHook {
     private record ColoredBox(AABB box, float red, float green, float blue) {
     }
 
-    private record ChunkScanResult(Map<Long, ColoredBox> boxesByBlockPos) {
+    private record ChunkScanResult(
+            Map<Long, ColoredBox> boxesByBlockPos,
+            Map<Long, HighlightBlockType> barrelsByBlockPos
+    ) {
     }
 
     private enum HighlightEntityType {
@@ -698,6 +733,19 @@ public final class UsefulWorldHighlightRenderHook {
             this.blue = blue;
         }
 
+        private boolean isBarrel() {
+            return this == NORMAL_BARREL || this == NETHER_BARREL || this == END_BARREL;
+        }
+
+        private String barrelDisplayName() {
+            return switch (this) {
+                case NORMAL_BARREL -> "Normal barrel";
+                case NETHER_BARREL -> "Nether barrel";
+                case END_BARREL -> "End barrel";
+                default -> "Barrel";
+            };
+        }
+
         private static HighlightBlockType from(BlockState blockState, BlockEntity blockEntity) {
             if (!isMineHighlightLocation()) {
                 return null;
@@ -861,9 +909,12 @@ public final class UsefulWorldHighlightRenderHook {
             Map<Long, ColoredBox> boxesByBlockPos = current == null
                     ? new HashMap<>()
                     : new HashMap<>(current.boxesByBlockPos);
+            Map<Long, HighlightBlockType> barrelsByBlockPos = current == null
+                    ? new HashMap<>()
+                    : new HashMap<>(current.barrelsByBlockPos);
             if (dirtyPositions.isEmpty()) {
                 count("rescanDirtyPositions/skippedEmpty");
-                return new ChunkScanResult(boxesByBlockPos);
+                return new ChunkScanResult(boxesByBlockPos, barrelsByBlockPos);
             }
 
             BlockPos playerPos = mc.player.blockPosition();
@@ -890,6 +941,7 @@ public final class UsefulWorldHighlightRenderHook {
                         if (boxesByBlockPos.remove(blockPosLong) != null) {
                             removedBoxes++;
                         }
+                        barrelsByBlockPos.remove(blockPosLong);
                         continue;
                     }
 
@@ -898,17 +950,23 @@ public final class UsefulWorldHighlightRenderHook {
                         if (boxesByBlockPos.remove(blockPosLong) != null) {
                             removedBoxes++;
                         }
+                        barrelsByBlockPos.remove(blockPosLong);
                         continue;
                     }
 
                     boxesByBlockPos.put(blockPosLong, new ColoredBox(blockType.createBox(cursor, blockState), blockType.red, blockType.green, blockType.blue));
+                    if (blockType.isBarrel()) {
+                        barrelsByBlockPos.put(blockPosLong, blockType);
+                    } else {
+                        barrelsByBlockPos.remove(blockPosLong);
+                    }
                     updatedBoxes++;
                 }
             }
             count("rescanDirtyPositions/updatedBoxes", updatedBoxes);
             count("rescanDirtyPositions/removedBoxes", removedBoxes);
             count("rescanDirtyPositions/outputBoxes", boxesByBlockPos.size());
-            return new ChunkScanResult(boxesByBlockPos);
+            return new ChunkScanResult(boxesByBlockPos, barrelsByBlockPos);
         }
     }
 

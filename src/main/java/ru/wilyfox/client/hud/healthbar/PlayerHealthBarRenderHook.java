@@ -37,10 +37,8 @@ public final class PlayerHealthBarRenderHook {
                 );
             }
             try (ModProfiler.Scope batchScope = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderHook/endBatch")) {
-                // Flush only the bar geometry. Numeric HP remains in the shared font batch and is
-                // flushed by the normal world renderer; the no-arg endBatch() walks the entire shared
-                // buffer registry and was ~90% of this feature's cost.
                 bufferSource.endBatch(RenderType.debugQuads());
+                PlayerHealthBarRenderer.flushNumericText();
             }
         }
     }

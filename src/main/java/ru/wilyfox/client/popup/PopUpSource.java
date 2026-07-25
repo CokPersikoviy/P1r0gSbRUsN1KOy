@@ -16,6 +16,7 @@ public final class PopUpSource {
     public static final String BOOSTER_EXPIRED = "booster.expired";
     public static final String FISHING_HIGHER_BITING = "fishing.higher_biting";
     public static final String ALCHEMY_ACTION = "alchemy.action";
+    public static final String BARREL_FOUND = "highlight.barrel_found";
 
     private PopUpSource() {
     }

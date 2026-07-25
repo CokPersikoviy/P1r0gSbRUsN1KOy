@@ -11,6 +11,7 @@ import ru.wilyfox.client.pet.ActivePetsStore;
 import ru.wilyfox.client.potion.PotionStore;
 import ru.wilyfox.client.rune.ActiveRunesStore;
 import ru.wilyfox.client.seller.SellerCooldownStore;
+import ru.wilyfox.client.statistic.DailyBlocksStore;
 import ru.wilyfox.client.wand.WandCooldownTracker;
 
 import java.util.LinkedHashMap;
@@ -43,6 +44,7 @@ final class ProtocolState {
     AbilityCooldownStore abilityCooldownStore;
     BossDamageStore bossDamageStore;
     LevelProgressStore levelProgressStore;
+    DailyBlocksStore dailyBlocksStore;
     PotionStore potionStore;
     SellerCooldownStore sellerCooldownStore;
     ComboProgressStore comboProgressStore;

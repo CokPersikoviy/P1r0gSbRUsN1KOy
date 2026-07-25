@@ -8,7 +8,6 @@ import ru.wilyfox.utils.Formatting;
 import java.util.regex.Pattern;
 
 public final class ChatToneDownFormatter {
-    private static final int PREFIX_COLOR = 0xFF7C7C7C;
     private static final Pattern PRIVATE_USE_CHARS = Pattern.compile("[\\uE000-\\uF8FF]");
     private static final Pattern YI_GLYPHS = Pattern.compile("[\\uA000-\\uA4CF]+");
     private static final Pattern RESOURCEPACK_GLYPHS = Pattern.compile("[✦✧◆◇■□▪▫●◉◈⬥⬦⬩⬪⬫]");
@@ -36,9 +35,9 @@ public final class ChatToneDownFormatter {
         String prefix = tab.getChatPrefix();
 
         if (!prefix.isEmpty()) {
-            result.append(Component.literal(prefix).withColor(PREFIX_COLOR));
+            result.append(Component.literal(prefix).withColor(WidgetTheme.TEXT_MUTED));
             if (!body.isEmpty()) {
-                result.append(Component.literal(" ").withColor(PREFIX_COLOR));
+                result.append(Component.literal(" ").withColor(WidgetTheme.TEXT_MUTED));
             }
         }
 
@@ -47,14 +46,14 @@ public final class ChatToneDownFormatter {
         }
 
         if (prefix.isEmpty()) {
-            result.append(Component.literal(body).withColor(PREFIX_COLOR));
+            result.append(Component.literal(body).withColor(WidgetTheme.TEXT_MUTED));
             return result;
         }
 
         java.util.regex.Matcher matcher = CHAT_SPLIT.matcher(body);
         if (matcher.matches()) {
             result.append(Component.literal(matcher.group(1)).withColor(WidgetTheme.TEXT_PRIMARY));
-            result.append(Component.literal(matcher.group(2)).withColor(PREFIX_COLOR));
+            result.append(Component.literal(matcher.group(2)).withColor(WidgetTheme.TEXT_MUTED));
             result.append(Component.literal(matcher.group(3)).withColor(WidgetTheme.TEXT_SECONDARY));
             return result;
         }

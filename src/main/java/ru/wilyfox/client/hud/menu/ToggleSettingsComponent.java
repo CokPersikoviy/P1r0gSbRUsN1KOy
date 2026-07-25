@@ -83,7 +83,13 @@ public class ToggleSettingsComponent extends SettingsComponent {
 
         context.fill(left + iconSize / 2, top, right, bottom, WidgetTheme.STATUS_WARNING);
         context.fill(left, bottom, left + iconSize / 2, top, WidgetTheme.STATUS_WARNING);
-        context.drawCenteredString(mc.font, "!", left + iconSize / 2, textY, 0xFF1A1A1A);
+        context.drawCenteredString(
+                mc.font,
+                "!",
+                left + iconSize / 2,
+                textY,
+                WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0xFF)
+        );
 
         boolean warningHovered = mouseX >= left && mouseX <= right && mouseY >= top && mouseY <= bottom;
         if (warningHovered) {

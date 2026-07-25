@@ -128,7 +128,13 @@ public class QuickAccessScreen extends Screen {
             itemLayouts.clear();
             sectionLayouts.clear();
 
-            graphics.fill(0, 0, this.width, this.height, isEditorMode() ? 0x00000000 : backdropColor());
+            graphics.fill(
+                    0,
+                    0,
+                    this.width,
+                    this.height,
+                    isEditorMode() ? WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0) : backdropColor()
+            );
             HudBlur.beginFrame(graphics); // capture the screen for the frosted panels' blur backdrop
             renderSelectorPanel(graphics, mouseX, mouseY);
 
@@ -296,7 +302,13 @@ public class QuickAccessScreen extends Screen {
         Minecraft minecraft = Minecraft.getInstance();
         graphics.fill(editorPanelX, editorPanelY, editorPanelX + EDITOR_WIDTH, editorPanelY + editorPanelHeight, solidPanelColor());
         graphics.fill(editorPanelX, editorPanelY, editorPanelX + EDITOR_WIDTH, editorPanelY + 1, WidgetTheme.ACCENT_LINE);
-        graphics.fill(editorPanelX, editorPanelY, editorPanelX + 1, editorPanelY + editorPanelHeight, WidgetTheme.ACCENT_LINE & 0x66FFFFFF);
+        graphics.fill(
+                editorPanelX,
+                editorPanelY,
+                editorPanelX + 1,
+                editorPanelY + editorPanelHeight,
+                WidgetTheme.withAlpha(WidgetTheme.ACCENT_LINE, 0x66)
+        );
 
         graphics.drawString(minecraft.font, "Inspector", editorPanelX + 10, editorPanelY + 8, WidgetTheme.TITLE);
 
@@ -320,7 +332,13 @@ public class QuickAccessScreen extends Screen {
         int footerY = selectorPanelY + selectorPanelHeight + 8;
         int footerWidth = selectorPanelWidth;
         graphics.fill(selectorPanelX, footerY, selectorPanelX + footerWidth, footerY + EDITOR_HINT_HEIGHT, solidSoftPanelColor());
-        graphics.fill(selectorPanelX, footerY, selectorPanelX + footerWidth, footerY + 1, WidgetTheme.ACCENT_LINE & 0x66FFFFFF);
+        graphics.fill(
+                selectorPanelX,
+                footerY,
+                selectorPanelX + footerWidth,
+                footerY + 1,
+                WidgetTheme.withAlpha(WidgetTheme.ACCENT_LINE, 0x66)
+        );
         graphics.drawCenteredString(
                 minecraft.font,
                 "Drag item cards to move them",
@@ -639,35 +657,35 @@ public class QuickAccessScreen extends Screen {
     }
 
     private int solidPanelColor() {
-        return 0xE0000000 | (WidgetTheme.PANEL_BG & 0x00FFFFFF);
+        return WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0xE0);
     }
 
     private int solidSoftPanelColor() {
-        return 0xD6000000 | (WidgetTheme.PANEL_BG_SOFT & 0x00FFFFFF);
+        return WidgetTheme.withAlpha(WidgetTheme.PANEL_BG_SOFT, 0xD6);
     }
 
     private int solidBarColor() {
-        return 0xCC000000 | (WidgetTheme.BAR_BG & 0x00FFFFFF);
+        return WidgetTheme.withAlpha(WidgetTheme.BAR_BG, 0xCC);
     }
 
     private int backdropColor() {
-        return 0x66000000 | (WidgetTheme.PANEL_BG & 0x00FFFFFF);
+        return WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0x66);
     }
 
     private int disabledOverlayColor() {
-        return 0x66000000 | (WidgetTheme.BAR_BG & 0x00FFFFFF);
+        return WidgetTheme.withAlpha(WidgetTheme.BAR_BG, 0x66);
     }
 
     private int disabledLineColor() {
-        return 0x99000000 | (WidgetTheme.TEXT_MUTED & 0x00FFFFFF);
+        return WidgetTheme.withAlpha(WidgetTheme.TEXT_MUTED, 0x99);
     }
 
     private int dragShadowColor() {
-        return 0x88000000 | (WidgetTheme.BAR_BG & 0x00FFFFFF);
+        return WidgetTheme.withAlpha(WidgetTheme.BAR_BG, 0x88);
     }
 
     private int dragPreviewColor() {
-        return 0xE0000000 | (WidgetTheme.PANEL_BG_SOFT & 0x00FFFFFF);
+        return WidgetTheme.withAlpha(WidgetTheme.PANEL_BG_SOFT, 0xE0);
     }
 
     private enum Mode {
@@ -693,7 +711,9 @@ public class QuickAccessScreen extends Screen {
         protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
             boolean hovered = isHoveredOrFocused();
             int bg = hovered ? WidgetTheme.PANEL_BG_SOFT : WidgetTheme.BAR_BG;
-            int line = hovered ? WidgetTheme.ACCENT_LINE : (WidgetTheme.ACCENT_LINE & 0x66FFFFFF);
+            int line = hovered
+                    ? WidgetTheme.ACCENT_LINE
+                    : WidgetTheme.withAlpha(WidgetTheme.ACCENT_LINE, 0x66);
             graphics.fill(getX(), getY(), getX() + width, getY() + height, bg);
             graphics.fill(getX(), getY(), getX() + width, getY() + 1, line);
             graphics.drawCenteredString(

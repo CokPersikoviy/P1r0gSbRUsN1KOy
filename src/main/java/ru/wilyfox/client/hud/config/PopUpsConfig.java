@@ -20,4 +20,5 @@ public class PopUpsConfig {
     public boolean runeSetReadyEvent = true;
     public boolean potionExpiredEvent = false;
     public boolean boosterExpiredEvent = false;
+    public boolean barrelFoundEvent = true;
 }

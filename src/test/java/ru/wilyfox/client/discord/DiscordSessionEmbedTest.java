@@ -22,6 +22,7 @@ class DiscordSessionEmbedTest {
         ));
 
         assertEquals("WilyFox [148]", fieldValue(embed, "Nickname"));
+        assertEquals("1.0.3", fieldValue(embed, "Version"));
         assertEquals("<t:1700000000:F>", fieldValue(embed, "Timestamp"));
         assertEquals("Spawn", fieldValue(embed, "Location"));
         assertEquals("Yes", fieldValue(embed, "Online"));
@@ -54,7 +55,7 @@ class DiscordSessionEmbedTest {
     }
 
     private static JsonObject embed(JoinWebhookNotifier.SessionSnapshot snapshot) {
-        return DiscordSessionEmbed.build(snapshot)
+        return DiscordSessionEmbed.build(snapshot, "1.0.3")
                 .getAsJsonArray("embeds")
                 .get(0)
                 .getAsJsonObject();

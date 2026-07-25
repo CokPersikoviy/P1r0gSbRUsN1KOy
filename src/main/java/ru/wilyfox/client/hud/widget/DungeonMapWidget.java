@@ -112,7 +112,7 @@ public final class DungeonMapWidget extends AbstractWidget {
 
     private boolean canRenderLiveMap(Minecraft mc) {
         return mc.level != null
-                && DiamondWorldProtocolClient.isDungeonLocation()
+                && DiamondWorldProtocolClient.isAnyDungeonLocation()
                 && DungeonMapTracker.getInstance().hasMapId();
     }
 
