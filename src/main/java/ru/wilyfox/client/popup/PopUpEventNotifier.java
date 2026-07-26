@@ -21,23 +21,20 @@ import ru.wilyfox.client.seller.SellerCooldownStore;
 import ru.wilyfox.client.wand.WandCooldownTracker;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 public final class PopUpEventNotifier {
-    private static final long BOSS_SPAWN_WINDOW_MS = 2_000L;
     private static final PopUpEventNotifier INSTANCE = new PopUpEventNotifier();
 
-    private final Map<String, Long> announcedBossRespawns = new HashMap<>();
+    private final BossSpawnTracker bossSpawnTracker = new BossSpawnTracker();
     private final Map<String, String> previousAbilityNames = new LinkedHashMap<>();
     private final Map<String, String> previousWandNames = new LinkedHashMap<>();
     private final Map<String, SellerStateSnapshot> previousSellerEntries = new LinkedHashMap<>();
-    private final Map<String, MinerStateSnapshot> previousMiners = new LinkedHashMap<>();
+    private final MinerReturnTracker minerReturnTracker = new MinerReturnTracker();
     private final Map<Integer, PotionStore.ActivePotionEntry> previousPotions = new LinkedHashMap<>();
     private final Set<Integer> expiredPotionIds = new HashSet<>();
     private final List<BoosterStateSnapshot> previousBoosters = new ArrayList<>();
@@ -157,11 +154,10 @@ public final class PopUpEventNotifier {
             }
         }
 
-        previousMiners.clear();
         if (activeMinersStore != null) {
-            for (ActiveMinerInfo miner : activeMinersStore.getAll()) {
-                previousMiners.put(minerKey(miner), new MinerStateSnapshot(miner, miner.isComplete()));
-            }
+            minerReturnTracker.prime(activeMinersStore.getAll());
+        } else {
+            minerReturnTracker.reset();
         }
 
         previousPotions.clear();
@@ -186,31 +182,16 @@ public final class PopUpEventNotifier {
             return;
         }
 
-        long now = System.currentTimeMillis();
-        for (BossInfo boss : bossRepository.getAllMerged()) {
-            String key = bossKey(boss);
-            long respawnAt = boss.getRespawnAt();
-            long remaining = respawnAt - now;
-
-            Long lastAnnounced = announcedBossRespawns.get(key);
-            if (lastAnnounced != null && lastAnnounced.longValue() != respawnAt) {
-                announcedBossRespawns.remove(key);
-                lastAnnounced = null;
-            }
-
-            if (remaining <= 0L && remaining >= -BOSS_SPAWN_WINDOW_MS && lastAnnounced == null) {
-                PopUpManager.getInstance().publish(PopUpRequest.of(
-                        PopUpSource.BOSS_SPAWN,
-                        "Boss Respawned",
-                        formatBossLabel(boss) + " appeared",
-                        PopUpSeverity.WARNING
-                ));
-                announcedBossRespawns.put(key, respawnAt);
-            }
-
-            if (remaining > BOSS_SPAWN_WINDOW_MS + 5_000L) {
-                announcedBossRespawns.remove(key);
-            }
+        for (BossInfo boss : bossSpawnTracker.update(
+                bossRepository.getAllMerged(),
+                System.currentTimeMillis()
+        )) {
+            PopUpManager.getInstance().publish(PopUpRequest.of(
+                    PopUpSource.BOSS_SPAWN,
+                    "Boss Respawned",
+                    formatBossLabel(boss) + " appeared",
+                    PopUpSeverity.WARNING
+            ));
         }
     }
 
@@ -310,25 +291,14 @@ public final class PopUpEventNotifier {
             return;
         }
 
-        Map<String, MinerStateSnapshot> current = new LinkedHashMap<>();
-        for (ActiveMinerInfo miner : activeMinersStore.getAll()) {
-            String key = minerKey(miner);
-            MinerStateSnapshot currentState = new MinerStateSnapshot(miner, miner.isComplete());
-            current.put(key, currentState);
-
-            MinerStateSnapshot previous = previousMiners.get(key);
-            if (previous != null && !previous.returned() && currentState.returned()) {
-                PopUpManager.getInstance().publish(PopUpRequest.of(
-                        PopUpSource.MINER_RETURNED,
-                        "Miner Returned",
-                        formatMinerLabel(miner) + " returned home",
-                        PopUpSeverity.INFO
-                ));
-            }
+        for (ActiveMinerInfo miner : minerReturnTracker.update(activeMinersStore.getAll())) {
+            PopUpManager.getInstance().publish(PopUpRequest.of(
+                    PopUpSource.MINER_RETURNED,
+                    "Miner Returned",
+                    formatMinerLabel(miner) + " returned home",
+                    PopUpSeverity.INFO
+            ));
         }
-
-        previousMiners.clear();
-        previousMiners.putAll(current);
     }
 
     private void checkGameEvent() {
@@ -465,28 +435,20 @@ public final class PopUpEventNotifier {
         previousRuneSetActive = false;
         previousGameEvent = DwGameEvent.NONE;
         previousLevelCompletionRevision = 0L;
-        announcedBossRespawns.clear();
+        bossSpawnTracker.reset();
         previousAbilityNames.clear();
         previousWandNames.clear();
         previousSellerEntries.clear();
-        previousMiners.clear();
+        minerReturnTracker.reset();
         previousPotions.clear();
         expiredPotionIds.clear();
         previousBoosters.clear();
-    }
-
-    private String minerKey(ActiveMinerInfo miner) {
-        return miner.id();
     }
 
     private String formatMinerLabel(ActiveMinerInfo miner) {
         return miner.level() > 0
                 ? miner.resource() + " miner [Lv." + miner.level() + "]"
                 : miner.resource() + " miner";
-    }
-
-    private String bossKey(BossInfo boss) {
-        return boss.getName().trim().toLowerCase(Locale.ROOT) + "#" + boss.getLevel();
     }
 
     private String formatBossLabel(BossInfo boss) {
@@ -502,6 +464,4 @@ public final class PopUpEventNotifier {
     private record SellerStateSnapshot(SellerCooldownStore.Entry entry, boolean ready) {
     }
 
-    private record MinerStateSnapshot(ActiveMinerInfo miner, boolean returned) {
-    }
 }

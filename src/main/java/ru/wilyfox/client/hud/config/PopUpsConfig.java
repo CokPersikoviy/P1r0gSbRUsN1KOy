@@ -21,4 +21,5 @@ public class PopUpsConfig {
     public boolean potionExpiredEvent = false;
     public boolean boosterExpiredEvent = false;
     public boolean barrelFoundEvent = true;
+    public boolean goldenCrystalFoundEvent = true;
 }

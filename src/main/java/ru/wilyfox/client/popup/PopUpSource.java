@@ -17,6 +17,7 @@ public final class PopUpSource {
     public static final String FISHING_HIGHER_BITING = "fishing.higher_biting";
     public static final String ALCHEMY_ACTION = "alchemy.action";
     public static final String BARREL_FOUND = "highlight.barrel_found";
+    public static final String GOLDEN_CRYSTAL_FOUND = "highlight.golden_crystal_found";
 
     private PopUpSource() {
     }

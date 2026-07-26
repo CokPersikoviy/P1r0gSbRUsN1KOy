@@ -34,7 +34,9 @@ import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3f;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.client.popup.PopUpManager;
 import ru.wilyfox.client.popup.PopUpRequest;
 import ru.wilyfox.client.popup.PopUpSeverity;
@@ -48,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +60,7 @@ public final class UsefulWorldHighlightRenderHook {
     private static final String PROFILER_PREFIX = "render/UsefulWorldHighlightRenderHook";
     private static final int GOLDEN_CRYSTAL_MODEL_ID = 271;
     private static final int ENTITY_SCAN_INTERVAL_TICKS = 10;
+    private static final int GOLDEN_CRYSTAL_DISCOVERY_RETENTION_TICKS = 100;
     private static final int BLOCK_SCAN_REFRESH_TICKS = 100;
     private static final int DIRTY_CHUNK_RESCAN_LIMIT = 2;
     private static final int DIRTY_LOCAL_RESCAN_RADIUS = 1;
@@ -74,6 +78,7 @@ public final class UsefulWorldHighlightRenderHook {
     private static final double GOLDEN_CRYSTAL_BOX_WIDTH = 0.58D;
     private static final double GOLDEN_CRYSTAL_BOX_HEIGHT = 0.46D;
     private static final double GOLDEN_CRYSTAL_BOX_Y_OFFSET = 0.28D;
+    private static final double BARREL_TRACER_CAMERA_OFFSET = 0.5D;
     private static final RenderType USEFUL_HIGHLIGHT_NO_DEPTH = RenderType.create(
             "froghelper_useful_highlight_no_depth",
             DefaultVertexFormat.POSITION_COLOR_NORMAL,
@@ -95,6 +100,9 @@ public final class UsefulWorldHighlightRenderHook {
     private static final List<ColoredBox> CACHED_BOXES = new ArrayList<>();
     private static final List<ColoredBox> BLOCK_BOXES = new ArrayList<>();
     private static final List<ColoredBox> ENTITY_BOXES = new ArrayList<>();
+    private static final List<BlockPos> CACHED_BARRELS = new ArrayList<>();
+    private static final GoldenCrystalDiscoveryTracker GOLDEN_CRYSTAL_TRACKER =
+            new GoldenCrystalDiscoveryTracker(GOLDEN_CRYSTAL_DISCOVERY_RETENTION_TICKS);
     private static final Map<Long, ChunkScanResult> BLOCK_CHUNK_CACHE = new HashMap<>();
     private static final Map<Long, Long> DIRTY_CHUNK_MARK_TIMES = new HashMap<>();
     private static final Set<Long> DIRTY_CHUNK_KEYS = new HashSet<>();
@@ -166,7 +174,8 @@ public final class UsefulWorldHighlightRenderHook {
             }
 
             refreshCacheIfNeeded(mc);
-            if (CACHED_BOXES.isEmpty()) {
+            boolean renderBarrelTracer = ConfigManager.get().render.barrelTracer && !CACHED_BARRELS.isEmpty();
+            if (CACHED_BOXES.isEmpty() && !renderBarrelTracer) {
                 count("frame/skippedEmptyBoxes");
                 return;
             }
@@ -189,7 +198,56 @@ public final class UsefulWorldHighlightRenderHook {
                     );
                 }
             }
+
+            if (renderBarrelTracer) {
+                try (ModProfiler.Scope tracerScope = profile("drawBarrelTracer")) {
+                    renderBarrelTracer(poseStack, lineConsumer, cameraPos, mc.gameRenderer.getMainCamera().getLookVector());
+                }
+            }
         }
+    }
+
+    private static void renderBarrelTracer(
+            PoseStack poseStack,
+            VertexConsumer lineConsumer,
+            Vec3 cameraPos,
+            Vector3f lookVector
+    ) {
+        BlockPos targetBlock = findNearestBarrel(CACHED_BARRELS, cameraPos);
+        if (targetBlock == null) {
+            count("drawBarrelTracer/skippedNoTarget");
+            return;
+        }
+
+        Vec3 start = cameraPos.add(
+                lookVector.x() * BARREL_TRACER_CAMERA_OFFSET,
+                lookVector.y() * BARREL_TRACER_CAMERA_OFFSET,
+                lookVector.z() * BARREL_TRACER_CAMERA_OFFSET
+        );
+        Vec3 target = Vec3.atCenterOf(targetBlock);
+        Vec3 relativeStart = start.subtract(cameraPos);
+        Vec3 direction = target.subtract(start);
+        ShapeRenderer.renderVector(
+                poseStack,
+                lineConsumer,
+                new Vector3f((float) relativeStart.x, (float) relativeStart.y, (float) relativeStart.z),
+                direction,
+                WidgetTheme.ACCENT_LINE
+        );
+        count("drawBarrelTracer/rendered");
+    }
+
+    static BlockPos findNearestBarrel(Collection<BlockPos> barrels, Vec3 origin) {
+        BlockPos nearest = null;
+        double nearestDistance = Double.POSITIVE_INFINITY;
+        for (BlockPos barrel : barrels) {
+            double distance = origin.distanceToSqr(Vec3.atCenterOf(barrel));
+            if (distance < nearestDistance) {
+                nearest = barrel;
+                nearestDistance = distance;
+            }
+        }
+        return nearest;
     }
 
     private static void refreshCacheIfNeeded(Minecraft mc) {
@@ -213,6 +271,7 @@ public final class UsefulWorldHighlightRenderHook {
             if (!isMineHighlightLocation()) {
                 count("refreshBlockCache/skippedNotMine");
                 BLOCK_BOXES.clear();
+                CACHED_BARRELS.clear();
                 BLOCK_CHUNK_CACHE.clear();
                 DIRTY_CHUNK_MARK_TIMES.clear();
                 DIRTY_CHUNK_KEYS.clear();
@@ -454,13 +513,18 @@ public final class UsefulWorldHighlightRenderHook {
     private static void rebuildBlockBoxes() {
         try (ModProfiler.Scope ignored = profile("rebuildBlockBoxes")) {
             BLOCK_BOXES.clear();
+            CACHED_BARRELS.clear();
             int cacheEntries = 0;
             for (ChunkScanResult result : BLOCK_CHUNK_CACHE.values()) {
                 cacheEntries++;
                 BLOCK_BOXES.addAll(result.boxesByBlockPos.values());
+                for (long barrelPosition : result.barrelsByBlockPos.keySet()) {
+                    CACHED_BARRELS.add(BlockPos.of(barrelPosition));
+                }
             }
             count("rebuildBlockBoxes/cacheEntries", cacheEntries);
             count("rebuildBlockBoxes/outputBoxes", BLOCK_BOXES.size());
+            count("rebuildBlockBoxes/barrels", CACHED_BARRELS.size());
         }
     }
 
@@ -519,6 +583,7 @@ public final class UsefulWorldHighlightRenderHook {
             );
             count("collectNearbyEntities/candidates", candidates.size());
             int highlightedEntities = 0;
+            Map<Long, BlockPos> goldenCrystalPositions = new LinkedHashMap<>();
             try (ModProfiler.Scope classifyScope = profile("collectNearbyEntities/classify")) {
                 for (Entity entity : candidates) {
                     HighlightEntityType entityType = HighlightEntityType.from(entity);
@@ -527,10 +592,35 @@ public final class UsefulWorldHighlightRenderHook {
                     }
 
                     highlightedEntities++;
-                    ENTITY_BOXES.add(new ColoredBox(entityType.createBox(entity), entityType.red, entityType.green, entityType.blue));
+                    AABB box = entityType.createBox(entity);
+                    ENTITY_BOXES.add(new ColoredBox(box, entityType.red, entityType.green, entityType.blue));
+                    if (entityType == HighlightEntityType.GOLDEN_CRYSTAL) {
+                        BlockPos position = BlockPos.containing(box.getCenter());
+                        goldenCrystalPositions.putIfAbsent(position.asLong(), position);
+                    }
                 }
             }
+            publishNewGoldenCrystals(goldenCrystalPositions, mc.level.getGameTime());
             count("collectNearbyEntities/highlighted", highlightedEntities);
+            count("collectNearbyEntities/goldenCrystals", goldenCrystalPositions.size());
+        }
+    }
+
+    private static void publishNewGoldenCrystals(Map<Long, BlockPos> positions, long gameTime) {
+        Set<Long> discovered = GOLDEN_CRYSTAL_TRACKER.update(positions.keySet(), gameTime);
+        for (long positionKey : discovered) {
+            BlockPos position = positions.get(positionKey);
+            if (position == null) {
+                continue;
+            }
+
+            PopUpManager.getInstance().publish(PopUpRequest.of(
+                    PopUpSource.GOLDEN_CRYSTAL_FOUND,
+                    "Golden crystal found",
+                    "At " + position.getX() + ", " + position.getY() + ", " + position.getZ(),
+                    PopUpSeverity.SUCCESS
+            ));
+            count("goldenCrystalFound/published");
         }
     }
 
@@ -538,6 +628,8 @@ public final class UsefulWorldHighlightRenderHook {
         CACHED_BOXES.clear();
         BLOCK_BOXES.clear();
         ENTITY_BOXES.clear();
+        CACHED_BARRELS.clear();
+        GOLDEN_CRYSTAL_TRACKER.clear();
         BLOCK_CHUNK_CACHE.clear();
         DIRTY_CHUNK_MARK_TIMES.clear();
         DIRTY_CHUNK_KEYS.clear();

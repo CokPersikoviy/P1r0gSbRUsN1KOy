@@ -95,6 +95,7 @@ public final class PopUpManager {
             case PopUpSource.POTION_EXPIRED -> ConfigManager.get().popUps.potionExpiredEvent;
             case PopUpSource.BOOSTER_EXPIRED -> ConfigManager.get().popUps.boosterExpiredEvent;
             case PopUpSource.BARREL_FOUND -> ConfigManager.get().popUps.barrelFoundEvent;
+            case PopUpSource.GOLDEN_CRYSTAL_FOUND -> ConfigManager.get().popUps.goldenCrystalFoundEvent;
             default -> true;
         };
     }

@@ -123,6 +123,20 @@ public final class DiamondWorldProtocolClient {
         return getCurrentGameEvent() == DwGameEvent.MYTHICAL_EVENT;
     }
 
+    /**
+     * Absolute wall-clock time when the server-reported market chat cooldown ends.
+     * A negative value means no {@code marketcd} packet has been received in this connection.
+     */
+    public static long getMarketCooldownEndsAt() {
+        return STATE.externalCooldownRevisions.containsKey("marketcd")
+                ? STATE.externalCooldownEndsAt.getOrDefault("marketcd", 0L)
+                : -1L;
+    }
+
+    public static long getMarketCooldownRevision() {
+        return STATE.externalCooldownRevisions.getOrDefault("marketcd", 0L);
+    }
+
     public static boolean isRaidBossLevel(int level) {
         if (level <= 0) {
             return false;

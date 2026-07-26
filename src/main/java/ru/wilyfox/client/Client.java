@@ -13,6 +13,7 @@ import ru.wilyfox.client.booster.BoosterStore;
 import ru.wilyfox.client.chat.BossShareService;
 import ru.wilyfox.client.chat.AutoBossAnnouncer;
 import ru.wilyfox.client.chat.AutoMessageScheduler;
+import ru.wilyfox.client.chat.ActiveEffectChatTracker;
 import ru.wilyfox.client.chat.ChatDispatchQueue;
 import ru.wilyfox.client.chat.ChatTabManager;
 import ru.wilyfox.client.chat.VisibilityStatusTracker;
@@ -23,6 +24,7 @@ import ru.wilyfox.client.dungeon.DungeonDecorationHighlightRenderHook;
 import ru.wilyfox.client.dungeon.DungeonMapTracker;
 import ru.wilyfox.client.discord.DiscordRpcService;
 import ru.wilyfox.client.discord.JoinWebhookNotifier;
+import ru.wilyfox.client.effect.ActiveEffectStore;
 import ru.wilyfox.client.event.ClientEntityEventHandler;
 import ru.wilyfox.client.highlight.UsefulWorldHighlightRenderHook;
 import ru.wilyfox.client.hud.HudRenderer;
@@ -32,6 +34,7 @@ import ru.wilyfox.client.hud.indicators.ScreenAnchor;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.hud.menu.HudSettingsPanel;
 import ru.wilyfox.client.hud.widget.ActiveMinersWidget;
+import ru.wilyfox.client.hud.widget.ActiveEffectsWidget;
 import ru.wilyfox.client.hud.widget.ActivePetsWidget;
 import ru.wilyfox.client.hud.widget.ActiveRunesWidget;
 import ru.wilyfox.client.hud.widget.AbilityCooldownWidget;
@@ -89,6 +92,7 @@ public class Client {
     private final ActiveRunesStore activeRunesStore = new ActiveRunesStore();
     private final ActivePetsStore activePetsStore = new ActivePetsStore();
     private final ActiveMinersStore activeMinersStore = new ActiveMinersStore();
+    private final ActiveEffectStore activeEffectStore = new ActiveEffectStore();
     private final AbilityCooldownStore abilityCooldownStore = new AbilityCooldownStore();
     private final BossDamageStore bossDamageStore = new BossDamageStore();
     private final VisibilityStatusStore visibilityStatusStore = new VisibilityStatusStore();
@@ -141,6 +145,7 @@ public class Client {
         AutoFish.register();
         AlchemyBrewingTracker.register();
         ChatDispatchQueue.init();
+        ActiveEffectChatTracker.register(activeEffectStore);
         ChatTabManager.getInstance().register();
         AutoMessageScheduler.getInstance().register();
         AutoBossAnnouncer.bindRepository(repository);
@@ -255,6 +260,10 @@ public class Client {
         );
         hudRenderer.registerWidget(
                 new AbilityCooldownWidget(20, 150, HudLayer.CONTENT, abilityCooldownStore),
+                ScreenAnchor.BOTTOM_LEFT
+        );
+        hudRenderer.registerWidget(
+                new ActiveEffectsWidget(20, 120, HudLayer.CONTENT, activeEffectStore),
                 ScreenAnchor.BOTTOM_LEFT
         );
         hudRenderer.registerWidget(

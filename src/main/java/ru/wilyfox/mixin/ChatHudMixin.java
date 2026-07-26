@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ru.wilyfox.client.chat.AutoBossAnnouncer;
 import ru.wilyfox.client.chat.AutoThanks;
+import ru.wilyfox.client.chat.ActiveEffectChatTracker;
 import ru.wilyfox.client.chat.BoosterChatDebug;
 import ru.wilyfox.client.chat.BossShareService;
 import ru.wilyfox.client.chat.ChatDispatchQueue;
@@ -50,6 +51,7 @@ public class ChatHudMixin {
         PrivateMessagePopUpNotifier.onIncomingMessage(logicalComponent);
         VisibilityStatusTracker.onIncomingMessage(logicalComponent);
         ComboTimerChatTracker.onIncomingMessage(logicalComponent);
+        ActiveEffectChatTracker.onIncomingMessage(logicalComponent);
         PlayerClanStorage.captureFromChat(logicalComponent);
         // ModUserStorage.captureFromChat runs in ChatMessageDecorator.decorate (before the Ⓕ beacon is
         // stripped for display) so detection still sees the raw marker.

@@ -74,13 +74,7 @@ final class ProtocolPayloadHandlers {
     static boolean handleBossTypes(ProtocolState state, byte[] data) {
         try {
             DwBossTypesPacket packet = DwBossTypesDecoder.decode(data);
-            state.bossTypes = new LinkedHashMap<>(packet.types());
-            state.capturedBossLevels = DwClanBossResolver.resolveLevels(state.clanInfo, state.bossTypes);
-            if (state.bossRepository != null) {
-                state.bossRepository.clearProtocolMetadata();
-                packet.types().forEach((id, type) ->
-                        state.bossRepository.updateProtocolMetadata(id, type.name(), type.level()));
-            }
+            applyBossTypes(state, packet);
 
             if (packet.types().isEmpty()) {
                 info(LOGGER, "DW protocol: bosstypes parsed successfully, entries=0");
@@ -112,6 +106,17 @@ final class ProtocolPayloadHandlers {
         } catch (Exception exception) {
             warn(LOGGER, "DW protocol: failed to parse bosstypes payload", exception);
             return false;
+        }
+    }
+
+    static void applyBossTypes(ProtocolState state, DwBossTypesPacket packet) {
+        // BossTypes is a registry update. The server may send it in parts, and EvoPlus keeps
+        // previous entries with putAll rather than treating every packet as a full snapshot.
+        state.bossTypes.putAll(packet.types());
+        state.capturedBossLevels = DwClanBossResolver.resolveLevels(state.clanInfo, state.bossTypes);
+        if (state.bossRepository != null) {
+            packet.types().forEach((id, type) ->
+                    state.bossRepository.updateProtocolMetadata(id, type.name(), type.level()));
         }
     }
 
@@ -835,10 +840,11 @@ final class ProtocolPayloadHandlers {
         }
     }
 
-    static boolean handleNamedCooldown(String typeId, String displayName, byte[] data) {
+    static boolean handleNamedCooldown(ProtocolState state, String typeId, String displayName, byte[] data) {
         try {
             DwCooldownValuePacket packet = DwCooldownValueDecoder.decode(data);
             long remaining = Math.max(0L, packet.remainingMillis());
+            applyNamedCooldown(state, typeId, remaining, System.currentTimeMillis());
             info(
                     LOGGER,
                     "DW protocol: {} parsed successfully, displayName={}, remaining={}, raw={}",
@@ -928,6 +934,12 @@ final class ProtocolPayloadHandlers {
             warn(LOGGER, "DW protocol: failed to parse siegepos payload", exception);
             return false;
         }
+    }
+
+    static void applyNamedCooldown(ProtocolState state, String typeId, long remainingMillis, long now) {
+        long remaining = Math.max(0L, remainingMillis);
+        state.externalCooldownEndsAt.put(typeId, now + remaining);
+        state.externalCooldownRevisions.merge(typeId, 1L, Long::sum);
     }
 
     static boolean handleBoosters(ProtocolState state, byte[] data) {

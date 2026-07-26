@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import ru.wilyfox.client.hud.config.AutoMessageEntryConfig;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.profiler.ModProfiler;
+import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,6 +14,7 @@ public final class AutoMessageScheduler {
     private static final AutoMessageScheduler INSTANCE = new AutoMessageScheduler();
 
     private final List<SlotState> slotStates = new ArrayList<>();
+    private final MarketAutoMessageState marketState = new MarketAutoMessageState();
     private boolean initialized;
 
     private AutoMessageScheduler() {
@@ -49,18 +51,26 @@ public final class AutoMessageScheduler {
             for (SlotState state : slotStates) {
                 state.reset();
             }
+            marketState.reset();
             return;
         }
 
+        List<String> marketMessages = new ArrayList<>();
         for (int index = 0; index < ConfigManager.get().autoMessages.entries.size(); index++) {
             AutoMessageEntryConfig entry = ConfigManager.get().autoMessages.entries.get(index);
             SlotState state = slotStates.get(index);
             String message = entry.message == null ? "" : entry.message.trim();
             int delaySeconds = Math.max(1, entry.delaySeconds);
-            String fingerprint = entry.active + "|" + delaySeconds + "|" + message;
+            String fingerprint = entry.active + "|" + entry.useMarketCooldown + "|" + delaySeconds + "|" + message;
 
             if (!entry.active || message.isBlank()) {
                 state.reset();
+                continue;
+            }
+
+            if (entry.useMarketCooldown) {
+                state.reset();
+                marketMessages.add(message);
                 continue;
             }
 
@@ -84,6 +94,29 @@ public final class AutoMessageScheduler {
 
             state.nextSendAt = now + delaySeconds * 1000L;
         }
+
+        processMarketMessage(marketMessages, now);
+    }
+
+    private void processMarketMessage(List<String> messages, long now) {
+        if (messages.isEmpty()) {
+            marketState.reset();
+            return;
+        }
+
+        long cooldownRevision = DiamondWorldProtocolClient.getMarketCooldownRevision();
+        String message = marketState.nextMessage(
+                messages,
+                DiamondWorldProtocolClient.getMarketCooldownEndsAt(),
+                cooldownRevision,
+                now
+        );
+        if (message == null || ChatDispatchQueue.containsQueuedChat(message)) {
+            return;
+        }
+
+        ChatDispatchQueue.enqueueChat(message, 0L);
+        marketState.markQueued(cooldownRevision);
     }
 
     private void ensureSlotCount(int count) {
@@ -99,6 +132,7 @@ public final class AutoMessageScheduler {
         for (SlotState state : slotStates) {
             state.reset();
         }
+        marketState.reset();
     }
 
     private static final class SlotState {

@@ -57,6 +57,8 @@ final class ProtocolState {
     Set<Integer> capturedBossLevels = Set.of();
     DwClanSiegePosition clanSiegePosition = DwClanSiegePosition.UNAVAILABLE;
     Map<String, Set<String>> bossCollectibles = new LinkedHashMap<>();
+    Map<String, Long> externalCooldownEndsAt = new LinkedHashMap<>();
+    Map<String, Long> externalCooldownRevisions = new LinkedHashMap<>();
     DwGameLocation currentGameLocation;
     Set<String> fishingLocationIds = new LinkedHashSet<>();
     Map<String, String> fishingLocationNames = new LinkedHashMap<>();
@@ -85,6 +87,8 @@ final class ProtocolState {
         capturedBossLevels = Set.of();
         clanSiegePosition = DwClanSiegePosition.UNAVAILABLE;
         bossCollectibles = new LinkedHashMap<>();
+        externalCooldownEndsAt = new LinkedHashMap<>();
+        externalCooldownRevisions = new LinkedHashMap<>();
         currentGameLocation = null;
         fishingLocationIds = new LinkedHashSet<>();
         fishingLocationNames = new LinkedHashMap<>();

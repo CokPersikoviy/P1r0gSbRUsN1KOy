@@ -19,6 +19,7 @@ public class RenderConfig {
     public boolean showCurrentServerInTab = true;
     public boolean dungeonDecorationHighlight = true;
     public boolean usefulItemsHighlight = true;
+    public boolean barrelTracer = true;
     public boolean showAlchemyIngredientMarkers = true;
     public boolean unclutterWidgets = true;
 

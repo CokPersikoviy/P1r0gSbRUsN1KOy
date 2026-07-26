@@ -11,14 +11,17 @@ import java.util.function.Supplier;
 public class AutoMessageSlotPreviewComponent extends SettingsComponent {
     private final Supplier<String> messageGetter;
     private final Supplier<Boolean> activeGetter;
+    private final Supplier<Boolean> marketCooldownGetter;
     private final IntSupplier delayGetter;
 
     public AutoMessageSlotPreviewComponent(Supplier<String> messageGetter,
                                            Supplier<Boolean> activeGetter,
+                                           Supplier<Boolean> marketCooldownGetter,
                                            IntSupplier delayGetter) {
         super(0, 0, 0, 0, "");
         this.messageGetter = messageGetter;
         this.activeGetter = activeGetter;
+        this.marketCooldownGetter = marketCooldownGetter;
         this.delayGetter = delayGetter;
     }
 
@@ -33,7 +36,8 @@ public class AutoMessageSlotPreviewComponent extends SettingsComponent {
             message = "Empty message";
         }
 
-        String meta = (activeGetter.get() ? "ON" : "OFF") + " | " + delayGetter.getAsInt() + "s";
+        String timing = marketCooldownGetter.get() ? "MARKET CD" : delayGetter.getAsInt() + "s";
+        String meta = (activeGetter.get() ? "ON" : "OFF") + " | " + timing;
         int metaWidth = mc.font.width(meta);
         int availableWidth = Math.max(16, width - 20 - metaWidth - 12);
         String preview = trimToWidth(mc, message, availableWidth);

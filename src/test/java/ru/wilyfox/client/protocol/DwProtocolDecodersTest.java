@@ -61,6 +61,49 @@ class DwProtocolDecodersTest {
     }
 
     @Test
+    void capturedBossesResolveIdsWithoutCaseOrOuterWhitespace() {
+        DwClanState clan = new DwClanState("Frogs", java.util.List.of("Fox"), java.util.List.of(" mythic_boss "));
+        java.util.Map<String, DwBossType> types = java.util.Map.of(
+                "MYTHIC_BOSS",
+                new DwBossType("MYTHIC_BOSS", "Mythic Boss", "minecraft:diamond", 27, 5_012, 73, true)
+        );
+
+        assertEquals(java.util.Set.of(27), DwClanBossResolver.resolveLevels(clan, types));
+    }
+
+    @Test
+    void bossTypesHandlerKeepsEntriesFromEarlierRegistryPackets() {
+        ProtocolState state = new ProtocolState();
+        state.clanInfo = new DwClanState("Frogs", java.util.List.of("Fox"), java.util.List.of("FIRST_BOSS"));
+
+        ByteArrayOutputStream firstPayload = new ByteArrayOutputStream();
+        writeVarInt(firstPayload, 1);
+        writeString(firstPayload, "FIRST_BOSS");
+        writeString(firstPayload, "First Boss");
+        writeString(firstPayload, "minecraft:stone");
+        writeVarInt(firstPayload, 25);
+        writeVarInt(firstPayload, 1);
+        writeVarInt(firstPayload, 10);
+        writeBoolean(firstPayload, false);
+
+        ByteArrayOutputStream secondPayload = new ByteArrayOutputStream();
+        writeVarInt(secondPayload, 1);
+        writeString(secondPayload, "SECOND_BOSS");
+        writeString(secondPayload, "Second Boss");
+        writeString(secondPayload, "minecraft:diamond");
+        writeVarInt(secondPayload, 530);
+        writeVarInt(secondPayload, 2);
+        writeVarInt(secondPayload, 20);
+        writeBoolean(secondPayload, true);
+
+        ProtocolPayloadHandlers.applyBossTypes(state, DwBossTypesDecoder.decode(firstPayload.toByteArray()));
+        ProtocolPayloadHandlers.applyBossTypes(state, DwBossTypesDecoder.decode(secondPayload.toByteArray()));
+
+        assertEquals(java.util.Set.of("FIRST_BOSS", "SECOND_BOSS"), state.bossTypes.keySet());
+        assertEquals(java.util.Set.of(25), state.capturedBossLevels);
+    }
+
+    @Test
     void petTypesUsesProtocolFieldOrder() {
         ByteArrayOutputStream payload = new ByteArrayOutputStream();
         writeVarInt(payload, 1);
@@ -170,6 +213,19 @@ class DwProtocolDecodersTest {
         writeLong(payload, 128L);
 
         assertEquals(128L, DwCooldownValueDecoder.decode(payload.toByteArray()).remainingMillis());
+    }
+
+    @Test
+    void namedCooldownStoresAbsoluteEndAndIncrementsRevision() {
+        ProtocolState state = new ProtocolState();
+
+        ProtocolPayloadHandlers.applyNamedCooldown(state, "marketcd", 2_500L, 10_000L);
+        assertEquals(12_500L, state.externalCooldownEndsAt.get("marketcd"));
+        assertEquals(1L, state.externalCooldownRevisions.get("marketcd"));
+
+        ProtocolPayloadHandlers.applyNamedCooldown(state, "marketcd", 1_000L, 11_000L);
+        assertEquals(12_000L, state.externalCooldownEndsAt.get("marketcd"));
+        assertEquals(2L, state.externalCooldownRevisions.get("marketcd"));
     }
 
     @Test

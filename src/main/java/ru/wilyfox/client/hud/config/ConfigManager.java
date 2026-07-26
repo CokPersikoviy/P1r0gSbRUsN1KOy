@@ -139,6 +139,7 @@ public class ConfigManager {
         if (sanitized.comboProgress == null) sanitized.comboProgress = new ComboProgressConfig();
         if (sanitized.wandCooldown == null) sanitized.wandCooldown = new WandCooldownConfig();
         if (sanitized.abilityCooldown == null) sanitized.abilityCooldown = new AbilityCooldownConfig();
+        if (sanitized.activeEffects == null) sanitized.activeEffects = new ActiveEffectsConfig();
         if (sanitized.activeRunes == null) sanitized.activeRunes = new ActiveRunesConfig();
         if (sanitized.activePets == null) sanitized.activePets = new ActivePetsConfig();
         if (sanitized.activeMiners == null) sanitized.activeMiners = new ActiveMinersConfig();

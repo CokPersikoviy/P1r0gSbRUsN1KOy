@@ -27,6 +27,7 @@ public class HudConfig {
     public ComboProgressConfig comboProgress = new ComboProgressConfig();
     public WandCooldownConfig wandCooldown = new WandCooldownConfig();
     public AbilityCooldownConfig abilityCooldown = new AbilityCooldownConfig();
+    public ActiveEffectsConfig activeEffects = new ActiveEffectsConfig();
     public ActiveRunesConfig activeRunes = new ActiveRunesConfig();
     public RunesBagConfig runesBag = new RunesBagConfig();
     public ActivePetsConfig activePets = new ActivePetsConfig();

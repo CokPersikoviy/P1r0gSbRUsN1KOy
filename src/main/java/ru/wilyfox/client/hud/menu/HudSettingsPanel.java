@@ -995,6 +995,15 @@ public class HudSettingsPanel {
                 )
         );
 
+        componentsByCategory.get(SettingsCategory.POP_UPS).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Event: Golden crystal found",
+                        () -> ConfigManager.get().popUps.goldenCrystalFoundEvent,
+                        value -> ConfigManager.get().popUps.goldenCrystalFoundEvent = value
+                )
+        );
+
         componentsByCategory.get(SettingsCategory.DISCORD).add(
                 new StatusSettingsComponent(
                         "RPC status",
@@ -1173,6 +1182,14 @@ public class HudSettingsPanel {
                         () -> ConfigManager.get().render.usefulItemsHighlight,
                         value -> ConfigManager.get().render.usefulItemsHighlight = value
                 ).withWarningTooltip("Performance sensitive")
+        );
+        componentsByCategory.get(SettingsCategory.RENDER).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
+                        "Barrel tracer",
+                        () -> ConfigManager.get().render.barrelTracer,
+                        value -> ConfigManager.get().render.barrelTracer = value
+                )
         );
 
         componentsByCategory.get(SettingsCategory.RENDER).add(new BreakLineSettingsComponent("Utility"));
@@ -1494,6 +1511,14 @@ public class HudSettingsPanel {
         componentsByCategory.get(SettingsCategory.WIDGET).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
+                        "Show Active Effects Widget",
+                        () -> ConfigManager.get().activeEffects.active,
+                        value -> ConfigManager.get().activeEffects.active = value
+                )
+        );
+        componentsByCategory.get(SettingsCategory.WIDGET).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
                         "Show Active Runes Widget",
                         () -> ConfigManager.get().activeRunes.active,
                         value -> ConfigManager.get().activeRunes.active = value
@@ -1621,6 +1646,7 @@ public class HudSettingsPanel {
                     new AutoMessageSlotPreviewComponent(
                             () -> getAutoMessageEntry(index).message,
                             () -> getAutoMessageEntry(index).active,
+                            () -> getAutoMessageEntry(index).useMarketCooldown,
                             () -> getAutoMessageEntry(index).delaySeconds
                     ).withIndent(18).withVisibility(() -> !autoMessageSlotExpanded.get(index))
             );
@@ -1645,13 +1671,23 @@ public class HudSettingsPanel {
             );
 
             autoMessageComponents.add(
+                    new ToggleSettingsComponent(
+                            0, 0, 0, 0,
+                            "Trade chat timing",
+                            () -> getAutoMessageEntry(index).useMarketCooldown,
+                            value -> getAutoMessageEntry(index).useMarketCooldown = value
+                    ).withIndent(36).withVisibility(() -> autoMessageSlotExpanded.get(index))
+            );
+
+            autoMessageComponents.add(
                     new StepperSettingsComponent(
                             0, 0, 0, 0,
                             "Delay s",
                             () -> getAutoMessageEntry(index).delaySeconds,
                             value -> getAutoMessageEntry(index).delaySeconds = value,
                             1, 3600, 5
-                    ).withIndent(36).withVisibility(() -> autoMessageSlotExpanded.get(index))
+                    ).withIndent(36).withVisibility(() ->
+                            autoMessageSlotExpanded.get(index) && !getAutoMessageEntry(index).useMarketCooldown)
             );
 
             autoMessageComponents.add(

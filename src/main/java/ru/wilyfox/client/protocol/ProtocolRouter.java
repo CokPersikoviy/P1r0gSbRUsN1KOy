@@ -52,7 +52,7 @@ final class ProtocolRouter {
             case "bosscollect" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleBossCollect(state, body), state);
             case "levelinfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleLevelInfo(state, body), state);
             case "harpooncd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleHarpoonCooldown(state, body), state);
-            case "marketcd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleNamedCooldown("marketcd", "Market", body), state);
+            case "marketcd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleNamedCooldown(state, "marketcd", "Market", body), state);
             case "gourmetcd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleGourmetCooldown(state, body), state);
             case "potioncd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handlePotionCooldowns(state, body), state);
             case "token" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleToken(body), state);

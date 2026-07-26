@@ -59,8 +59,14 @@ public final class FishingNibblesWidget extends AbstractWidget {
             y += mc.font.lineHeight + LINE_GAP + 1;
         }
 
+        int panelWidth = getUnscaledWidth(lines, mc);
         for (String line : lines) {
-            context.drawString(mc.font, line, PADDING_X, y, WidgetTheme.TEXT_SOFT);
+            if (isDimensionHeader(line)) {
+                int centeredX = Math.max(PADDING_X, (panelWidth - mc.font.width(line)) / 2);
+                context.drawString(mc.font, line, centeredX, y, WidgetTheme.TEXT_MUTED);
+            } else {
+                context.drawString(mc.font, line, PADDING_X, y, WidgetTheme.TEXT_SOFT);
+            }
             y += mc.font.lineHeight + LINE_GAP;
         }
 
@@ -99,6 +105,19 @@ public final class FishingNibblesWidget extends AbstractWidget {
                 return List.of();
             }
 
+            if (ConfigManager.get().fishing.nibblesSort == FishingNibblesSort.DIMENSION) {
+                return List.of(
+                        "- Overworld -",
+                        "City Canal - 100.0%",
+                        "- Nether -",
+                        "Amber Grot - 150.0%",
+                        "Nether Valley - 150.0%",
+                        "- End -",
+                        "Silence - 150.0%",
+                        "Crystal Gorge - 100.0%"
+                );
+            }
+
             return List.of(
                     "Amber Grot - 150.0%",
                     "Nether Valley - 150.0%",
@@ -113,13 +132,20 @@ public final class FishingNibblesWidget extends AbstractWidget {
         Map<String, String> locationNames = DiamondWorldProtocolClient.getFishingLocationNames();
         Comparator<Map.Entry<String, Double>> comparator = ConfigManager.get().fishing.nibblesSort == FishingNibblesSort.NIBBLE
                 ? Comparator.<Map.Entry<String, Double>>comparingDouble(Map.Entry::getValue).reversed()
-                : Comparator.<Map.Entry<String, Double>>comparingInt(entry -> dimensionOrder(entry.getKey()))
-                        .thenComparing(Map.Entry.<String, Double>comparingByValue().reversed());
+                : dimensionComparator();
 
+        int previousDimension = Integer.MIN_VALUE;
         for (Map.Entry<String, Double> entry : nibbles.entrySet().stream()
                 .filter(entry -> locationNames.containsKey(entry.getKey()))
                 .sorted(comparator.thenComparing(entry -> locationNames.get(entry.getKey()), String.CASE_INSENSITIVE_ORDER))
                 .toList()) {
+            if (ConfigManager.get().fishing.nibblesSort == FishingNibblesSort.DIMENSION) {
+                int dimension = dimensionOrder(entry.getKey());
+                if (dimension != previousDimension) {
+                    lines.add("- " + dimensionName(dimension) + " -");
+                    previousDimension = dimension;
+                }
+            }
             String name = locationNames.get(entry.getKey());
             lines.add(name + " - " + String.format(Locale.ROOT, "%.1f%%", entry.getValue()));
         }
@@ -135,13 +161,31 @@ public final class FishingNibblesWidget extends AbstractWidget {
         };
     }
 
+    static Comparator<Map.Entry<String, Double>> dimensionComparator() {
+        return Comparator.<Map.Entry<String, Double>>comparingInt(entry -> dimensionOrder(entry.getKey()))
+                .thenComparing(Map.Entry.<String, Double>comparingByValue().reversed());
+    }
+
     private static int dimensionOrder(String id) {
         return switch (id) {
-            case "overworld" -> 0;
-            case "nether" -> 1;
-            case "end" -> 2;
+            case "bay", "azurepond", "citycanal", "swamp" -> 0;
+            case "ambergrot", "basalt", "netherval", "magma" -> 1;
+            case "endwharf", "silence", "crystal" -> 2;
             default -> Integer.MAX_VALUE;
         };
+    }
+
+    private static String dimensionName(int dimension) {
+        return switch (dimension) {
+            case 0 -> "Overworld";
+            case 1 -> "Nether";
+            case 2 -> "End";
+            default -> "Other";
+        };
+    }
+
+    private static boolean isDimensionHeader(String line) {
+        return line.startsWith("- ") && line.endsWith(" -");
     }
 
     private int getUnscaledWidth(List<String> lines, Minecraft mc) {
