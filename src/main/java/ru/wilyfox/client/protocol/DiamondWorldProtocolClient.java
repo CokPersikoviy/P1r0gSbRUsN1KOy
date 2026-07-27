@@ -105,6 +105,10 @@ public final class DiamondWorldProtocolClient {
         return STATE.currentServerInfo != null ? STATE.currentServerInfo : CurrentServerInfo.unknown();
     }
 
+    public static long getWorldContextRevision() {
+        return STATE.worldContextRevision;
+    }
+
     public static DwGameEvent getCurrentGameEvent() {
         return STATE.currentGameEvent != null ? STATE.currentGameEvent : DwGameEvent.NONE;
     }

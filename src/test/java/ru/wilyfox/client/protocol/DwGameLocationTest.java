@@ -52,24 +52,28 @@ class DwGameLocationTest {
     void statisticLocationRequiresGameLocationAndKeepsLastGoodValue() {
         ProtocolState state = new ProtocolState();
         state.currentGameLocation = new DwGameLocation("alchemy");
+        long initialRevision = state.worldContextRevision;
 
         ProtocolPayloadHandlers.updateGameLocation(
                 state,
                 new DwStatisticInfoPacket(Map.of("location", "\"bay\""))
         );
         assertEquals("alchemy", state.currentGameLocation.id());
+        assertEquals(initialRevision, state.worldContextRevision);
 
         ProtocolPayloadHandlers.updateGameLocation(
                 state,
                 new DwStatisticInfoPacket(Map.of("gameLocation", "\"bay\""))
         );
         assertEquals("bay", state.currentGameLocation.id());
+        assertEquals(initialRevision + 1L, state.worldContextRevision);
 
         ProtocolPayloadHandlers.updateGameLocation(
                 state,
                 new DwStatisticInfoPacket(Map.of("gameLocation", "{\"id\":\"swamp\"}"))
         );
         assertEquals("bay", state.currentGameLocation.id());
+        assertEquals(initialRevision + 1L, state.worldContextRevision);
     }
 
     @Test

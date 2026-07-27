@@ -109,8 +109,8 @@ public final class FishingNibblesWidget extends AbstractWidget {
                 return List.of(
                         "- Overworld -",
                         "City Canal - 100.0%",
-                        "- Nether -",
                         "Amber Grot - 150.0%",
+                        "- Nether -",
                         "Nether Valley - 150.0%",
                         "- End -",
                         "Silence - 150.0%",
@@ -168,8 +168,8 @@ public final class FishingNibblesWidget extends AbstractWidget {
 
     private static int dimensionOrder(String id) {
         return switch (id) {
-            case "bay", "azurepond", "citycanal", "swamp" -> 0;
-            case "ambergrot", "basalt", "netherval", "magma" -> 1;
+            case "bay", "azurepond", "citycanal", "swamp", "ambergrot" -> 0;
+            case "basalt", "netherval", "magma" -> 1;
             case "endwharf", "silence", "crystal" -> 2;
             default -> Integer.MAX_VALUE;
         };

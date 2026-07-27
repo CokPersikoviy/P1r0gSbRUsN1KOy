@@ -28,6 +28,7 @@ final class ProtocolState {
     long lastHandshakeAt;
     long lastPayloadAt;
     long lastAbilityTimersAt;
+    long worldContextRevision;
 
     Map<String, DwBossType> bossTypes = new LinkedHashMap<>();
     Map<String, DwPetType> petTypes = new LinkedHashMap<>();
@@ -67,6 +68,7 @@ final class ProtocolState {
     Map<Integer, DwHourlyQuestProgress> hourlyQuestProgress = new LinkedHashMap<>();
 
     void resetRuntimeState() {
+        worldContextRevision++;
         receivedEvoPlusPayload = false;
         lastHandshakeAt = 0L;
         lastPayloadAt = 0L;

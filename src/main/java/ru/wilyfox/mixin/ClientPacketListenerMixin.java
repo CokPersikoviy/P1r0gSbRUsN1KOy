@@ -3,6 +3,9 @@ package ru.wilyfox.mixin;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundMapItemDataPacket;
+import net.minecraft.network.protocol.game.ClientboundLoginPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
 import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -33,5 +36,20 @@ public class ClientPacketListenerMixin {
     @Inject(method = "handleMapItemData", at = @At("TAIL"))
     private void froghelper$trackDungeonMapId(ClientboundMapItemDataPacket packet, CallbackInfo ci) {
         DungeonMapTracker.getInstance().updateMapId(packet.mapId());
+    }
+
+    @Inject(method = "handleLogin", at = @At("HEAD"))
+    private void froghelper$resetUsefulHighlightOnLogin(ClientboundLoginPacket packet, CallbackInfo ci) {
+        UsefulWorldHighlightRenderHook.onPlayerTeleport();
+    }
+
+    @Inject(method = "handleRespawn", at = @At("HEAD"))
+    private void froghelper$resetUsefulHighlightOnRespawn(ClientboundRespawnPacket packet, CallbackInfo ci) {
+        UsefulWorldHighlightRenderHook.onPlayerTeleport();
+    }
+
+    @Inject(method = "handleMovePlayer", at = @At("HEAD"))
+    private void froghelper$resetUsefulHighlightOnTeleport(ClientboundPlayerPositionPacket packet, CallbackInfo ci) {
+        UsefulWorldHighlightRenderHook.onPlayerTeleport();
     }
 }

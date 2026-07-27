@@ -23,7 +23,7 @@ class FishingNibblesWidgetTest {
         entries.sort(FishingNibblesWidget.dimensionComparator());
 
         assertEquals(
-                List.of("swamp", "bay", "magma", "ambergrot", "endwharf", "crystal"),
+                List.of("swamp", "ambergrot", "bay", "magma", "endwharf", "crystal"),
                 entries.stream().map(Map.Entry::getKey).toList()
         );
     }

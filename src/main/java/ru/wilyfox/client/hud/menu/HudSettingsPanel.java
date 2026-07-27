@@ -1183,14 +1183,6 @@ public class HudSettingsPanel {
                         value -> ConfigManager.get().render.usefulItemsHighlight = value
                 ).withWarningTooltip("Performance sensitive")
         );
-        componentsByCategory.get(SettingsCategory.RENDER).add(
-                new ToggleSettingsComponent(
-                        0, 0, 0, 0,
-                        "Barrel tracer",
-                        () -> ConfigManager.get().render.barrelTracer,
-                        value -> ConfigManager.get().render.barrelTracer = value
-                )
-        );
 
         componentsByCategory.get(SettingsCategory.RENDER).add(new BreakLineSettingsComponent("Utility"));
         componentsByCategory.get(SettingsCategory.RENDER).add(

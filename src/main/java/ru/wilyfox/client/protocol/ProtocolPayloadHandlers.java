@@ -149,6 +149,7 @@ final class ProtocolPayloadHandlers {
         try {
             CurrentServerInfo serverInfo = DwServerInfoDecoder.decode(data);
             state.currentServerInfo = serverInfo;
+            state.worldContextRevision++;
             info(
                     LOGGER,
                     "DW protocol: serverinfo parsed successfully, family={}, server={}, mirror={}, display={}",
@@ -391,6 +392,7 @@ final class ProtocolPayloadHandlers {
         DwGameLocation location = ProtocolPayloadSupport.parseGameLocation(value);
         if (location != null) {
             state.currentGameLocation = location;
+            state.worldContextRevision++;
         }
     }
 

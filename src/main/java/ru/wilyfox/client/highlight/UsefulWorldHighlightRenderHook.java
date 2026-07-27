@@ -34,9 +34,7 @@ import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Vector3f;
 import ru.wilyfox.client.hud.config.ConfigManager;
-import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.client.popup.PopUpManager;
 import ru.wilyfox.client.popup.PopUpRequest;
 import ru.wilyfox.client.popup.PopUpSeverity;
@@ -54,6 +52,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 public final class UsefulWorldHighlightRenderHook {
@@ -69,6 +68,7 @@ public final class UsefulWorldHighlightRenderHook {
     private static final int MAX_CHUNK_SCAN_BUDGET_PER_FRAME = 3;
     private static final long TARGET_CHUNK_SCAN_BUDGET_NANOS = 4_000_000L;
     private static final long DIRTY_CHUNK_MARK_COOLDOWN_MS = 500L;
+    private static final long WORLD_CONTEXT_WAIT_TIMEOUT_MS = 3_000L;
     private static final int HORIZONTAL_SCAN_RADIUS = 32;
     private static final int VERTICAL_SCAN_RADIUS = 20;
     private static final float LINE_ALPHA = 1.0F;
@@ -78,7 +78,6 @@ public final class UsefulWorldHighlightRenderHook {
     private static final double GOLDEN_CRYSTAL_BOX_WIDTH = 0.58D;
     private static final double GOLDEN_CRYSTAL_BOX_HEIGHT = 0.46D;
     private static final double GOLDEN_CRYSTAL_BOX_Y_OFFSET = 0.28D;
-    private static final double BARREL_TRACER_CAMERA_OFFSET = 0.5D;
     private static final RenderType USEFUL_HIGHLIGHT_NO_DEPTH = RenderType.create(
             "froghelper_useful_highlight_no_depth",
             DefaultVertexFormat.POSITION_COLOR_NORMAL,
@@ -100,7 +99,6 @@ public final class UsefulWorldHighlightRenderHook {
     private static final List<ColoredBox> CACHED_BOXES = new ArrayList<>();
     private static final List<ColoredBox> BLOCK_BOXES = new ArrayList<>();
     private static final List<ColoredBox> ENTITY_BOXES = new ArrayList<>();
-    private static final List<BlockPos> CACHED_BARRELS = new ArrayList<>();
     private static final GoldenCrystalDiscoveryTracker GOLDEN_CRYSTAL_TRACKER =
             new GoldenCrystalDiscoveryTracker(GOLDEN_CRYSTAL_DISCOVERY_RETENTION_TICKS);
     private static final Map<Long, ChunkScanResult> BLOCK_CHUNK_CACHE = new HashMap<>();
@@ -115,12 +113,24 @@ public final class UsefulWorldHighlightRenderHook {
     private static int lastMaxChunkX = Integer.MIN_VALUE;
     private static int lastMinChunkZ = Integer.MIN_VALUE;
     private static int lastMaxChunkZ = Integer.MIN_VALUE;
+    private static boolean waitingForWorldContext;
+    private static long worldContextWaitStartedAt;
+    private static long worldContextRevisionAtTransition;
+    private static String lastWorldContextKey;
 
     private UsefulWorldHighlightRenderHook() {
     }
 
     public static void register() {
         WorldRenderEvents.AFTER_ENTITIES.register(UsefulWorldHighlightRenderHook::onAfterEntities);
+    }
+
+    public static void onPlayerTeleport() {
+        waitingForWorldContext = true;
+        worldContextWaitStartedAt = 0L;
+        worldContextRevisionAtTransition = DiamondWorldProtocolClient.getWorldContextRevision();
+        clearCache();
+        count("worldContext/transition");
     }
 
     public static void markBlockDirty(BlockPos blockPos) {
@@ -133,6 +143,11 @@ public final class UsefulWorldHighlightRenderHook {
             Minecraft mc = Minecraft.getInstance();
             if (mc.level == null || mc.player == null) {
                 count("dirtyMark/skippedNoWorld");
+                return;
+            }
+
+            if (waitingForWorldContext) {
+                count("dirtyMark/skippedWorldTransition");
                 return;
             }
 
@@ -173,9 +188,13 @@ public final class UsefulWorldHighlightRenderHook {
                 return;
             }
 
+            if (shouldWaitForWorldContext()) {
+                count("frame/skippedWorldTransition");
+                return;
+            }
+
             refreshCacheIfNeeded(mc);
-            boolean renderBarrelTracer = ConfigManager.get().render.barrelTracer && !CACHED_BARRELS.isEmpty();
-            if (CACHED_BOXES.isEmpty() && !renderBarrelTracer) {
+            if (CACHED_BOXES.isEmpty()) {
                 count("frame/skippedEmptyBoxes");
                 return;
             }
@@ -198,56 +217,7 @@ public final class UsefulWorldHighlightRenderHook {
                     );
                 }
             }
-
-            if (renderBarrelTracer) {
-                try (ModProfiler.Scope tracerScope = profile("drawBarrelTracer")) {
-                    renderBarrelTracer(poseStack, lineConsumer, cameraPos, mc.gameRenderer.getMainCamera().getLookVector());
-                }
-            }
         }
-    }
-
-    private static void renderBarrelTracer(
-            PoseStack poseStack,
-            VertexConsumer lineConsumer,
-            Vec3 cameraPos,
-            Vector3f lookVector
-    ) {
-        BlockPos targetBlock = findNearestBarrel(CACHED_BARRELS, cameraPos);
-        if (targetBlock == null) {
-            count("drawBarrelTracer/skippedNoTarget");
-            return;
-        }
-
-        Vec3 start = cameraPos.add(
-                lookVector.x() * BARREL_TRACER_CAMERA_OFFSET,
-                lookVector.y() * BARREL_TRACER_CAMERA_OFFSET,
-                lookVector.z() * BARREL_TRACER_CAMERA_OFFSET
-        );
-        Vec3 target = Vec3.atCenterOf(targetBlock);
-        Vec3 relativeStart = start.subtract(cameraPos);
-        Vec3 direction = target.subtract(start);
-        ShapeRenderer.renderVector(
-                poseStack,
-                lineConsumer,
-                new Vector3f((float) relativeStart.x, (float) relativeStart.y, (float) relativeStart.z),
-                direction,
-                WidgetTheme.ACCENT_LINE
-        );
-        count("drawBarrelTracer/rendered");
-    }
-
-    static BlockPos findNearestBarrel(Collection<BlockPos> barrels, Vec3 origin) {
-        BlockPos nearest = null;
-        double nearestDistance = Double.POSITIVE_INFINITY;
-        for (BlockPos barrel : barrels) {
-            double distance = origin.distanceToSqr(Vec3.atCenterOf(barrel));
-            if (distance < nearestDistance) {
-                nearest = barrel;
-                nearestDistance = distance;
-            }
-        }
-        return nearest;
     }
 
     private static void refreshCacheIfNeeded(Minecraft mc) {
@@ -266,12 +236,55 @@ public final class UsefulWorldHighlightRenderHook {
         }
     }
 
+    private static boolean shouldWaitForWorldContext() {
+        long revision = DiamondWorldProtocolClient.getWorldContextRevision();
+        String contextKey = currentWorldContextKey();
+        boolean contextChanged = lastWorldContextKey != null && !Objects.equals(lastWorldContextKey, contextKey);
+        lastWorldContextKey = contextKey;
+
+        if (contextChanged) {
+            waitingForWorldContext = false;
+            clearCache();
+            count("worldContext/contextChanged");
+            return false;
+        }
+
+        if (!waitingForWorldContext) {
+            return false;
+        }
+
+        long now = System.currentTimeMillis();
+        if (worldContextWaitStartedAt == 0L) {
+            worldContextWaitStartedAt = now;
+        }
+
+        if (revision != worldContextRevisionAtTransition) {
+            waitingForWorldContext = false;
+            clearCache();
+            count("worldContext/packetReceived");
+            return false;
+        }
+
+        if (now - worldContextWaitStartedAt >= WORLD_CONTEXT_WAIT_TIMEOUT_MS) {
+            waitingForWorldContext = false;
+            clearCache();
+            count("worldContext/timeout");
+            return false;
+        }
+
+        return true;
+    }
+
+    private static String currentWorldContextKey() {
+        CurrentServerInfo serverInfo = DiamondWorldProtocolClient.getCurrentServerInfo();
+        return serverInfo + "\u0000" + DiamondWorldProtocolClient.getCurrentGameLocation();
+    }
+
     private static void refreshBlockCacheIfNeeded(Minecraft mc) {
         try (ModProfiler.Scope ignored = profile("refreshBlockCache")) {
             if (!isMineHighlightLocation()) {
                 count("refreshBlockCache/skippedNotMine");
                 BLOCK_BOXES.clear();
-                CACHED_BARRELS.clear();
                 BLOCK_CHUNK_CACHE.clear();
                 DIRTY_CHUNK_MARK_TIMES.clear();
                 DIRTY_CHUNK_KEYS.clear();
@@ -513,18 +526,13 @@ public final class UsefulWorldHighlightRenderHook {
     private static void rebuildBlockBoxes() {
         try (ModProfiler.Scope ignored = profile("rebuildBlockBoxes")) {
             BLOCK_BOXES.clear();
-            CACHED_BARRELS.clear();
             int cacheEntries = 0;
             for (ChunkScanResult result : BLOCK_CHUNK_CACHE.values()) {
                 cacheEntries++;
                 BLOCK_BOXES.addAll(result.boxesByBlockPos.values());
-                for (long barrelPosition : result.barrelsByBlockPos.keySet()) {
-                    CACHED_BARRELS.add(BlockPos.of(barrelPosition));
-                }
             }
             count("rebuildBlockBoxes/cacheEntries", cacheEntries);
             count("rebuildBlockBoxes/outputBoxes", BLOCK_BOXES.size());
-            count("rebuildBlockBoxes/barrels", CACHED_BARRELS.size());
         }
     }
 
@@ -628,7 +636,6 @@ public final class UsefulWorldHighlightRenderHook {
         CACHED_BOXES.clear();
         BLOCK_BOXES.clear();
         ENTITY_BOXES.clear();
-        CACHED_BARRELS.clear();
         GOLDEN_CRYSTAL_TRACKER.clear();
         BLOCK_CHUNK_CACHE.clear();
         DIRTY_CHUNK_MARK_TIMES.clear();
