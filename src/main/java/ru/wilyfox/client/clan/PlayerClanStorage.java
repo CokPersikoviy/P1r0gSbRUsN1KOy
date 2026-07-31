@@ -29,6 +29,11 @@ public final class PlayerClanStorage {
         ensureLoaded();
     }
 
+    public static synchronized int diagnosticEntryCount() {
+        ensureLoaded();
+        return ENTRIES.size();
+    }
+
     public static synchronized void captureFromChat(Component component) {
         ParsedClanChatEntry parsed = PlayerClanChatParser.parse(component);
         if (parsed == null) {

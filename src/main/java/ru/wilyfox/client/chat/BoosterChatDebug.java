@@ -69,4 +69,8 @@ public final class BoosterChatDebug {
                 || text.contains("х4")
                 || text.contains("х5");
     }
+
+    public static synchronized int diagnosticMessageCount() {
+        return LOGGED_MESSAGES.size();
+    }
 }

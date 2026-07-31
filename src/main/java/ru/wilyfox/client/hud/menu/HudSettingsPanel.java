@@ -462,6 +462,10 @@ public class HudSettingsPanel {
         );
 
         componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
+                new BossBlacklistSettingsComponent()
+        );
+
+        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
                         "Show collectibles",

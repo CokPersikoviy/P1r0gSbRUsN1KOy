@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.WidgetChrome;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.popup.PopUpManager;
 import ru.wilyfox.client.popup.PopUpNotification;
@@ -122,9 +123,12 @@ public final class PopUpsWidget extends AbstractWidget {
         int titleColor = withScaledAlpha(getTitleColor(notification.severity()), alpha);
         int accentColor = withScaledAlpha(getAccentColor(notification.severity()), alpha);
 
-        // New-style surface: rounded panel + a single inset severity accent line (fades with the pop-up).
-        HudSurface.fillRounded(context, x, y, width, height, 4, panelColor);
-        context.fill(x + 4, y, x + width - 4, y + 1, accentColor);
+        if (HudSurface.chrome() != WidgetChrome.BARE) {
+            // New-style surface: rounded panel + a single inset severity accent line (fades with the pop-up).
+            HudSurface.fillRounded(context, x, y, width, height, 4, panelColor);
+            int accentInset = HudSurface.nativeRenderer() ? 0 : 4;
+            context.fill(x + accentInset, y, x + width - accentInset, y + 1, accentColor);
+        }
 
         int textX = x + PADDING_X;
         int titleY = y + PADDING_Y;
@@ -237,4 +241,3 @@ public final class PopUpsWidget extends AbstractWidget {
         return Math.max(0.0f, Math.min(1.0f, value));
     }
 }
-

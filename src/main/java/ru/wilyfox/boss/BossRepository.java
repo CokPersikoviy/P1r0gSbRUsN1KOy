@@ -38,20 +38,20 @@ public class BossRepository {
     public void upsert(String bossName, long respawnAtMillis) {
         int fallbackLevel = Objects.requireNonNullElse(BossLevel.getBossLevel(bossName), 0);
         int level = protocolLevelsByName.getOrDefault(nameKey(bossName), fallbackLevel);
-        upsert(worldBosses, bossName, bossName, respawnAtMillis, level);
+        upsert(worldBosses, bossName, null, bossName, respawnAtMillis, level);
     }
 
     public void upsertProtocol(String bossId, String bossName, long respawnAtMillis, int level) {
         rememberProtocolLevel(bossName, level);
-        upsert(protocolBosses, bossId, bossName, respawnAtMillis, level);
+        upsert(protocolBosses, bossId, bossId, bossName, respawnAtMillis, level);
     }
 
     public void updateProtocolMetadata(String bossId, String bossName, int level) {
         rememberProtocolLevel(bossName, level);
         protocolBosses.computeIfPresent(bossId, (ignored, boss) ->
-                new BossInfo(bossName, boss.getRespawnAt(), level));
+                new BossInfo(bossId, bossName, boss.getRespawnAt(), level));
         worldBosses.replaceAll((ignored, boss) -> sameName(boss.getName(), bossName)
-                ? new BossInfo(bossName, boss.getRespawnAt(), level)
+                ? new BossInfo(boss.getId(), bossName, boss.getRespawnAt(), level)
                 : boss);
     }
 
@@ -204,10 +204,20 @@ public class BossRepository {
         return null;
     }
 
-    private void upsert(Map<String, BossInfo> storage, String key, String bossName, long respawnAtMillis, int level) {
+    private void upsert(
+            Map<String, BossInfo> storage,
+            String key,
+            String bossId,
+            String bossName,
+            long respawnAtMillis,
+            int level
+    ) {
         storage.compute(key, (ignored, oldBoss) -> {
-            if (oldBoss == null || oldBoss.getLevel() != level || !Objects.equals(oldBoss.getName(), bossName)) {
-                return new BossInfo(bossName, respawnAtMillis, level);
+            if (oldBoss == null
+                    || oldBoss.getLevel() != level
+                    || !Objects.equals(oldBoss.getId(), bossId)
+                    || !Objects.equals(oldBoss.getName(), bossName)) {
+                return new BossInfo(bossId, bossName, respawnAtMillis, level);
             }
 
             oldBoss.setRespawnAt(respawnAtMillis);

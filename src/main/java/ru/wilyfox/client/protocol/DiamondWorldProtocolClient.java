@@ -109,6 +109,10 @@ public final class DiamondWorldProtocolClient {
         return STATE.worldContextRevision;
     }
 
+    public static long getGameLocationRevision() {
+        return STATE.gameLocationRevision;
+    }
+
     public static DwGameEvent getCurrentGameEvent() {
         return STATE.currentGameEvent != null ? STATE.currentGameEvent : DwGameEvent.NONE;
     }
@@ -406,13 +410,18 @@ public final class DiamondWorldProtocolClient {
      */
     public static int getHighestKnownBossLevel() {
         int highest = 0;
-        for (DwBossType type : STATE.bossTypes.values()) {
+        for (DwBossType type : BossTypeCatalog.snapshot()) {
             if (type.level() > highest) {
                 highest = type.level();
             }
         }
 
         return highest;
+    }
+
+    /** Retained boss registry used by settings; starts with built-ins and expands from bosstypes. */
+    public static List<DwBossType> getKnownBossTypes() {
+        return BossTypeCatalog.snapshot();
     }
 
     public static BossIconInfo getBossIconByLevel(int level) {

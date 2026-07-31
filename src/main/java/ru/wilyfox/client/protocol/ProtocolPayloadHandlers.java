@@ -113,6 +113,7 @@ final class ProtocolPayloadHandlers {
         // BossTypes is a registry update. The server may send it in parts, and EvoPlus keeps
         // previous entries with putAll rather than treating every packet as a full snapshot.
         state.bossTypes.putAll(packet.types());
+        BossTypeCatalog.update(packet.types());
         state.capturedBossLevels = DwClanBossResolver.resolveLevels(state.clanInfo, state.bossTypes);
         if (state.bossRepository != null) {
             packet.types().forEach((id, type) ->
@@ -393,6 +394,7 @@ final class ProtocolPayloadHandlers {
         if (location != null) {
             state.currentGameLocation = location;
             state.worldContextRevision++;
+            state.gameLocationRevision++;
         }
     }
 
@@ -994,7 +996,8 @@ final class ProtocolPayloadHandlers {
                 level = type.level();
             }
 
-            snapshot.put(bossId, new BossInfo(bossName, now + entry.getValue(), level));
+            BossTypeCatalog.observe(bossId, bossName, level);
+            snapshot.put(bossId, new BossInfo(bossId, bossName, now + entry.getValue(), level));
         }
 
         state.bossRepository.replaceProtocol(snapshot);

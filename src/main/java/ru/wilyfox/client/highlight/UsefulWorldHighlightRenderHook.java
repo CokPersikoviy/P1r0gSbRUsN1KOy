@@ -68,7 +68,6 @@ public final class UsefulWorldHighlightRenderHook {
     private static final int MAX_CHUNK_SCAN_BUDGET_PER_FRAME = 3;
     private static final long TARGET_CHUNK_SCAN_BUDGET_NANOS = 4_000_000L;
     private static final long DIRTY_CHUNK_MARK_COOLDOWN_MS = 500L;
-    private static final long WORLD_CONTEXT_WAIT_TIMEOUT_MS = 3_000L;
     private static final int HORIZONTAL_SCAN_RADIUS = 32;
     private static final int VERTICAL_SCAN_RADIUS = 20;
     private static final float LINE_ALPHA = 1.0F;
@@ -114,8 +113,7 @@ public final class UsefulWorldHighlightRenderHook {
     private static int lastMinChunkZ = Integer.MIN_VALUE;
     private static int lastMaxChunkZ = Integer.MIN_VALUE;
     private static boolean waitingForWorldContext;
-    private static long worldContextWaitStartedAt;
-    private static long worldContextRevisionAtTransition;
+    private static long gameLocationRevisionAtTransition;
     private static String lastWorldContextKey;
 
     private UsefulWorldHighlightRenderHook() {
@@ -127,8 +125,7 @@ public final class UsefulWorldHighlightRenderHook {
 
     public static void onPlayerTeleport() {
         waitingForWorldContext = true;
-        worldContextWaitStartedAt = 0L;
-        worldContextRevisionAtTransition = DiamondWorldProtocolClient.getWorldContextRevision();
+        gameLocationRevisionAtTransition = DiamondWorldProtocolClient.getGameLocationRevision();
         clearCache();
         count("worldContext/transition");
     }
@@ -171,6 +168,19 @@ public final class UsefulWorldHighlightRenderHook {
 
             DIRTY_CHUNK_MARK_TIMES.put(chunkKey, now);
         }
+    }
+
+    public static DiagnosticSnapshot diagnosticSnapshot() {
+        int dirtyBlockPositions = DIRTY_BLOCK_POSITIONS.values().stream().mapToInt(Set::size).sum();
+        return new DiagnosticSnapshot(
+                CACHED_BOXES.size(),
+                BLOCK_BOXES.size(),
+                ENTITY_BOXES.size(),
+                BLOCK_CHUNK_CACHE.size(),
+                DIRTY_CHUNK_KEYS.size(),
+                dirtyBlockPositions,
+                PENDING_BLOCK_SCAN_KEYS.size()
+        );
     }
 
     private static void onAfterEntities(WorldRenderContext context) {
@@ -237,38 +247,24 @@ public final class UsefulWorldHighlightRenderHook {
     }
 
     private static boolean shouldWaitForWorldContext() {
-        long revision = DiamondWorldProtocolClient.getWorldContextRevision();
+        long locationRevision = DiamondWorldProtocolClient.getGameLocationRevision();
         String contextKey = currentWorldContextKey();
         boolean contextChanged = lastWorldContextKey != null && !Objects.equals(lastWorldContextKey, contextKey);
         lastWorldContextKey = contextKey;
 
         if (contextChanged) {
-            waitingForWorldContext = false;
             clearCache();
             count("worldContext/contextChanged");
-            return false;
         }
 
         if (!waitingForWorldContext) {
             return false;
         }
 
-        long now = System.currentTimeMillis();
-        if (worldContextWaitStartedAt == 0L) {
-            worldContextWaitStartedAt = now;
-        }
-
-        if (revision != worldContextRevisionAtTransition) {
+        if (locationRevision != gameLocationRevisionAtTransition) {
             waitingForWorldContext = false;
             clearCache();
-            count("worldContext/packetReceived");
-            return false;
-        }
-
-        if (now - worldContextWaitStartedAt >= WORLD_CONTEXT_WAIT_TIMEOUT_MS) {
-            waitingForWorldContext = false;
-            clearCache();
-            count("worldContext/timeout");
+            count("worldContext/locationPacketReceived");
             return false;
         }
 
@@ -660,6 +656,17 @@ public final class UsefulWorldHighlightRenderHook {
     private record ColoredBox(AABB box, float red, float green, float blue) {
     }
 
+    public record DiagnosticSnapshot(
+            int cachedBoxes,
+            int blockBoxes,
+            int entityBoxes,
+            int cachedChunks,
+            int dirtyChunks,
+            int dirtyBlockPositions,
+            int pendingChunkScans
+    ) {
+    }
+
     private record ChunkScanResult(
             Map<Long, ColoredBox> boxesByBlockPos,
             Map<Long, HighlightBlockType> barrelsByBlockPos
@@ -879,7 +886,8 @@ public final class UsefulWorldHighlightRenderHook {
 
             NoteBlockInstrument instrument = blockState.getValue(NoteBlock.INSTRUMENT);
             int note = blockState.getValue(NoteBlock.NOTE);
-            if (instrument != NoteBlockInstrument.FLUTE) {
+            boolean powered = blockState.getValue(NoteBlock.POWERED);
+            if (instrument != NoteBlockInstrument.FLUTE || powered) {
                 return null;
             }
 

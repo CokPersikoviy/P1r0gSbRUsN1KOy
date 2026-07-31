@@ -32,6 +32,14 @@ public final class HudSurface {
         return ConfigManager.get().render.nativeRenderer;
     }
 
+    static boolean shouldUseSmoothGeometry(WidgetChrome chrome, boolean useNative) {
+        return chrome != WidgetChrome.BARE && !useNative;
+    }
+
+    static boolean shouldUseBlur(WidgetChrome chrome, boolean useNative) {
+        return chrome == WidgetChrome.FROST && !useNative;
+    }
+
     /** Draw a widget background at (0,0,w,h) in the current (translated + scaled) pose. */
     public static void drawPanel(GuiGraphics context, int width, int height) {
         drawPanel(context, 0, 0, width, height, chrome(), nativeRenderer());
@@ -121,6 +129,11 @@ public final class HudSurface {
      * smooth — a GUI pixel is huge at high GUI scale, so 5 of them can never be smooth. No sprite, no shader.
      */
     public static void fillRounded(GuiGraphics context, int x, int y, int w, int h, int r, int color) {
+        if (!shouldUseSmoothGeometry(chrome(), nativeRenderer())) {
+            context.fill(x, y, x + w, y + h, color);
+            return;
+        }
+
         r = Math.max(0, Math.min(r, Math.min(w, h) / 2));
         if (r == 0) {
             context.fill(x, y, x + w, y + h, color);

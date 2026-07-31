@@ -53,6 +53,7 @@ class DwGameLocationTest {
         ProtocolState state = new ProtocolState();
         state.currentGameLocation = new DwGameLocation("alchemy");
         long initialRevision = state.worldContextRevision;
+        long initialLocationRevision = state.gameLocationRevision;
 
         ProtocolPayloadHandlers.updateGameLocation(
                 state,
@@ -60,6 +61,7 @@ class DwGameLocationTest {
         );
         assertEquals("alchemy", state.currentGameLocation.id());
         assertEquals(initialRevision, state.worldContextRevision);
+        assertEquals(initialLocationRevision, state.gameLocationRevision);
 
         ProtocolPayloadHandlers.updateGameLocation(
                 state,
@@ -67,6 +69,7 @@ class DwGameLocationTest {
         );
         assertEquals("bay", state.currentGameLocation.id());
         assertEquals(initialRevision + 1L, state.worldContextRevision);
+        assertEquals(initialLocationRevision + 1L, state.gameLocationRevision);
 
         ProtocolPayloadHandlers.updateGameLocation(
                 state,
@@ -74,6 +77,7 @@ class DwGameLocationTest {
         );
         assertEquals("bay", state.currentGameLocation.id());
         assertEquals(initialRevision + 1L, state.worldContextRevision);
+        assertEquals(initialLocationRevision + 1L, state.gameLocationRevision);
     }
 
     @Test

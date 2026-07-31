@@ -62,13 +62,11 @@ public final class HudBlur {
             capturedOk = false;
             return;
         }
-        // The blurred backdrop is ONLY consumed by FROST panels via blurBehind. In the native renderer
-        // every panel takes the flat-tint path (blurBehind is never called), so capturing + blurring the
-        // whole screen here was a full-screen post-effect burned every frame for nothing — the "slow even
-        // on native renderer" cost. Skip it entirely when native is on.
-        if (HudSurface.nativeRenderer()) {
+        // Only custom-rendered FROST surfaces consume the snapshot. BARE, SOLID and native paths must
+        // not pay for a full-screen capture/post-chain that cannot contribute to the final frame.
+        if (!HudSurface.shouldUseBlur(HudSurface.chrome(), HudSurface.nativeRenderer())) {
             capturedOk = false;
-            ModProfiler.getInstance().incrementCounter("hud/blur/capture/skippedNative");
+            ModProfiler.getInstance().incrementCounter("hud/blur/capture/skippedSurfaceMode");
             return;
         }
 
@@ -119,7 +117,8 @@ public final class HudBlur {
      * so this never disturbs the HUD's own rendering.
      */
     public static void blurBehind(GuiGraphics context, int x, int y, int w, int h, int radius) {
-        if (!capturedOk || disabled || blurred == null) {
+        if (!HudSurface.shouldUseBlur(HudSurface.chrome(), HudSurface.nativeRenderer())
+                || !capturedOk || disabled || blurred == null) {
             return;
         }
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("hud/blur/blurBehind")) {

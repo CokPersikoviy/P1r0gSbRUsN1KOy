@@ -186,6 +186,18 @@ public class ConfigManager {
         sanitized.potionTimers.belowZeroSeconds = Math.max(0, Math.min(60, sanitized.potionTimers.belowZeroSeconds));
         if (sanitized.bossWidget != null) {
             sanitized.bossWidget.postSpawnShowSeconds = Math.max(0, Math.min(600, sanitized.bossWidget.postSpawnShowSeconds));
+            if (sanitized.bossWidget.blacklist == null) {
+                sanitized.bossWidget.blacklist = new java.util.LinkedHashSet<>();
+            } else {
+                java.util.Set<String> normalizedBlacklist = new java.util.LinkedHashSet<>();
+                for (String bossId : sanitized.bossWidget.blacklist) {
+                    String normalized = ru.wilyfox.client.protocol.BossTypeCatalog.normalizeId(bossId);
+                    if (!normalized.isEmpty()) {
+                        normalizedBlacklist.add(normalized);
+                    }
+                }
+                sanitized.bossWidget.blacklist = normalizedBlacklist;
+            }
         }
         // Migrate legacy absolute widget positions to resolution-independent fractions, using the
         // window size they were last saved at (correct reference, before any resize can chain-corrupt).

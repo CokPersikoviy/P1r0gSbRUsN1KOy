@@ -1,5 +1,8 @@
 package ru.wilyfox.client.hud.config;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 public class BossWidgetConfig {
     /**
      * Highest boss level the mod ships knowledge of. Used as the default max-level filter and as
@@ -11,6 +14,8 @@ public class BossWidgetConfig {
     public boolean active = true;
     public boolean fullAligment = false;
     public BossTimerSourceMode sourceMode = BossTimerSourceMode.PROTOCOL_PREFERRED;
+    /** Stable protocol boss IDs hidden from the timer. Legacy fallback entries use level:&lt;n&gt;. */
+    public Set<String> blacklist = new LinkedHashSet<>();
 
     public int maxBosses = 5;
 

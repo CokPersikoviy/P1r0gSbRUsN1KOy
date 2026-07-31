@@ -18,6 +18,7 @@ import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.internal.HudFrameClock;
 import ru.wilyfox.utils.MouseUtils;
 import ru.wilyfox.client.hud.config.BossTimerSourceMode;
+import ru.wilyfox.client.boss.BossBlacklist;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
@@ -399,7 +400,7 @@ public class BossHudWidget extends AbstractWidget {
                 break;
             }
 
-            if (isExcludedBoss(boss)) {
+            if (BossBlacklist.isBlocked(boss) || isExcludedBoss(boss)) {
                 continue;
             }
 

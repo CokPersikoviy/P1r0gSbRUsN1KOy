@@ -50,7 +50,7 @@ public final class ProfilerDebugCommand {
             case "start" -> {
                 profiler.reset();
                 profiler.start();
-                showLocalMessage("Profiler started.");
+                showLocalMessage("Profiler started. Long-running diagnostics retained.");
             }
             case "stop" -> {
                 profiler.stop();
@@ -58,7 +58,7 @@ public final class ProfilerDebugCommand {
             }
             case "reset" -> {
                 profiler.reset();
-                showLocalMessage("Profiler stats reset.");
+                showLocalMessage("Profiler session stats reset. Long-running diagnostics retained.");
             }
             case "report" -> showLines(profiler.buildReportLines(option));
             case "dump", "save" -> dumpReport(profiler, option);

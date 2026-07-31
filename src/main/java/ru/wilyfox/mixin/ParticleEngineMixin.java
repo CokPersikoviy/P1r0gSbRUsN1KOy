@@ -5,13 +5,16 @@ import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import ru.wilyfox.client.alchemy.AlchemyIngredientTracker;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.fishing.FishingSpotTracker;
+import ru.wilyfox.client.profiler.ModProfiler;
+import net.minecraft.client.Camera;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.state.BlockState;
@@ -25,17 +28,48 @@ import static ru.wilyfox.client.debug.DebugLogger.info;
 @Mixin(ParticleEngine.class)
 public class ParticleEngineMixin {
     private static final Set<String> LOGGED_FISHING_PARTICLES = new HashSet<>();
+    @Unique
+    private ModProfiler.Scope froghelper$particleTickScope;
+    @Unique
+    private ModProfiler.Scope froghelper$particleRenderScope;
+
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void froghelper$beginParticleTick(CallbackInfo ci) {
+        froghelper$particleTickScope = ModProfiler.getInstance().scope("render/particles/tick");
+    }
+
+    @Inject(method = "tick", at = @At("RETURN"))
+    private void froghelper$endParticleTick(CallbackInfo ci) {
+        froghelper$particleTickScope.close();
+        froghelper$particleTickScope = null;
+    }
+
+    @Inject(method = "render", at = @At("HEAD"))
+    private void froghelper$beginParticleRender(
+            Camera camera,
+            float partialTick,
+            MultiBufferSource.BufferSource bufferSource,
+            CallbackInfo ci
+    ) {
+        froghelper$particleRenderScope = ModProfiler.getInstance().scope("render/particles/frame");
+    }
+
+    @Inject(method = "render", at = @At("RETURN"))
+    private void froghelper$endParticleRender(
+            Camera camera,
+            float partialTick,
+            MultiBufferSource.BufferSource bufferSource,
+            CallbackInfo ci
+    ) {
+        froghelper$particleRenderScope.close();
+        froghelper$particleRenderScope = null;
+    }
 
     @Inject(method = "createParticle", at = @At("HEAD"))
     private void froghelper$trackFishingParticles(ParticleOptions particleOptions, double x, double y, double z, double xd, double yd, double zd, CallbackInfoReturnable<?> cir) {
         FishingSpotTracker tracker = FishingSpotTracker.getInstance();
         if (isFishingBubbleParticle(particleOptions)) {
             tracker.addBubble(x, y, z);
-            return;
-        }
-
-        if (particleOptions.getType() == ParticleTypes.HAPPY_VILLAGER) {
-            AlchemyIngredientTracker.getInstance().addParticle(x, y, z);
             return;
         }
 

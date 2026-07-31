@@ -69,6 +69,10 @@ public final class ModUserProtocol {
         ChatDispatchQueue.removeQueuedCommandsContaining(TOKEN_PREFIX);
     }
 
+    public static synchronized DebugSnapshot diagnosticSnapshot() {
+        return new DebugSnapshot(INCOMING.size(), PAIRED.size(), ACKED.size());
+    }
+
     public static synchronized void onModUserSeen(String name) {
         if (!isSocialsEnabled() || name == null || name.isBlank() || isSelf(name)) {
             return;
@@ -253,5 +257,8 @@ public final class ModUserProtocol {
         private String join() {
             return String.join("", parts);
         }
+    }
+
+    public record DebugSnapshot(int incomingBuffers, int pairedPlayers, int acknowledgedPlayers) {
     }
 }

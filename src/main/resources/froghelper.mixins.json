@@ -5,6 +5,10 @@
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
 		"ClientPacketListenerMixin",
+		"MinecraftProfilerMixin",
+		"LevelRendererProfilerMixin",
+		"BlockEntityRenderDispatcherProfilerMixin",
+		"EntityRenderDispatcherProfilerMixin",
 		"ChatComponentAccessorMixin",
 		"ChatHudMixin",
 		"ChatScreenMixin",
@@ -21,10 +25,17 @@
 		"LightningBoltRendererMixin",
 		"MultiPlayerGameModeMixin",
 		"ParticleEngineMixin",
+		"ParticleEngineAccessorMixin",
 		"PlayerFishingAccessorMixin",
 		"PlayerRendererMixin",
 		"PlayerTabOverlayMixin",
-		"ScreenEffectRendererMixin"
+		"ScreenEffectRendererMixin",
+		"TextureManagerAccessorMixin",
+		"LevelRendererAccessorMixin",
+		"MapTextureManagerAccessorMixin",
+		"SoundManagerAccessorMixin",
+		"SoundEngineAccessorMixin",
+		"SodiumWorldRendererProfilerMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

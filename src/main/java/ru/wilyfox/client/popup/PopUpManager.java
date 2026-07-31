@@ -79,6 +79,11 @@ public final class PopUpManager {
         ));
     }
 
+    public synchronized int diagnosticNotificationCount() {
+        pruneExpired();
+        return notifications.size();
+    }
+
     private boolean isSourceEnabled(String source) {
         return switch (source) {
             case PopUpSource.CHAT_COPY -> ConfigManager.get().popUps.chatCopyEvent;

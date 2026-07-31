@@ -3,20 +3,21 @@ package ru.wilyfox.client.alchemy;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.LerpingBossEvent;
 import net.minecraft.world.BossEvent;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
 import ru.wilyfox.bridge.BossHealthOverlayAccessor;
 import ru.wilyfox.client.hud.config.ConfigManager;
 
-import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class AlchemyIngredientTracker {
     private static final AlchemyIngredientTracker INSTANCE = new AlchemyIngredientTracker();
     private static final long LIFETIME_MS = 2_000L;
-    private static final double DUPLICATE_DISTANCE_SQUARED = 0.04;
 
-    private final List<AlchemyIngredientSpot> spots = new ArrayList<>();
+    private final Map<Long, AlchemyIngredientSpot> spots = new LinkedHashMap<>();
 
     private AlchemyIngredientTracker() {
     }
@@ -33,16 +34,8 @@ public final class AlchemyIngredientTracker {
 
         long now = System.currentTimeMillis();
         Vec3 position = new Vec3(x, y, z);
-        for (int i = 0; i < spots.size(); i++) {
-            AlchemyIngredientSpot spot = spots.get(i);
-            if (spot.center().distanceToSqr(position) <= DUPLICATE_DISTANCE_SQUARED) {
-                spots.set(i, new AlchemyIngredientSpot(position, now));
-                cleanup(now);
-                return;
-            }
-        }
-
-        spots.add(new AlchemyIngredientSpot(position, now));
+        long blockKey = BlockPos.containing(x, y, z).asLong();
+        spots.put(blockKey, new AlchemyIngredientSpot(position, now));
         cleanup(now);
     }
 
@@ -53,15 +46,20 @@ public final class AlchemyIngredientTracker {
         }
 
         cleanup(System.currentTimeMillis());
-        return List.copyOf(spots);
+        return List.copyOf(spots.values());
     }
 
     public void clear() {
         spots.clear();
     }
 
+    public int diagnosticSpotCount() {
+        cleanup(System.currentTimeMillis());
+        return spots.size();
+    }
+
     private void cleanup(long now) {
-        Iterator<AlchemyIngredientSpot> iterator = spots.iterator();
+        Iterator<AlchemyIngredientSpot> iterator = spots.values().iterator();
         while (iterator.hasNext()) {
             AlchemyIngredientSpot spot = iterator.next();
             if (now - spot.createdAtMillis() > LIFETIME_MS) {

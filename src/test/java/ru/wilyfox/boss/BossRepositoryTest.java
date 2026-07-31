@@ -39,6 +39,14 @@ class BossRepositoryTest {
     }
 
     @Test
+    void protocolBossRetainsStableTypeId() {
+        BossRepository repository = repository();
+        repository.upsertProtocol("keeper_v2", "Хранитель", System.currentTimeMillis() + 60_000L, 510);
+
+        assertEquals("keeper_v2", repository.getAllProtocol().iterator().next().getId());
+    }
+
+    @Test
     void protocolSnapshotRemovesFutureEntryMissingFromNextPacket() {
         long now = System.currentTimeMillis();
         BossRepository repository = repository();

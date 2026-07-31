@@ -142,6 +142,11 @@ public final class FishingSpotTracker {
         particles.clear();
     }
 
+    public synchronized int diagnosticParticleCount() {
+        cleanup(System.currentTimeMillis());
+        return particles.size();
+    }
+
     private static final class CellData {
         private int count;
         private long latestTimestamp;

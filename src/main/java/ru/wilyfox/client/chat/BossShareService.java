@@ -41,6 +41,10 @@ public final class BossShareService {
     private BossShareService() {
     }
 
+    public static synchronized int diagnosticPendingShareCount() {
+        return incomingShares.size();
+    }
+
     public static void bindRepository(BossRepository bossRepository) {
         repository = bossRepository;
         register();
