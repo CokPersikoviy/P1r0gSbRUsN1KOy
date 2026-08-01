@@ -14,7 +14,7 @@ public class SodiumWorldRendererProfilerMixin {
     @Unique
     private ModProfiler.Scope froghelper$sodiumBlockEntitiesScope;
     @Unique
-    private ModProfiler.Scope froghelper$sodiumBlockEntityScope;
+    private static ModProfiler.Scope froghelper$sodiumBlockEntityScope;
 
     @Inject(method = "renderBlockEntities", at = @At("HEAD"), require = 0, remap = false)
     private void froghelper$beginSodiumBlockEntities(CallbackInfo ci) {
@@ -28,12 +28,12 @@ public class SodiumWorldRendererProfilerMixin {
     }
 
     @Inject(method = "renderBlockEntity", at = @At("HEAD"), require = 0, remap = false)
-    private void froghelper$beginSodiumBlockEntity(CallbackInfo ci) {
+    private static void froghelper$beginSodiumBlockEntity(CallbackInfo ci) {
         froghelper$sodiumBlockEntityScope = ModProfiler.getInstance().scope("render/sodium/blockEntity");
     }
 
     @Inject(method = "renderBlockEntity", at = @At("RETURN"), require = 0, remap = false)
-    private void froghelper$endSodiumBlockEntity(CallbackInfo ci) {
+    private static void froghelper$endSodiumBlockEntity(CallbackInfo ci) {
         froghelper$sodiumBlockEntityScope.close();
         froghelper$sodiumBlockEntityScope = null;
     }
