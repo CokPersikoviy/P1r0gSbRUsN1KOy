@@ -7,34 +7,33 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ru.wilyfox.client.profiler.ModProfiler;
+import ru.wilyfox.client.profiler.ProfilerScopeStack;
 
 @Pseudo
 @Mixin(targets = "net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer", remap = false)
 public class SodiumWorldRendererProfilerMixin {
     @Unique
-    private ModProfiler.Scope froghelper$sodiumBlockEntitiesScope;
+    private final ProfilerScopeStack froghelper$sodiumBlockEntitiesScopes = new ProfilerScopeStack();
     @Unique
-    private static ModProfiler.Scope froghelper$sodiumBlockEntityScope;
+    private static final ProfilerScopeStack froghelper$sodiumBlockEntityScopes = new ProfilerScopeStack();
 
     @Inject(method = "renderBlockEntities", at = @At("HEAD"), require = 0, remap = false)
     private void froghelper$beginSodiumBlockEntities(CallbackInfo ci) {
-        froghelper$sodiumBlockEntitiesScope = ModProfiler.getInstance().scope("render/sodium/blockEntities");
+        froghelper$sodiumBlockEntitiesScopes.push(ModProfiler.getInstance().scope("render/sodium/blockEntities"));
     }
 
     @Inject(method = "renderBlockEntities", at = @At("RETURN"), require = 0, remap = false)
     private void froghelper$endSodiumBlockEntities(CallbackInfo ci) {
-        froghelper$sodiumBlockEntitiesScope.close();
-        froghelper$sodiumBlockEntitiesScope = null;
+        froghelper$sodiumBlockEntitiesScopes.closeLatest();
     }
 
     @Inject(method = "renderBlockEntity", at = @At("HEAD"), require = 0, remap = false)
     private static void froghelper$beginSodiumBlockEntity(CallbackInfo ci) {
-        froghelper$sodiumBlockEntityScope = ModProfiler.getInstance().scope("render/sodium/blockEntity");
+        froghelper$sodiumBlockEntityScopes.push(ModProfiler.getInstance().scope("render/sodium/blockEntity"));
     }
 
     @Inject(method = "renderBlockEntity", at = @At("RETURN"), require = 0, remap = false)
     private static void froghelper$endSodiumBlockEntity(CallbackInfo ci) {
-        froghelper$sodiumBlockEntityScope.close();
-        froghelper$sodiumBlockEntityScope = null;
+        froghelper$sodiumBlockEntityScopes.closeLatest();
     }
 }

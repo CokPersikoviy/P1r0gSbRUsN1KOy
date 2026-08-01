@@ -13,6 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.fishing.FishingSpotTracker;
 import ru.wilyfox.client.profiler.ModProfiler;
+import ru.wilyfox.client.profiler.ProfilerScopeStack;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.core.BlockPos;
@@ -29,19 +30,18 @@ import static ru.wilyfox.client.debug.DebugLogger.info;
 public class ParticleEngineMixin {
     private static final Set<String> LOGGED_FISHING_PARTICLES = new HashSet<>();
     @Unique
-    private ModProfiler.Scope froghelper$particleTickScope;
+    private final ProfilerScopeStack froghelper$particleTickScopes = new ProfilerScopeStack();
     @Unique
-    private ModProfiler.Scope froghelper$particleRenderScope;
+    private final ProfilerScopeStack froghelper$particleRenderScopes = new ProfilerScopeStack();
 
     @Inject(method = "tick", at = @At("HEAD"))
     private void froghelper$beginParticleTick(CallbackInfo ci) {
-        froghelper$particleTickScope = ModProfiler.getInstance().scope("render/particles/tick");
+        froghelper$particleTickScopes.push(ModProfiler.getInstance().scope("render/particles/tick"));
     }
 
     @Inject(method = "tick", at = @At("RETURN"))
     private void froghelper$endParticleTick(CallbackInfo ci) {
-        froghelper$particleTickScope.close();
-        froghelper$particleTickScope = null;
+        froghelper$particleTickScopes.closeLatest();
     }
 
     @Inject(method = "render", at = @At("HEAD"))
@@ -51,7 +51,7 @@ public class ParticleEngineMixin {
             MultiBufferSource.BufferSource bufferSource,
             CallbackInfo ci
     ) {
-        froghelper$particleRenderScope = ModProfiler.getInstance().scope("render/particles/frame");
+        froghelper$particleRenderScopes.push(ModProfiler.getInstance().scope("render/particles/frame"));
     }
 
     @Inject(method = "render", at = @At("RETURN"))
@@ -61,8 +61,7 @@ public class ParticleEngineMixin {
             MultiBufferSource.BufferSource bufferSource,
             CallbackInfo ci
     ) {
-        froghelper$particleRenderScope.close();
-        froghelper$particleRenderScope = null;
+        froghelper$particleRenderScopes.closeLatest();
     }
 
     @Inject(method = "createParticle", at = @At("HEAD"))

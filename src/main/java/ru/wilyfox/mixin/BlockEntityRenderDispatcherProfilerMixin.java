@@ -11,11 +11,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ru.wilyfox.client.profiler.ModProfiler;
+import ru.wilyfox.client.profiler.ProfilerScopeStack;
 
 @Mixin(BlockEntityRenderDispatcher.class)
 public class BlockEntityRenderDispatcherProfilerMixin {
     @Unique
-    private ModProfiler.Scope froghelper$blockEntityScope;
+    private final ProfilerScopeStack froghelper$blockEntityScopes = new ProfilerScopeStack();
 
     @Inject(method = "render", at = @At("HEAD"))
     private <E extends BlockEntity> void froghelper$beginBlockEntityRender(
@@ -25,10 +26,10 @@ public class BlockEntityRenderDispatcherProfilerMixin {
             MultiBufferSource bufferSource,
             CallbackInfo ci
     ) {
-        froghelper$blockEntityScope = ModProfiler.getInstance().typedScope(
+        froghelper$blockEntityScopes.push(ModProfiler.getInstance().typedScope(
                 "render/blockEntity",
                 BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType())
-        );
+        ));
     }
 
     @Inject(method = "render", at = @At("RETURN"))
@@ -39,7 +40,6 @@ public class BlockEntityRenderDispatcherProfilerMixin {
             MultiBufferSource bufferSource,
             CallbackInfo ci
     ) {
-        froghelper$blockEntityScope.close();
-        froghelper$blockEntityScope = null;
+        froghelper$blockEntityScopes.closeLatest();
     }
 }

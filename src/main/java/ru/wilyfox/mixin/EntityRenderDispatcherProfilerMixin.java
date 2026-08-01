@@ -11,11 +11,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ru.wilyfox.client.profiler.ModProfiler;
+import ru.wilyfox.client.profiler.ProfilerScopeStack;
 
 @Mixin(EntityRenderDispatcher.class)
 public class EntityRenderDispatcherProfilerMixin {
     @Unique
-    private ModProfiler.Scope froghelper$entityScope;
+    private final ProfilerScopeStack froghelper$entityScopes = new ProfilerScopeStack();
 
     @Inject(method = "render", at = @At("HEAD"))
     private <E extends Entity> void froghelper$beginEntityRender(
@@ -29,10 +30,10 @@ public class EntityRenderDispatcherProfilerMixin {
             int packedLight,
             CallbackInfo ci
     ) {
-        froghelper$entityScope = ModProfiler.getInstance().typedScope(
+        froghelper$entityScopes.push(ModProfiler.getInstance().typedScope(
                 "render/entity",
                 BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType())
-        );
+        ));
     }
 
     @Inject(method = "render", at = @At("RETURN"))
@@ -47,7 +48,6 @@ public class EntityRenderDispatcherProfilerMixin {
             int packedLight,
             CallbackInfo ci
     ) {
-        froghelper$entityScope.close();
-        froghelper$entityScope = null;
+        froghelper$entityScopes.closeLatest();
     }
 }
