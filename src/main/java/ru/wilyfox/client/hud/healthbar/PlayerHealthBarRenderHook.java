@@ -38,6 +38,7 @@ public final class PlayerHealthBarRenderHook {
             }
             try (ModProfiler.Scope batchScope = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderHook/endBatch")) {
                 bufferSource.endBatch(RenderType.debugQuads());
+                PlayerHealthBarRenderer.flushSeeThroughBars(bufferSource);
                 PlayerHealthBarRenderer.flushNumericText();
             }
         }

@@ -1,13 +1,16 @@
 package ru.wilyfox.client.hud.healthbar;
 
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.util.Mth;
@@ -31,6 +34,22 @@ public final class PlayerHealthBarRenderer {
     private static final float ACCENT_Z = 0.001f;
     private static final float FILL_Z = 0.002f;
     private static final float TEXT_Z = 0.004f;
+    private static final float OCCLUDED_BRIGHTNESS = 0.45f;
+    private static final RenderType HEALTH_BAR_SEE_THROUGH = RenderType.create(
+            "froghelper_health_bar_see_through",
+            DefaultVertexFormat.POSITION_COLOR,
+            VertexFormat.Mode.QUADS,
+            1536,
+            false,
+            true,
+            RenderType.CompositeState.builder()
+                    .setShaderState(RenderStateShard.POSITION_COLOR_SHADER)
+                    .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
+                    .setDepthTestState(RenderStateShard.NO_DEPTH_TEST)
+                    .setCullState(RenderStateShard.NO_CULL)
+                    .setWriteMaskState(RenderStateShard.COLOR_WRITE)
+                    .createCompositeState(false)
+    );
     private static final ByteBufferBuilder HEALTH_TEXT_BUFFER = new ByteBufferBuilder(16 * 1024);
     private static final MultiBufferSource.BufferSource HEALTH_TEXT_SOURCE =
             MultiBufferSource.immediate(HEALTH_TEXT_BUFFER);
@@ -81,6 +100,7 @@ public final class PlayerHealthBarRenderer {
         int skippedInvisible = 0;
         int skippedOccluded = 0;
         int skippedDistance = 0;
+        int renderedOccluded = 0;
         try (ModProfiler.Scope iterateScope = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderer/iteratePlayers")) {
             for (Player target : mc.level.players()) {
                 candidates++;
@@ -103,7 +123,8 @@ public final class PlayerHealthBarRenderer {
                 try (ModProfiler.Scope visibilityScope = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderer/visibilityCheck")) {
                     visibleToCamera = isVisibleToCameraCached(target);
                 }
-                if (!visibleToCamera) {
+                boolean occluded = !visibleToCamera;
+                if (occluded && target.isDiscrete()) {
                     skippedOccluded++;
                     continue;
                 }
@@ -127,11 +148,14 @@ public final class PlayerHealthBarRenderer {
                 poseStack.scale(WORLD_SCALE, -WORLD_SCALE, WORLD_SCALE);
 
                 try (ModProfiler.Scope renderBarScope = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderer/renderBar")) {
-                    renderHealthBar(poseStack, bufferSource, target, distanceAlpha);
+                    renderHealthBar(poseStack, bufferSource, target, distanceAlpha, occluded);
                 }
 
                 poseStack.popPose();
                 rendered++;
+                if (occluded) {
+                    renderedOccluded++;
+                }
             }
         }
         ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/candidates", candidates);
@@ -141,10 +165,17 @@ public final class PlayerHealthBarRenderer {
         ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/skippedInvisible", skippedInvisible);
         ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/skippedOccluded", skippedOccluded);
         ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/skippedDistance", skippedDistance);
+        ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/renderedOccluded", renderedOccluded);
         }
     }
 
-    private static void renderHealthBar(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, Player target, float distanceAlpha) {
+    private static void renderHealthBar(
+            PoseStack poseStack,
+            MultiBufferSource.BufferSource bufferSource,
+            Player target,
+            float distanceAlpha,
+            boolean occluded
+    ) {
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderer/renderHealthBar")) {
         var config = ConfigManager.get().playerHealthBars;
         float health = target.getHealth();
@@ -178,7 +209,7 @@ public final class PlayerHealthBarRenderer {
         int fillEndX = x1 + fillWidth;
 
         Matrix4f matrix = poseStack.last().pose();
-        VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.debugQuads());
+        VertexConsumer vertexConsumer = bufferSource.getBuffer(occluded ? HEALTH_BAR_SEE_THROUGH : RenderType.debugQuads());
 
         float finalAlpha = distanceAlpha * opacityMultiplier;
         int panelBaseColor = critical
@@ -187,6 +218,11 @@ public final class PlayerHealthBarRenderer {
         int panelColor = applyAlpha(panelBaseColor, finalAlpha);
         int accentColor = applyAlpha(getAccentColor(criticalBlend), finalAlpha);
         int fillColor = applyAlpha(getFillColor(criticalBlend), finalAlpha);
+        if (occluded) {
+            panelColor = scaleRgb(panelColor, OCCLUDED_BRIGHTNESS);
+            accentColor = scaleRgb(accentColor, OCCLUDED_BRIGHTNESS);
+            fillColor = scaleRgb(fillColor, OCCLUDED_BRIGHTNESS);
+        }
 
         fillQuad(vertexConsumer, matrix, x1 - bgPadding, y1 - bgPadding, x2 + bgPadding, y2 + bgPadding, PANEL_Z, panelColor);
         fillQuad(vertexConsumer, matrix, x1 - bgPadding, y1 - bgPadding, x2 + bgPadding, y1 - bgPadding + accentHeight, ACCENT_Z, accentColor);
@@ -204,7 +240,8 @@ public final class PlayerHealthBarRenderer {
                     barWidth,
                     barHeight,
                     y1,
-                    finalAlpha
+                    finalAlpha,
+                    occluded
             );
         }
         }
@@ -217,7 +254,8 @@ public final class PlayerHealthBarRenderer {
             int barWidth,
             int barHeight,
             int barY,
-            float alpha
+            float alpha,
+            boolean occluded
     ) {
         Minecraft minecraft = Minecraft.getInstance();
         Font font = minecraft.font;
@@ -242,6 +280,9 @@ public final class PlayerHealthBarRenderer {
         float textX = -renderedWidth / 2.0F;
         float textY = barY + (barHeight - renderedHeight) / 2.0F;
         int textColor = applyAlpha(WidgetTheme.TEXT_SOFT, alpha);
+        if (occluded) {
+            textColor = scaleRgb(textColor, OCCLUDED_BRIGHTNESS);
+        }
 
         poseStack.pushPose();
         poseStack.translate(textX, textY, TEXT_Z);
@@ -289,6 +330,10 @@ public final class PlayerHealthBarRenderer {
         }
     }
 
+    public static void flushSeeThroughBars(MultiBufferSource.BufferSource bufferSource) {
+        bufferSource.endBatch(HEALTH_BAR_SEE_THROUGH);
+    }
+
     static String formatHealth(float health, float maxHealth) {
         int current = Math.max(0, Mth.ceil(health));
         int maximum = Math.max(1, Mth.ceil(maxHealth));
@@ -311,6 +356,15 @@ public final class PlayerHealthBarRenderer {
         int alpha = (argb >>> 24) & 0xFF;
         int scaledAlpha = Mth.clamp(Math.round(alpha * alphaMultiplier), 0, 255);
         return (scaledAlpha << 24) | (argb & 0x00FFFFFF);
+    }
+
+    static int scaleRgb(int argb, float multiplier) {
+        float clamped = Mth.clamp(multiplier, 0.0f, 1.0f);
+        int alpha = (argb >>> 24) & 0xFF;
+        int red = Math.round(((argb >>> 16) & 0xFF) * clamped);
+        int green = Math.round(((argb >>> 8) & 0xFF) * clamped);
+        int blue = Math.round((argb & 0xFF) * clamped);
+        return (alpha << 24) | (red << 16) | (green << 8) | blue;
     }
 
     private static int getFillColor(float criticalBlend) {
