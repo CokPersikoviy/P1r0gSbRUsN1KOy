@@ -1,45 +1,45 @@
 package ru.wilyfox.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ru.wilyfox.client.profiler.ModProfiler;
-import ru.wilyfox.client.profiler.ProfilerScopeStack;
+
+import java.util.IdentityHashMap;
+import java.util.Map;
 
 @Mixin(BlockEntityRenderDispatcher.class)
 public class BlockEntityRenderDispatcherProfilerMixin {
     @Unique
-    private final ProfilerScopeStack froghelper$blockEntityScopes = new ProfilerScopeStack();
+    private static final Map<BlockEntityType<?>, String> froghelper$sectionByType = new IdentityHashMap<>();
 
-    @Inject(method = "render", at = @At("HEAD"))
-    private <E extends BlockEntity> void froghelper$beginBlockEntityRender(
+    @WrapMethod(method = "render")
+    private <E extends BlockEntity> void froghelper$profileBlockEntityRender(
             E blockEntity,
             float partialTick,
             PoseStack poseStack,
             MultiBufferSource bufferSource,
-            CallbackInfo ci
+            Operation<Void> original
     ) {
-        froghelper$blockEntityScopes.push(ModProfiler.getInstance().typedScope(
-                "render/blockEntity",
-                BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType())
-        ));
-    }
+        ModProfiler profiler = ModProfiler.getInstance();
+        if (!profiler.isEnabled()) {
+            original.call(blockEntity, partialTick, poseStack, bufferSource);
+            return;
+        }
 
-    @Inject(method = "render", at = @At("RETURN"))
-    private <E extends BlockEntity> void froghelper$endBlockEntityRender(
-            E blockEntity,
-            float partialTick,
-            PoseStack poseStack,
-            MultiBufferSource bufferSource,
-            CallbackInfo ci
-    ) {
-        froghelper$blockEntityScopes.closeLatest();
+        String section = froghelper$sectionByType.computeIfAbsent(
+                blockEntity.getType(),
+                type -> profiler.typedSection("render/blockEntity", BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type))
+        );
+        try (ModProfiler.Scope ignored = profiler.scope(section)) {
+            original.call(blockEntity, partialTick, poseStack, bufferSource);
+        }
     }
 }

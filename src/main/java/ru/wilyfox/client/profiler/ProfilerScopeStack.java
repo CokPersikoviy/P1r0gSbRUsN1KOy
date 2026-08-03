@@ -8,9 +8,10 @@ public final class ProfilerScopeStack {
     private final ThreadLocal<Deque<ModProfiler.Scope>> scopes = ThreadLocal.withInitial(ArrayDeque::new);
 
     public void push(ModProfiler.Scope scope) {
-        if (scope != null) {
-            scopes.get().addLast(scope);
+        if (ModProfiler.isNoopScope(scope)) {
+            return;
         }
+        scopes.get().addLast(scope);
     }
 
     public void closeLatest() {
@@ -18,9 +19,6 @@ public final class ProfilerScopeStack {
         ModProfiler.Scope scope = threadScopes.pollLast();
         if (scope != null) {
             scope.close();
-        }
-        if (threadScopes.isEmpty()) {
-            scopes.remove();
         }
     }
 }

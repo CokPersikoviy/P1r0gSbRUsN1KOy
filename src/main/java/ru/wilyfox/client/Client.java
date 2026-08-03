@@ -69,6 +69,7 @@ import ru.wilyfox.client.pet.ActivePetsStore;
 import ru.wilyfox.client.potion.PotionStore;
 import ru.wilyfox.client.popup.PopUpEventNotifier;
 import ru.wilyfox.client.performance.EstimatedTpsMonitor;
+import ru.wilyfox.client.performance.SodiumBrushableBlockEntityCulling;
 import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.quickaccess.QuickAccessInputHandler;
 import ru.wilyfox.client.rune.ActiveRunesStore;
@@ -128,6 +129,7 @@ public class Client {
 
     public void init() {
         ModProfiler.getInstance().registerDiagnostics();
+        SodiumBrushableBlockEntityCulling.registerIfAvailable();
         ru.wilyfox.client.command.FhCommands.register();
         new ClientEntityEventHandler(this.bossTracker).register();
         new HudInputHandler(hudRenderer).register();

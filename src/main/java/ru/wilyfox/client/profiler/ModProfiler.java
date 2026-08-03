@@ -62,7 +62,7 @@ public final class ModProfiler {
     private final Deque<ProfilerDiagnostics.DiagnosticSample> persistentSamples = new ArrayDeque<>();
     private final ThreadLocal<Deque<ActiveScope>> activeScopes = ThreadLocal.withInitial(ArrayDeque::new);
     private final AtomicBoolean diagnosticsRegistered = new AtomicBoolean();
-    private boolean enabled;
+    private volatile boolean enabled;
     private long sessionStartedAt;
     private long sessionStoppedAt;
     private long lastClientHeartbeatNanos;
@@ -154,7 +154,7 @@ public final class ModProfiler {
         activeStall = null;
     }
 
-    public synchronized boolean isEnabled() {
+    public boolean isEnabled() {
         return enabled;
     }
 
@@ -167,7 +167,7 @@ public final class ModProfiler {
     }
 
     public void recordNetworkPacket(String direction, Packet<?> packet) {
-        if (packet == null) {
+        if (!isEnabled() || packet == null) {
             return;
         }
         String type = packet.getClass().getSimpleName();
@@ -176,8 +176,15 @@ public final class ModProfiler {
     }
 
     public Scope typedScope(String prefix, Object typeKey) {
+        if (!isEnabled()) {
+            return NOOP_SCOPE;
+        }
+        return scope(typedSection(prefix, typeKey));
+    }
+
+    public String typedSection(String prefix, Object typeKey) {
         String type = typeKey == null ? "unknown" : typeKey.toString();
-        return scope(prefix + "/" + safeSectionComponent(type));
+        return prefix + "/" + safeSectionComponent(type);
     }
 
     public synchronized void recordProtocolPayloadReceived(int payloadBytes) {
@@ -441,9 +448,13 @@ public final class ModProfiler {
         }
 
         Deque<ActiveScope> stack = activeScopes.get();
-        ActiveScope scope = new ActiveScope(section, System.nanoTime(), stack.peekLast());
+        ActiveScope scope = new ActiveScope(this, section, System.nanoTime(), stack.peekLast(), stack);
         stack.addLast(scope);
-        return () -> closeScope(scope, stack);
+        return scope;
+    }
+
+    static boolean isNoopScope(Scope scope) {
+        return scope == null || scope == NOOP_SCOPE;
     }
 
     public void incrementCounter(String counter) {
@@ -668,18 +679,7 @@ public final class ModProfiler {
         stats.selfNanos += selfNanos;
         stats.maxNanos = Math.max(stats.maxNanos, elapsedNanos);
 
-        Map<String, CallTreeNodeStats> targetMap = rootNodes;
-        if (parentScope != null) {
-            List<ActiveScope> ancestors = new ArrayList<>();
-            for (ActiveScope current = parentScope; current != null; current = current.parent) {
-                ancestors.add(current);
-            }
-            for (int i = ancestors.size() - 1; i >= 0; i--) {
-                ActiveScope ancestor = ancestors.get(i);
-                CallTreeNodeStats ancestorNode = targetMap.computeIfAbsent(ancestor.section, ignored -> new CallTreeNodeStats());
-                targetMap = ancestorNode.children;
-            }
-        }
+        Map<String, CallTreeNodeStats> targetMap = callTreeChildren(parentScope);
         CallTreeNodeStats node = targetMap.computeIfAbsent(section, ignored -> new CallTreeNodeStats());
         node.calls++;
         node.totalNanos += elapsedNanos;
@@ -699,6 +699,15 @@ public final class ModProfiler {
                 recentSamples.removeFirst();
             }
         }
+    }
+
+    private Map<String, CallTreeNodeStats> callTreeChildren(ActiveScope scope) {
+        if (scope == null) {
+            return rootNodes;
+        }
+        Map<String, CallTreeNodeStats> parentChildren = callTreeChildren(scope.parent);
+        CallTreeNodeStats node = parentChildren.computeIfAbsent(scope.section, ignored -> new CallTreeNodeStats());
+        return node.children;
     }
 
     private long sessionDurationMs() {
@@ -1921,16 +1930,36 @@ public final class ModProfiler {
         private long maxNanos;
     }
 
-    private static final class ActiveScope {
+    private static final class ActiveScope implements Scope {
+        private final ModProfiler profiler;
         private final String section;
         private final long startedAtNanos;
         private final ActiveScope parent;
+        private final Deque<ActiveScope> stack;
         private long childNanos;
+        private boolean closed;
 
-        private ActiveScope(String section, long startedAtNanos, ActiveScope parent) {
+        private ActiveScope(
+                ModProfiler profiler,
+                String section,
+                long startedAtNanos,
+                ActiveScope parent,
+                Deque<ActiveScope> stack
+        ) {
+            this.profiler = profiler;
             this.section = section;
             this.startedAtNanos = startedAtNanos;
             this.parent = parent;
+            this.stack = stack;
+        }
+
+        @Override
+        public void close() {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            profiler.closeScope(this, stack);
         }
     }
 

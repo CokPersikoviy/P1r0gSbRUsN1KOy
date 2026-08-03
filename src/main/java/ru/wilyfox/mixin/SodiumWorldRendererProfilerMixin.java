@@ -14,8 +14,6 @@ import ru.wilyfox.client.profiler.ProfilerScopeStack;
 public class SodiumWorldRendererProfilerMixin {
     @Unique
     private final ProfilerScopeStack froghelper$sodiumBlockEntitiesScopes = new ProfilerScopeStack();
-    @Unique
-    private static final ProfilerScopeStack froghelper$sodiumBlockEntityScopes = new ProfilerScopeStack();
 
     @Inject(method = "renderBlockEntities", at = @At("HEAD"), require = 0, remap = false)
     private void froghelper$beginSodiumBlockEntities(CallbackInfo ci) {
@@ -27,13 +25,4 @@ public class SodiumWorldRendererProfilerMixin {
         froghelper$sodiumBlockEntitiesScopes.closeLatest();
     }
 
-    @Inject(method = "renderBlockEntity", at = @At("HEAD"), require = 0, remap = false)
-    private static void froghelper$beginSodiumBlockEntity(CallbackInfo ci) {
-        froghelper$sodiumBlockEntityScopes.push(ModProfiler.getInstance().scope("render/sodium/blockEntity"));
-    }
-
-    @Inject(method = "renderBlockEntity", at = @At("RETURN"), require = 0, remap = false)
-    private static void froghelper$endSodiumBlockEntity(CallbackInfo ci) {
-        froghelper$sodiumBlockEntityScopes.closeLatest();
-    }
 }

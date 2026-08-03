@@ -19,6 +19,7 @@ loom {
 
 repositories {
 	mavenCentral()
+	maven { url = "https://api.modrinth.com/maven" }
 	// Add repositories to retrieve artifacts from in here.
 	// You should only use this when depending on other mods because
 	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
@@ -38,6 +39,7 @@ dependencies {
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	modCompileOnly "maven.modrinth:sodium:mc1.21.4-0.6.13-fabric"
 	proguard "com.guardsquare:proguard-base:7.5.0"
 	testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.10.2"
