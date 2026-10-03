@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.internal;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import ru.wilyfox.client.hud.indicators.CornerSnapIndicator;
 import ru.wilyfox.client.hud.indicators.ScreenAnchor;
@@ -19,9 +19,9 @@ public final class HudEditorOverlayRenderer {
     private HudEditorOverlayRenderer() {
     }
 
-    public static void renderHoveredWidgetOutline(HudEditorOverlayHost host, GuiGraphics context, Widget hoveredWidget) {
+    public static void renderHoveredWidgetOutline(HudEditorOverlayHost host, GuiGraphicsExtractor context, Widget hoveredWidget) {
         int padding = 3;
-        HudBounds bounds = Screen.hasAltDown() && hoveredWidget instanceof AbstractWidget abstractWidget
+        HudBounds bounds = ru.wilyfox.utils.InputModifiers.hasAltDown() && hoveredWidget instanceof AbstractWidget abstractWidget
                 ? getAltOutlineBounds(host, abstractWidget)
                 : new HudBounds(hoveredWidget.getStartX(), hoveredWidget.getStartY(), hoveredWidget.getWidth(), hoveredWidget.getHeight());
 
@@ -35,8 +35,8 @@ public final class HudEditorOverlayRenderer {
         );
     }
 
-    public static void renderScreenAnchors(HudEditorOverlayHost host, GuiGraphics context, int screenWidth, int screenHeight, int screenSnapMargin) {
-        boolean showCenterAnchors = Screen.hasShiftDown();
+    public static void renderScreenAnchors(HudEditorOverlayHost host, GuiGraphicsExtractor context, int screenWidth, int screenHeight, int screenSnapMargin) {
+        boolean showCenterAnchors = ru.wilyfox.utils.InputModifiers.hasShiftDown();
 
         renderSingleScreenAnchor(host, context, ScreenAnchor.TOP_LEFT, screenSnapMargin, screenSnapMargin);
         renderSingleScreenAnchor(host, context, ScreenAnchor.TOP_RIGHT, screenWidth - screenSnapMargin, screenSnapMargin);
@@ -53,7 +53,7 @@ public final class HudEditorOverlayRenderer {
         renderSingleScreenAnchor(host, context, ScreenAnchor.HOTBAR_RIGHT, host.getHotbarRightAnchorX(screenWidth), host.getHotbarAnchorY(screenHeight));
     }
 
-    public static void renderWidgetSnapIndicators(HudEditorOverlayHost host, GuiGraphics context) {
+    public static void renderWidgetSnapIndicators(HudEditorOverlayHost host, GuiGraphicsExtractor context) {
         CornerSnapIndicator activeDraggedCornerIndicator = host.getActiveDraggedCornerIndicator();
         CornerSnapIndicator activeTargetCornerIndicator = host.getActiveTargetCornerIndicator();
         if (activeDraggedCornerIndicator == null || activeTargetCornerIndicator == null) {
@@ -107,7 +107,7 @@ public final class HudEditorOverlayRenderer {
         }
     }
 
-    public static void renderGroupTooltip(HudEditorOverlayHost host, GuiGraphics context, Widget hovered) {
+    public static void renderGroupTooltip(HudEditorOverlayHost host, GuiGraphicsExtractor context, Widget hovered) {
         if (!(hovered instanceof AbstractWidget abstractWidget)) {
             return;
         }
@@ -146,14 +146,14 @@ public final class HudEditorOverlayRenderer {
         HudSurface.fillRounded(context, x, y, width, height, 3, WidgetTheme.TOOLTIP_BG);
         context.fill(x + 3, y, x + width - 3, y + 1, WidgetTheme.ACCENT_LINE);
 
-        context.pose().pushPose();
-        context.pose().translate(x + paddingX, y + (height - Minecraft.getInstance().font.lineHeight * labelScale) / 2.0f, 0);
-        context.pose().scale(labelScale, labelScale, 1.0f);
-        context.drawString(Minecraft.getInstance().font, text, 0, 0, WidgetTheme.TOOLTIP_TEXT);
-        context.pose().popPose();
+        context.pose().pushMatrix();
+        context.pose().translate(x + paddingX, y + (height - Minecraft.getInstance().font.lineHeight * labelScale) / 2.0f);
+        context.pose().scale(labelScale, labelScale);
+        context.text(Minecraft.getInstance().font, text, 0, 0, WidgetTheme.TOOLTIP_TEXT);
+        context.pose().popMatrix();
     }
 
-    public static void renderScaleTooltip(GuiGraphics context, Widget hovered) {
+    public static void renderScaleTooltip(GuiGraphicsExtractor context, Widget hovered) {
         if (!(hovered instanceof AbstractWidget scalableWidget)) {
             return;
         }
@@ -186,11 +186,11 @@ public final class HudEditorOverlayRenderer {
         HudSurface.fillRounded(context, x, y, width, height, 3, WidgetTheme.TOOLTIP_BG);
         context.fill(x + 3, y, x + width - 3, y + 1, WidgetTheme.ACCENT_LINE);
 
-        context.pose().pushPose();
-        context.pose().translate(x + paddingX, y + (height - Minecraft.getInstance().font.lineHeight * labelScale) / 2.0f, 0);
-        context.pose().scale(labelScale, labelScale, 1.0f);
-        context.drawString(Minecraft.getInstance().font, text, 0, 0, WidgetTheme.TOOLTIP_TEXT);
-        context.pose().popPose();
+        context.pose().pushMatrix();
+        context.pose().translate(x + paddingX, y + (height - Minecraft.getInstance().font.lineHeight * labelScale) / 2.0f);
+        context.pose().scale(labelScale, labelScale);
+        context.text(Minecraft.getInstance().font, text, 0, 0, WidgetTheme.TOOLTIP_TEXT);
+        context.pose().popMatrix();
     }
 
     private static HudBounds getAltOutlineBounds(HudEditorOverlayHost host, AbstractWidget hoveredWidget) {
@@ -227,7 +227,7 @@ public final class HudEditorOverlayRenderer {
         return new HudBounds(minX, minY, maxX - minX, maxY - minY);
     }
 
-    private static void renderSingleScreenAnchor(HudEditorOverlayHost host, GuiGraphics context, ScreenAnchor anchor, int x, int y) {
+    private static void renderSingleScreenAnchor(HudEditorOverlayHost host, GuiGraphicsExtractor context, ScreenAnchor anchor, int x, int y) {
         if (host.isScreenAnchorOccupied(anchor, null) || host.isScreenAnchorCovered(x, y)) {
             return;
         }

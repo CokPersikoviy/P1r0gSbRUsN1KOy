@@ -1,7 +1,7 @@
 package ru.wilyfox.client.quickaccess;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -66,11 +66,11 @@ public class QuickAccessEditorScreen extends Screen {
 
     @Override
     public void onClose() {
-        Minecraft.getInstance().setScreen(parent);
+        Minecraft.getInstance().gui.setScreen(parent);
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("ui/QuickAccessEditorScreen/render")) {
             graphics.fill(0, 0, this.width, this.height, WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0x50));
 
@@ -82,27 +82,29 @@ public class QuickAccessEditorScreen extends Screen {
             HudSurface.drawPanel(graphics, panelX, panelY, PANEL_WIDTH, PANEL_HEIGHT, WidgetChrome.FROST, HudSurface.nativeRenderer());
             graphics.fill(panelX + LIST_WIDTH, panelY + HEADER_HEIGHT, panelX + LIST_WIDTH + 1, panelY + PANEL_HEIGHT - 8, WidgetTheme.BAR_BG);
 
-            graphics.drawString(this.font, "Quick Access", panelX + 10, panelY + 8, WidgetTheme.TITLE);
-            graphics.drawString(this.font, "Editor", panelX + 92, panelY + 8, WidgetTheme.TEXT_SECONDARY);
+            graphics.text(this.font, "Quick Access", panelX + 10, panelY + 8, WidgetTheme.TITLE);
+            graphics.text(this.font, "Editor", panelX + 92, panelY + 8, WidgetTheme.TEXT_SECONDARY);
 
             renderSelectionList(graphics, mouseX, mouseY);
 
-            super.render(graphics, mouseX, mouseY, partialTick);
+            super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 
             renderEditorLabels(graphics);
         }
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x(), mouseY = event.y();
+        int button = event.button();
         if (button == 0 && handleListClick(mouseX, mouseY)) {
             return true;
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
-    private void renderSelectionList(GuiGraphics graphics, int mouseX, int mouseY) {
+    private void renderSelectionList(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
         List<QuickAccessSectionConfig> sections = ConfigManager.get().quickAccess.sections;
         int listX = panelX + 8;
         int listY = panelY + HEADER_HEIGHT + 8;
@@ -129,7 +131,7 @@ public class QuickAccessEditorScreen extends Screen {
         }
     }
 
-    private void renderListRow(GuiGraphics graphics, int x, int y, int width, int height, boolean selected, boolean hovered, String text) {
+    private void renderListRow(GuiGraphicsExtractor graphics, int x, int y, int width, int height, boolean selected, boolean hovered, String text) {
         int bg = selected ? WidgetTheme.PANEL_BG_SOFT : (hovered ? WidgetTheme.PANEL_BG : WidgetTheme.BAR_BG);
         int textColor = selected ? WidgetTheme.TITLE : (hovered ? WidgetTheme.TEXT_SOFT : WidgetTheme.TEXT_SECONDARY);
 
@@ -138,7 +140,7 @@ public class QuickAccessEditorScreen extends Screen {
             graphics.fill(x, y, x + width, y + 1, WidgetTheme.ACCENT_LINE);
         }
 
-        graphics.drawString(this.font, text, x + 6, y + (height - this.font.lineHeight) / 2, textColor);
+        graphics.text(this.font, text, x + 6, y + (height - this.font.lineHeight) / 2, textColor);
     }
 
     private boolean handleListClick(double mouseX, double mouseY) {
@@ -262,23 +264,23 @@ public class QuickAccessEditorScreen extends Screen {
         addRenderableWidget(itemModelBox);
     }
 
-    private void renderEditorLabels(GuiGraphics graphics) {
+    private void renderEditorLabels(GuiGraphicsExtractor graphics) {
         int formX = panelX + LIST_WIDTH + 18;
         int formY = panelY + HEADER_HEIGHT + 18;
 
-        graphics.drawString(this.font, "Section title", formX, formY, WidgetTheme.TEXT_SECONDARY);
+        graphics.text(this.font, "Section title", formX, formY, WidgetTheme.TEXT_SECONDARY);
 
         QuickAccessSectionConfig section = getSelectedSection();
         if (section == null || selectedItem < 0 || selectedItem >= section.items.size()) {
-            graphics.drawString(this.font, "Select an item to edit its command and icon.", formX, formY + 52, WidgetTheme.TEXT_MUTED);
+            graphics.text(this.font, "Select an item to edit its command and icon.", formX, formY + 52, WidgetTheme.TEXT_MUTED);
             return;
         }
 
-        graphics.drawString(this.font, "Item title", formX, formY + 42, WidgetTheme.TEXT_SECONDARY);
-        graphics.drawString(this.font, "Command", formX, formY + 84, WidgetTheme.TEXT_SECONDARY);
-        graphics.drawString(this.font, "Item id", formX, formY + 126, WidgetTheme.TEXT_SECONDARY);
-        graphics.drawString(this.font, "Custom model data", formX, formY + 168, WidgetTheme.TEXT_SECONDARY);
-        graphics.drawString(this.font, "Use {player} to target player under crosshair.", formX, panelY + PANEL_HEIGHT - 44, WidgetTheme.TEXT_MUTED);
+        graphics.text(this.font, "Item title", formX, formY + 42, WidgetTheme.TEXT_SECONDARY);
+        graphics.text(this.font, "Command", formX, formY + 84, WidgetTheme.TEXT_SECONDARY);
+        graphics.text(this.font, "Item id", formX, formY + 126, WidgetTheme.TEXT_SECONDARY);
+        graphics.text(this.font, "Custom model data", formX, formY + 168, WidgetTheme.TEXT_SECONDARY);
+        graphics.text(this.font, "Use {player} to target player under crosshair.", formX, panelY + PANEL_HEIGHT - 44, WidgetTheme.TEXT_MUTED);
     }
 
     private EditBox createTextBox(int x, int y, int width, String initialValue, java.util.function.Consumer<String> onChange) {

@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 public class BreakLineSettingsComponent extends SettingsComponent {
@@ -11,7 +11,7 @@ public class BreakLineSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
         int centerY = y + height / 2;
         int labelWidth = label == null || label.isBlank() ? 0 : mc.font.width(label);
@@ -32,7 +32,7 @@ public class BreakLineSettingsComponent extends SettingsComponent {
         if (labelWidth > 0) {
             int textX = x + (width - labelWidth) / 2;
             int textY = y + (height - mc.font.lineHeight) / 2;
-            context.drawString(mc.font, label, textX, textY, WidgetTheme.TEXT_SECONDARY);
+            context.text(mc.font, label, textX, textY, WidgetTheme.TEXT_SECONDARY);
         }
     }
 

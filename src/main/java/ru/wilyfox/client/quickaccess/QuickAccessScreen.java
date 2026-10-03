@@ -2,14 +2,14 @@ package ru.wilyfox.client.quickaccess;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomModelData;
@@ -105,13 +105,13 @@ public class QuickAccessScreen extends Screen {
     }
 
     @Override
-    protected void renderBlurredBackground() {
+    protected void extractBlurredBackground(GuiGraphicsExtractor graphics) {
     }
 
     @Override
     public void onClose() {
         if (isEditorMode()) {
-            Minecraft.getInstance().setScreen(parent);
+            Minecraft.getInstance().gui.setScreen(parent);
             return;
         }
 
@@ -119,7 +119,7 @@ public class QuickAccessScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("ui/QuickAccessScreen/render")) {
             hoveredItem = null;
             dragMouseX = mouseX;
@@ -141,7 +141,7 @@ public class QuickAccessScreen extends Screen {
             if (isEditorMode()) {
                 renderEditorPanel(graphics);
                 renderEditorFooter(graphics);
-                super.render(graphics, mouseX, mouseY, partialTick);
+                super.extractRenderState(graphics, mouseX, mouseY, partialTick);
             }
 
             if (dragging) {
@@ -151,7 +151,9 @@ public class QuickAccessScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x(), mouseY = event.y();
+        int button = event.button();
         if (button == 0) {
             ItemLayout clickedItem = findItemLayout(mouseX, mouseY);
             if (clickedItem != null) {
@@ -178,28 +180,32 @@ public class QuickAccessScreen extends Screen {
             }
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dragX, double dragY) {
+        double mouseX = event.x(), mouseY = event.y();
+        int button = event.button();
         if (isEditorMode() && dragging && button == 0) {
             dragMouseX = (int) mouseX;
             dragMouseY = (int) mouseY;
             return true;
         }
 
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDragged(event, dragX, dragY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+        double mouseX = event.x(), mouseY = event.y();
+        int button = event.button();
         if (isEditorMode() && dragging && button == 0) {
             finishDrag(mouseX, mouseY);
             return true;
         }
 
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(event);
     }
 
     public QuickAccessItemConfig getHoveredItem() {
@@ -210,7 +216,7 @@ public class QuickAccessScreen extends Screen {
         return mode == Mode.EDITOR;
     }
 
-    private void renderSelectorPanel(GuiGraphics graphics, int mouseX, int mouseY) {
+    private void renderSelectorPanel(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
         Minecraft minecraft = Minecraft.getInstance();
         List<QuickAccessSectionConfig> sections = ConfigManager.get().quickAccess.sections;
 
@@ -227,7 +233,7 @@ public class QuickAccessScreen extends Screen {
             labelColor = hoveredItem == null ? WidgetTheme.TITLE : (canExecute(hoveredItem) ? WidgetTheme.TITLE : WidgetTheme.TEXT_MUTED);
         }
 
-        graphics.drawCenteredString(
+        graphics.centeredText(
                 minecraft.font,
                 label,
                 selectorPanelX + selectorPanelWidth / 2,
@@ -249,7 +255,7 @@ public class QuickAccessScreen extends Screen {
             int sectionColor = isEditorMode() && selectedSection == sectionIndex && selectedItem < 0
                     ? WidgetTheme.TITLE
                     : WidgetTheme.TEXT_SECONDARY;
-            graphics.drawString(minecraft.font, section.title, selectorPanelX + PANEL_PADDING, currentY, sectionColor);
+            graphics.text(minecraft.font, section.title, selectorPanelX + PANEL_PADDING, currentY, sectionColor);
             currentY += headerHeight + 5;
 
             int currentX = selectorPanelX + PANEL_PADDING;
@@ -267,7 +273,7 @@ public class QuickAccessScreen extends Screen {
         }
     }
 
-    private void renderItemCard(GuiGraphics graphics, Minecraft minecraft, QuickAccessItemConfig item, int sectionIndex, int itemIndex, int x, int y, int mouseX, int mouseY) {
+    private void renderItemCard(GuiGraphicsExtractor graphics, Minecraft minecraft, QuickAccessItemConfig item, int sectionIndex, int itemIndex, int x, int y, int mouseX, int mouseY) {
         boolean hovered = mouseX >= x && mouseX <= x + ITEM_SIZE && mouseY >= y && mouseY <= y + ITEM_SIZE;
         boolean executable = canExecute(item);
         boolean selected = isEditorMode() && selectedSection == sectionIndex && selectedItem == itemIndex;
@@ -289,7 +295,7 @@ public class QuickAccessScreen extends Screen {
             graphics.fill(x, y, x + ITEM_SIZE, y + ITEM_SIZE, dragShadowColor());
         } else {
             ItemStack stack = getDisplayStack(item);
-            graphics.renderItem(stack, x + (ITEM_SIZE - 16) / 2, y + (ITEM_SIZE - 16) / 2);
+            graphics.item(stack, x + (ITEM_SIZE - 16) / 2, y + (ITEM_SIZE - 16) / 2);
         }
 
         itemLayouts.add(new ItemLayout(sectionIndex, itemIndex, x, y, ITEM_SIZE, ITEM_SIZE));
@@ -298,7 +304,7 @@ public class QuickAccessScreen extends Screen {
         }
     }
 
-    private void renderEditorPanel(GuiGraphics graphics) {
+    private void renderEditorPanel(GuiGraphicsExtractor graphics) {
         Minecraft minecraft = Minecraft.getInstance();
         graphics.fill(editorPanelX, editorPanelY, editorPanelX + EDITOR_WIDTH, editorPanelY + editorPanelHeight, solidPanelColor());
         graphics.fill(editorPanelX, editorPanelY, editorPanelX + EDITOR_WIDTH, editorPanelY + 1, WidgetTheme.ACCENT_LINE);
@@ -310,24 +316,24 @@ public class QuickAccessScreen extends Screen {
                 WidgetTheme.withAlpha(WidgetTheme.ACCENT_LINE, 0x66)
         );
 
-        graphics.drawString(minecraft.font, "Inspector", editorPanelX + 10, editorPanelY + 8, WidgetTheme.TITLE);
+        graphics.text(minecraft.font, "Inspector", editorPanelX + 10, editorPanelY + 8, WidgetTheme.TITLE);
 
         int labelX = editorPanelX + 10;
         int labelY = editorPanelY + 32;
-        graphics.drawString(minecraft.font, "Section title", labelX, labelY, WidgetTheme.TEXT_SECONDARY);
+        graphics.text(minecraft.font, "Section title", labelX, labelY, WidgetTheme.TEXT_SECONDARY);
 
         if (selectedItem >= 0) {
-            graphics.drawString(minecraft.font, "Item title", labelX, labelY + 42, WidgetTheme.TEXT_SECONDARY);
-            graphics.drawString(minecraft.font, "Command", labelX, labelY + 84, WidgetTheme.TEXT_SECONDARY);
-            graphics.drawString(minecraft.font, "Item id", labelX, labelY + 126, WidgetTheme.TEXT_SECONDARY);
-            graphics.drawString(minecraft.font, "Custom model data", labelX, labelY + 168, WidgetTheme.TEXT_SECONDARY);
+            graphics.text(minecraft.font, "Item title", labelX, labelY + 42, WidgetTheme.TEXT_SECONDARY);
+            graphics.text(minecraft.font, "Command", labelX, labelY + 84, WidgetTheme.TEXT_SECONDARY);
+            graphics.text(minecraft.font, "Item id", labelX, labelY + 126, WidgetTheme.TEXT_SECONDARY);
+            graphics.text(minecraft.font, "Custom model data", labelX, labelY + 168, WidgetTheme.TEXT_SECONDARY);
         } else {
-            graphics.drawString(minecraft.font, "Select an item to edit command and icon.", labelX, labelY + 42, WidgetTheme.TEXT_MUTED);
+            graphics.text(minecraft.font, "Select an item to edit command and icon.", labelX, labelY + 42, WidgetTheme.TEXT_MUTED);
         }
 
     }
 
-    private void renderEditorFooter(GuiGraphics graphics) {
+    private void renderEditorFooter(GuiGraphicsExtractor graphics) {
         Minecraft minecraft = Minecraft.getInstance();
         int footerY = selectorPanelY + selectorPanelHeight + 8;
         int footerWidth = selectorPanelWidth;
@@ -339,14 +345,14 @@ public class QuickAccessScreen extends Screen {
                 footerY + 1,
                 WidgetTheme.withAlpha(WidgetTheme.ACCENT_LINE, 0x66)
         );
-        graphics.drawCenteredString(
+        graphics.centeredText(
                 minecraft.font,
                 "Drag item cards to move them",
                 selectorPanelX + footerWidth / 2,
                 footerY + 7,
                 WidgetTheme.TEXT_MUTED
         );
-        graphics.drawCenteredString(
+        graphics.centeredText(
                 minecraft.font,
                 "Use {player} for crosshair target",
                 selectorPanelX + footerWidth / 2,
@@ -355,7 +361,7 @@ public class QuickAccessScreen extends Screen {
         );
     }
 
-    private void renderDraggedPreview(GuiGraphics graphics) {
+    private void renderDraggedPreview(GuiGraphicsExtractor graphics) {
         QuickAccessItemConfig item = getSelectedItem();
         if (item == null) {
             return;
@@ -365,7 +371,7 @@ public class QuickAccessScreen extends Screen {
         int y = dragMouseY - ITEM_SIZE / 2;
         HudSurface.fillRounded(graphics, x, y, ITEM_SIZE, ITEM_SIZE, 4, dragPreviewColor());
         graphics.fill(x + 4, y, x + ITEM_SIZE - 4, y + 1, WidgetTheme.ACCENT_LINE);
-        graphics.renderItem(getDisplayStack(item), x + (ITEM_SIZE - 16) / 2, y + (ITEM_SIZE - 16) / 2);
+        graphics.item(getDisplayStack(item), x + (ITEM_SIZE - 16) / 2, y + (ITEM_SIZE - 16) / 2);
     }
 
     private void finishDrag(double mouseX, double mouseY) {
@@ -532,7 +538,7 @@ public class QuickAccessScreen extends Screen {
     }
 
     private ItemStack createStack(QuickAccessItemConfig item) {
-        ResourceLocation location = ResourceLocation.tryParse(item.itemId);
+        Identifier location = Identifier.tryParse(item.itemId);
         ItemStack stack = location != null ? new ItemStack(BuiltInRegistries.ITEM.getValue(location)) : ItemStack.EMPTY;
         if (stack.isEmpty()) {
             stack = new ItemStack(Items.PAPER);
@@ -708,7 +714,7 @@ public class QuickAccessScreen extends Screen {
         }
 
         @Override
-        protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
             boolean hovered = isHoveredOrFocused();
             int bg = hovered ? WidgetTheme.PANEL_BG_SOFT : WidgetTheme.BAR_BG;
             int line = hovered
@@ -716,7 +722,7 @@ public class QuickAccessScreen extends Screen {
                     : WidgetTheme.withAlpha(WidgetTheme.ACCENT_LINE, 0x66);
             graphics.fill(getX(), getY(), getX() + width, getY() + height, bg);
             graphics.fill(getX(), getY(), getX() + width, getY() + 1, line);
-            graphics.drawCenteredString(
+            graphics.centeredText(
                     QuickAccessScreen.this.font,
                     getMessage(),
                     getX() + width / 2,
@@ -726,7 +732,8 @@ public class QuickAccessScreen extends Screen {
         }
 
         @Override
-        public void onClick(double mouseX, double mouseY) {
+        public void onClick(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+            double mouseX = event.x(), mouseY = event.y();
             onPress.run();
         }
 
@@ -754,7 +761,7 @@ public class QuickAccessScreen extends Screen {
         }
 
         @Override
-        protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
             boolean focused = isFocused();
             boolean hovered = isHoveredOrFocused();
             int bg = focused ? WidgetTheme.PANEL_BG_SOFT : WidgetTheme.BAR_BG;
@@ -764,7 +771,7 @@ public class QuickAccessScreen extends Screen {
 
             String visible = getVisibleText();
             int textY = getY() + (height - 8) / 2;
-            graphics.drawString(font, visible, getX() + TEXT_PADDING, textY, WidgetTheme.TEXT_PRIMARY);
+            graphics.text(font, visible, getX() + TEXT_PADDING, textY, WidgetTheme.TEXT_PRIMARY);
 
             if (focused) {
                 int cursorX = getX() + TEXT_PADDING + font.width(value.substring(displayOffset, cursor));
@@ -773,19 +780,21 @@ public class QuickAccessScreen extends Screen {
         }
 
         @Override
-        public void onClick(double mouseX, double mouseY) {
+        public void onClick(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+            double mouseX = event.x(), mouseY = event.y();
             setFocused(true);
             cursor = getCursorFromMouse(mouseX);
             syncOffsetToCursor();
         }
 
         @Override
-        public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        int keyCode = event.key(), scanCode = event.scancode(), modifiers = event.modifiers();
             if (!isFocused()) {
                 return false;
             }
 
-            if (Screen.isPaste(keyCode)) {
+            if (event.isPaste()) {
                 insert(Minecraft.getInstance().keyboardHandler.getClipboard());
                 return true;
             }
@@ -833,12 +842,14 @@ public class QuickAccessScreen extends Screen {
         }
 
         @Override
-        public boolean charTyped(char codePoint, int modifiers) {
+        public boolean charTyped(net.minecraft.client.input.CharacterEvent event) {
+        int codePoint = event.codepoint();
+        int modifiers = 0;
             if (!isFocused() || Character.isISOControl(codePoint)) {
                 return false;
             }
 
-            insert(String.valueOf(codePoint));
+            insert(new String(Character.toChars(codePoint)));
             return true;
         }
 

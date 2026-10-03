@@ -14,7 +14,7 @@ public final class DwBossTypesDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int count = DwProtocolCodec.readVarInt(buf);
+            int count = DwProtocolCodec.readCollectionSize(buf);
             Map<String, DwBossType> types = new LinkedHashMap<>(Math.max(4, count));
 
             for (int i = 0; i < count; i++) {

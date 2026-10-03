@@ -1,7 +1,7 @@
 package ru.wilyfox.client.chat;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 import java.util.List;
@@ -28,7 +28,7 @@ public final class ChatTabOverlay {
         return INSTANCE;
     }
 
-    public void render(GuiGraphics graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor graphics, int screenWidth, int screenHeight, int mouseX, int mouseY) {
         Minecraft minecraft = Minecraft.getInstance();
 
         int x = START_X;
@@ -67,7 +67,7 @@ public final class ChatTabOverlay {
             int textX = x + (tabWidth - minecraft.font.width(title)) / 2;
             int textY = y + (TAB_HEIGHT - minecraft.font.lineHeight) / 2;
 
-            graphics.drawString(
+            graphics.text(
                     minecraft.font,
                     title,
                     textX,
@@ -126,7 +126,7 @@ public final class ChatTabOverlay {
         return false;
     }
 
-    private void renderEmojiButton(GuiGraphics graphics, Minecraft minecraft, int x, int y, int mouseX, int mouseY, int screenHeight) {
+    private void renderEmojiButton(GuiGraphicsExtractor graphics, Minecraft minecraft, int x, int y, int mouseX, int mouseY, int screenHeight) {
         boolean hovered = isOverEmojiButton(mouseX, mouseY, x, screenHeight);
         int bg = emojiMenuOpen ? activeTabBackground() : (hovered ? hoveredTabBackground() : idleTabBackground());
         int textColor = emojiMenuOpen ? WidgetTheme.TITLE : (hovered ? WidgetTheme.TEXT_SOFT : WidgetTheme.TEXT_SECONDARY);
@@ -136,7 +136,7 @@ public final class ChatTabOverlay {
             graphics.fill(x, y + TAB_HEIGHT - 1, x + EMOJI_BUTTON_WIDTH, y + TAB_HEIGHT, WidgetTheme.ACCENT_LINE);
         }
 
-        graphics.drawCenteredString(
+        graphics.centeredText(
                 minecraft.font,
                 ":)",
                 x + EMOJI_BUTTON_WIDTH / 2,
@@ -145,7 +145,7 @@ public final class ChatTabOverlay {
         );
     }
 
-    private void renderEmojiMenu(GuiGraphics graphics, Minecraft minecraft, int buttonX, int buttonY, int mouseX, int mouseY, int screenWidth, int screenHeight) {
+    private void renderEmojiMenu(GuiGraphicsExtractor graphics, Minecraft minecraft, int buttonX, int buttonY, int mouseX, int mouseY, int screenWidth, int screenHeight) {
         List<ServerEmojiRegistry.EmojiEntry> emojis = ServerEmojiRegistry.all();
         int rows = (emojis.size() + EMOJI_GRID_COLUMNS - 1) / EMOJI_GRID_COLUMNS;
         int panelWidth = EMOJI_PANEL_PADDING * 2 + EMOJI_GRID_COLUMNS * EMOJI_CELL_SIZE;
@@ -166,7 +166,7 @@ public final class ChatTabOverlay {
                     && mouseY >= cellY && mouseY <= cellY + EMOJI_CELL_SIZE;
 
             graphics.fill(cellX, cellY, cellX + EMOJI_CELL_SIZE, cellY + EMOJI_CELL_SIZE, hovered ? hoveredTabBackground() : idleEmojiCellBackground());
-            graphics.drawCenteredString(
+            graphics.centeredText(
                     minecraft.font,
                     emojis.get(index).symbol(),
                     cellX + EMOJI_CELL_SIZE / 2,
@@ -245,7 +245,7 @@ public final class ChatTabOverlay {
             return START_X + 320;
         }
 
-        return START_X + minecraft.gui.getChat().getWidth();
+        return START_X + net.minecraft.client.gui.components.ChatComponent.getWidth(minecraft.options.chatWidth().get());
     }
 
     private int getScreenWidth(Minecraft minecraft) {
@@ -253,12 +253,10 @@ public final class ChatTabOverlay {
     }
 
     private void insertEmoji(Minecraft minecraft, String emoji) {
-        if (minecraft.screen == null || emoji == null || emoji.isBlank()) {
+        if (minecraft.gui.screen() == null || emoji == null || emoji.isBlank()) {
             return;
         }
 
-        for (int i = 0; i < emoji.length(); i++) {
-            minecraft.screen.charTyped(emoji.charAt(i), 0);
-        }
+        emoji.codePoints().forEach(codepoint -> minecraft.gui.screen().charTyped(new net.minecraft.client.input.CharacterEvent(codepoint)));
     }
 }

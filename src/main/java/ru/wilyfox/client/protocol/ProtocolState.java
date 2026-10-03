@@ -27,7 +27,6 @@ final class ProtocolState {
     boolean receivedEvoPlusPayload;
     long lastHandshakeAt;
     long lastPayloadAt;
-    long lastAbilityTimersAt;
     long worldContextRevision;
     long gameLocationRevision;
 
@@ -35,7 +34,7 @@ final class ProtocolState {
     Map<String, DwPetType> petTypes = new LinkedHashMap<>();
     Map<String, DwAbilityType> abilityTypes = new LinkedHashMap<>();
     Map<Integer, DwStaffType> staffTypes = new LinkedHashMap<>();
-    Map<String, Long> lastAbilityTimers = new LinkedHashMap<>();
+    Map<String, AbilityTimerSample> abilityTimerHistory = new LinkedHashMap<>();
     Map<String, Integer> payloadSampleCounts = new LinkedHashMap<>();
     ProtocolDiagnostics diagnostics = new ProtocolDiagnostics();
 
@@ -74,14 +73,13 @@ final class ProtocolState {
         receivedEvoPlusPayload = false;
         lastHandshakeAt = 0L;
         lastPayloadAt = 0L;
-        lastAbilityTimersAt = 0L;
         loggedFirstMinerPayload = false;
 
         bossTypes = new LinkedHashMap<>();
         petTypes = new LinkedHashMap<>();
         abilityTypes = new LinkedHashMap<>();
         staffTypes = new LinkedHashMap<>();
-        lastAbilityTimers = new LinkedHashMap<>();
+        abilityTimerHistory = new LinkedHashMap<>();
         payloadSampleCounts = new LinkedHashMap<>();
         diagnostics = new ProtocolDiagnostics();
 
@@ -99,5 +97,11 @@ final class ProtocolState {
         fishingNibbles = new LinkedHashMap<>();
         hourlyQuestTypes = new LinkedHashMap<>();
         hourlyQuestProgress = new LinkedHashMap<>();
+    }
+
+    record AbilityTimerSample(long remainingMillis, long receivedAtMillis) {
+        long remainingAt(long now) {
+            return Math.max(0L, remainingMillis - Math.max(0L, now - receivedAtMillis));
+        }
     }
 }

@@ -11,9 +11,19 @@ import ru.wilyfox.client.hud.config.ConfigManager;
 @Mixin(GameRenderer.class)
 public class GameRendererMixin {
     @Inject(method = "bobHurt", at = @At("HEAD"), cancellable = true)
-    private void froghelper$hideHurtCameraShake(PoseStack poseStack, float partialTick, CallbackInfo ci) {
+    private void froghelper$hideHurtCameraShake(net.minecraft.client.renderer.state.level.CameraRenderState camera, PoseStack poseStack, CallbackInfo ci) {
         if (ConfigManager.get().render.hideHurtCameraShake) {
             ci.cancel();
         }
+    }
+
+    @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/render/GuiRenderer;render()V"))
+    private void froghelper$captureHudBlur(CallbackInfo ci) {
+        ru.wilyfox.client.hud.widget.HudBlur.captureBeforeGui();
+    }
+
+    @Inject(method = "close", at = @At("HEAD"))
+    private void froghelper$closeHudBlur(CallbackInfo ci) {
+        ru.wilyfox.client.hud.widget.HudBlur.close();
     }
 }

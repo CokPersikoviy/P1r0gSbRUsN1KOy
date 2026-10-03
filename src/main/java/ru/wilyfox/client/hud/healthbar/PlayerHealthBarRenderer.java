@@ -1,17 +1,19 @@
 package ru.wilyfox.client.hud.healthbar;
 
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderStateShard;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.renderer.rendertype.RenderSetup;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import java.util.Optional;
+import ru.wilyfox.mixin.RenderTypeInvoker;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
@@ -35,25 +37,22 @@ public final class PlayerHealthBarRenderer {
     private static final float FILL_Z = 0.002f;
     private static final float TEXT_Z = 0.004f;
     private static final float OCCLUDED_BRIGHTNESS = 0.45f;
-    private static final RenderType HEALTH_BAR_SEE_THROUGH = RenderType.create(
-            "froghelper_health_bar_see_through",
-            DefaultVertexFormat.POSITION_COLOR,
-            VertexFormat.Mode.QUADS,
-            1536,
-            false,
-            true,
-            RenderType.CompositeState.builder()
-                    .setShaderState(RenderStateShard.POSITION_COLOR_SHADER)
-                    .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
-                    .setDepthTestState(RenderStateShard.NO_DEPTH_TEST)
-                    .setCullState(RenderStateShard.NO_CULL)
-                    .setWriteMaskState(RenderStateShard.COLOR_WRITE)
-                    .createCompositeState(false)
-    );
-    private static final ByteBufferBuilder HEALTH_TEXT_BUFFER = new ByteBufferBuilder(16 * 1024);
-    private static final MultiBufferSource.BufferSource HEALTH_TEXT_SOURCE =
-            MultiBufferSource.immediate(HEALTH_TEXT_BUFFER);
-    private static boolean numericTextQueued;
+    private static final class SeeThroughType {
+        private static final RenderType INSTANCE = createSeeThroughType();
+    }
+
+    private static RenderType createSeeThroughType() {
+        RenderPipeline base = RenderPipelines.DEBUG_QUADS;
+        var snippet = new RenderPipeline.Snippet(Optional.of(base.getVertexShader()),
+                Optional.of(base.getFragmentShader()), Optional.of(base.getShaderDefines()),
+                Optional.of(base.getBindGroupLayouts()), base.getColorTargetStates(),
+                base.getColorTargetStates().length, Optional.empty(), Optional.of(base.getPolygonMode()),
+                Optional.of(false), base.getVertexFormatBindings(), Optional.of(base.getPrimitiveTopology()));
+        var pipeline = RenderPipeline.builder(snippet)
+                .withLocation(net.minecraft.resources.Identifier.fromNamespaceAndPath("froghelper", "health_bar_see_through")).build();
+        return RenderTypeInvoker.froghelper$create("froghelper_health_bar_see_through",
+                RenderSetup.builder(pipeline).createRenderSetup());
+    }
     private static final double BAR_Y_OFFSET = 0.85;
     private static final double FADE_START_DISTANCE = 8.0;
     private static final double FADE_END_DISTANCE = 20.0;
@@ -61,25 +60,37 @@ public final class PlayerHealthBarRenderer {
 
     // Occlusion cache: isVisibleToCamera() raycasts the world (Level.clip) per player, and doing it every
     // frame for every nearby player scales badly on crowded bosses (~22 raycasts/frame here). Occlusion
-    // changes slowly, so cache the result per player (entity id) for a short TTL and re-raycast only when
+    // changes slowly, so cache the result per player identity for a short TTL and re-raycast only when
     // it goes stale — a ~150 ms lag on a health bar appearing/hiding is imperceptible.
     private static final long VISIBILITY_TTL_MS = 150L;
     private static final long VISIBILITY_STALE_MS = 3000L; // evict players not queried this long (they left)
-    private static final java.util.Map<Integer, long[]> VISIBILITY_CACHE = new java.util.HashMap<>();
+    private static final java.util.Map<Player, long[]> VISIBILITY_CACHE = new java.util.IdentityHashMap<>();
+    private static ClientLevel visibilityLevel;
     private static long lastVisibilityPruneMs;
 
     private PlayerHealthBarRenderer() {
     }
 
-    public static void render(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, float partialTick) {
+    static void clearVisibilityCache() {
+        VISIBILITY_CACHE.clear();
+        lastVisibilityPruneMs = 0L;
+        visibilityLevel = null;
+    }
+
+    public static void render(PoseStack poseStack, SubmitNodeCollector collector, float partialTick) {
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderer/frame")) {
         Minecraft mc = Minecraft.getInstance();
+        if (visibilityLevel != mc.level) {
+            clearVisibilityCache();
+            visibilityLevel = mc.level;
+        }
         if (mc.level == null || mc.player == null || mc.gameRenderer == null) {
             ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/skippedNoWorld");
             return;
         }
 
-        if (!ConfigManager.get().playerHealthBars.active) {
+        var settings = ConfigManager.get().playerHealthBars;
+        if (!settings.active || settings.opacityPercent <= 0) {
             ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/skippedDisabled");
             return;
         }
@@ -91,8 +102,9 @@ public final class PlayerHealthBarRenderer {
             return;
         }
 
-        Vec3 cameraPos = camera.getPosition();
-        pruneVisibilityCache(System.currentTimeMillis());
+        Vec3 cameraPos = camera.position();
+        long now = System.currentTimeMillis();
+        pruneVisibilityCache(now);
         int candidates = 0;
         int rendered = 0;
         int skippedSelf = 0;
@@ -119,22 +131,12 @@ public final class PlayerHealthBarRenderer {
                     continue;
                 }
 
-                boolean visibleToCamera;
-                try (ModProfiler.Scope visibilityScope = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderer/visibilityCheck")) {
-                    visibleToCamera = isVisibleToCameraCached(target);
-                }
-                boolean occluded = !visibleToCamera;
-                if (occluded && target.isDiscrete()) {
-                    skippedOccluded++;
-                    continue;
-                }
-
                 double x = Mth.lerp(partialTick, target.xOld, target.getX());
                 double y = Mth.lerp(partialTick, target.yOld, target.getY()) + target.getBbHeight() + BAR_Y_OFFSET;
                 double z = Mth.lerp(partialTick, target.zOld, target.getZ());
 
-                double distance = cameraPos.distanceTo(new Vec3(x, y, z));
-                float distanceAlpha = ConfigManager.get().playerHealthBars.distanceFade
+                double distance = Math.sqrt(cameraPos.distanceToSqr(x, y, z));
+                float distanceAlpha = settings.distanceFade
                         ? getDistanceAlpha(distance)
                         : 1.0f;
                 if (distanceAlpha <= 0.01f) {
@@ -142,13 +144,23 @@ public final class PlayerHealthBarRenderer {
                     continue;
                 }
 
+                boolean visibleToCamera;
+                try (ModProfiler.Scope visibilityScope = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderer/visibilityCheck")) {
+                    visibleToCamera = isVisibleToCameraCached(target, now);
+                }
+                boolean occluded = !visibleToCamera;
+                if (occluded && target.isDiscrete()) {
+                    skippedOccluded++;
+                    continue;
+                }
+
                 poseStack.pushPose();
                 poseStack.translate(x - cameraPos.x, y - cameraPos.y, z - cameraPos.z);
-                poseStack.mulPose(dispatcher.cameraOrientation());
+                poseStack.mulPose(camera.rotation());
                 poseStack.scale(WORLD_SCALE, -WORLD_SCALE, WORLD_SCALE);
 
                 try (ModProfiler.Scope renderBarScope = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderer/renderBar")) {
-                    renderHealthBar(poseStack, bufferSource, target, distanceAlpha, occluded);
+                    renderHealthBar(poseStack, collector, target, distanceAlpha, occluded);
                 }
 
                 poseStack.popPose();
@@ -171,7 +183,7 @@ public final class PlayerHealthBarRenderer {
 
     private static void renderHealthBar(
             PoseStack poseStack,
-            MultiBufferSource.BufferSource bufferSource,
+            SubmitNodeCollector collector,
             Player target,
             float distanceAlpha,
             boolean occluded
@@ -208,8 +220,6 @@ public final class PlayerHealthBarRenderer {
         int fillWidth = Math.round(barWidth * progress);
         int fillEndX = x1 + fillWidth;
 
-        Matrix4f matrix = poseStack.last().pose();
-        VertexConsumer vertexConsumer = bufferSource.getBuffer(occluded ? HEALTH_BAR_SEE_THROUGH : RenderType.debugQuads());
 
         float finalAlpha = distanceAlpha * opacityMultiplier;
         int panelBaseColor = critical
@@ -224,17 +234,24 @@ public final class PlayerHealthBarRenderer {
             fillColor = scaleRgb(fillColor, OCCLUDED_BRIGHTNESS);
         }
 
-        fillQuad(vertexConsumer, matrix, x1 - bgPadding, y1 - bgPadding, x2 + bgPadding, y2 + bgPadding, PANEL_Z, panelColor);
-        fillQuad(vertexConsumer, matrix, x1 - bgPadding, y1 - bgPadding, x2 + bgPadding, y1 - bgPadding + accentHeight, ACCENT_Z, accentColor);
-
-        if (fillWidth > 0) {
-            fillQuad(vertexConsumer, matrix, x1, y1, fillEndX, y2, FILL_Z, fillColor);
-        }
+        int capturedPanelColor = panelColor;
+        int capturedAccentColor = accentColor;
+        int capturedFillColor = fillColor;
+        collector.submitCustomGeometry(poseStack, occluded ? SeeThroughType.INSTANCE : RenderTypes.debugQuads(),
+                (pose, vertexConsumer) -> {
+                    Matrix4f matrix = pose.pose();
+                    fillQuad(vertexConsumer, matrix, x1 - bgPadding, y1 - bgPadding, x2 + bgPadding, y2 + bgPadding, PANEL_Z, capturedPanelColor);
+                    fillQuad(vertexConsumer, matrix, x1 - bgPadding, y1 - bgPadding, x2 + bgPadding, y1 - bgPadding + accentHeight, ACCENT_Z, capturedAccentColor);
+                    if (fillWidth > 0) {
+                        fillQuad(vertexConsumer, matrix, x1, y1, fillEndX, y2, FILL_Z, capturedFillColor);
+                    }
+                });
 
         if (config.showNumericHp) {
             ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/numeric/enabled");
             renderHealthText(
                     poseStack,
+                    collector,
                     health,
                     maxHealth,
                     barWidth,
@@ -249,6 +266,7 @@ public final class PlayerHealthBarRenderer {
 
     private static void renderHealthText(
             PoseStack poseStack,
+            SubmitNodeCollector collector,
             float health,
             float maxHealth,
             int barWidth,
@@ -287,51 +305,13 @@ public final class PlayerHealthBarRenderer {
         poseStack.pushPose();
         poseStack.translate(textX, textY, TEXT_Z);
         poseStack.scale(textScale, textScale, 1.0F);
-        Matrix4f textMatrix = poseStack.last().pose();
-        font.drawInBatch(
-                text,
-                0.0F,
-                0.0F,
-                textColor,
-                false,
-                textMatrix,
-                HEALTH_TEXT_SOURCE,
-                Font.DisplayMode.SEE_THROUGH,
-                0,
-                LightTexture.FULL_BRIGHT
-        );
-        font.drawInBatch(
-                text,
-                0.0F,
-                0.0F,
-                textColor,
-                true,
-                textMatrix,
-                HEALTH_TEXT_SOURCE,
-                Font.DisplayMode.NORMAL,
-                0,
-                LightTexture.FULL_BRIGHT
-        );
+        var sequence = net.minecraft.network.chat.Component.literal(text).getVisualOrderText();
+        collector.submitText(poseStack, 0, 0, sequence, false, Font.DisplayMode.SEE_THROUGH,
+                0xF000F0, textColor, 0, 0);
+        collector.submitText(poseStack, 0, 0, sequence, true, Font.DisplayMode.NORMAL,
+                0xF000F0, textColor, 0, 0);
         poseStack.popPose();
-        numericTextQueued = true;
         ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/numeric/queued");
-    }
-
-    public static void flushNumericText() {
-        if (!numericTextQueued) {
-            return;
-        }
-
-        try {
-            HEALTH_TEXT_SOURCE.endBatch();
-            ModProfiler.getInstance().incrementCounter("render/PlayerHealthBarRenderer/numeric/flushed");
-        } finally {
-            numericTextQueued = false;
-        }
-    }
-
-    public static void flushSeeThroughBars(MultiBufferSource.BufferSource bufferSource) {
-        bufferSource.endBatch(HEALTH_BAR_SEE_THROUGH);
     }
 
     static String formatHealth(float health, float maxHealth) {
@@ -416,17 +396,15 @@ public final class PlayerHealthBarRenderer {
     }
 
     /** {@link #isVisibleToCamera} with a short-TTL per-player cache to avoid raycasting every frame. */
-    private static boolean isVisibleToCameraCached(Player target) {
-        long now = System.currentTimeMillis();
-        int id = target.getId();
-        long[] cached = VISIBILITY_CACHE.get(id);
-        if (cached != null && now - cached[0] < VISIBILITY_TTL_MS) {
+    private static boolean isVisibleToCameraCached(Player target, long now) {
+        long[] cached = VISIBILITY_CACHE.get(target);
+        if (cached != null && now >= cached[0] && now - cached[0] < VISIBILITY_TTL_MS) {
             return cached[1] != 0L;
         }
 
         boolean visible = isVisibleToCamera(target);
         if (cached == null) {
-            VISIBILITY_CACHE.put(id, new long[]{now, visible ? 1L : 0L});
+            VISIBILITY_CACHE.put(target, new long[]{now, visible ? 1L : 0L});
         } else {
             cached[0] = now;
             cached[1] = visible ? 1L : 0L;
@@ -437,7 +415,7 @@ public final class PlayerHealthBarRenderer {
     /** Drop cache entries for players that haven't been queried recently (left the area). Runs at most
      *  once per {@link #VISIBILITY_STALE_MS}. */
     private static void pruneVisibilityCache(long now) {
-        if (now - lastVisibilityPruneMs < VISIBILITY_STALE_MS) {
+        if (now >= lastVisibilityPruneMs && now - lastVisibilityPruneMs < VISIBILITY_STALE_MS) {
             return;
         }
         lastVisibilityPruneMs = now;
@@ -450,7 +428,7 @@ public final class PlayerHealthBarRenderer {
             return false;
         }
 
-        Vec3 from = mc.gameRenderer.getMainCamera().getPosition();
+        Vec3 from = mc.gameRenderer.mainCamera().position();
         Vec3 to = target.position().add(0.0, target.getBbHeight() * 0.85, 0.0);
 
         ClipContext context = new ClipContext(

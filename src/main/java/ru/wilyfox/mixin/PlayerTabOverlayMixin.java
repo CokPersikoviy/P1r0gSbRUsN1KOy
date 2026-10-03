@@ -2,7 +2,7 @@ package ru.wilyfox.mixin;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.PlayerTabOverlay;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.network.chat.Component;
@@ -54,7 +54,7 @@ public abstract class PlayerTabOverlayMixin {
             return;
         }
 
-        String name = playerInfo.getProfile().getName();
+        String name = playerInfo.getProfile().name();
         Component base = cir.getReturnValue();
         if (base == null) {
             base = Component.literal(name);
@@ -69,8 +69,8 @@ public abstract class PlayerTabOverlayMixin {
         cir.setReturnValue(base);
     }
 
-    @Inject(method = "render", at = @At("TAIL"))
-    private void froghelper$renderCurrentServer(GuiGraphics context, int screenWidth, Scoreboard scoreboard, Objective objective, CallbackInfo ci) {
+    @Inject(method = "extractRenderState", at = @At("TAIL"))
+    private void froghelper$renderCurrentServer(GuiGraphicsExtractor context, int screenWidth, Scoreboard scoreboard, Objective objective, CallbackInfo ci) {
         froghelper$logBoosterTabText();
 
         Font font = minecraft.font;
@@ -91,10 +91,10 @@ public abstract class PlayerTabOverlayMixin {
 
         int padding = 4;
         context.fill(x - padding, y - 2, x + textWidth + padding, y + 9, 0x78111111);
-        context.drawString(font, serverName, x, y, 0xFFD8D8D8, false);
+        context.text(font, serverName, x, y, 0xFFD8D8D8, false);
     }
 
-    private int froghelper$renderActivePotions(GuiGraphics context, int screenWidth, Font font, int y) {
+    private int froghelper$renderActivePotions(GuiGraphicsExtractor context, int screenWidth, Font font, int y) {
         Client client = Client.getInstance();
         if (!ConfigManager.get().alchemy.potionsInTab || client == null) {
             return y;
@@ -120,10 +120,10 @@ public abstract class PlayerTabOverlayMixin {
         int x = (screenWidth - width) / 2;
 
         context.fill(x, y - 2, x + width, y + height, 0xB0111111);
-        context.drawCenteredString(font, title, screenWidth / 2, y, WidgetTheme.TITLE);
+        context.centeredText(font, title, screenWidth / 2, y, WidgetTheme.TITLE);
         int textY = y + 10;
         for (String line : lines) {
-            context.drawCenteredString(font, line, screenWidth / 2, textY, WidgetTheme.TEXT_SOFT);
+            context.centeredText(font, line, screenWidth / 2, textY, WidgetTheme.TEXT_SOFT);
             textY += 10;
         }
         return y + height + 4;

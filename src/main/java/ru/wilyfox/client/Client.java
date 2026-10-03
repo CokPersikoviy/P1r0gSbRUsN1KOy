@@ -1,8 +1,8 @@
 package ru.wilyfox.client;
 
-import net.fabricmc.fabric.api.client.rendering.v1.HudLayerRegistrationCallback;
-import net.fabricmc.fabric.api.client.rendering.v1.IdentifiedLayer;
-import net.minecraft.resources.ResourceLocation;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
+import net.minecraft.resources.Identifier;
 import ru.wilyfox.boss.BossRepository;
 import ru.wilyfox.boss.BossTracker;
 import ru.wilyfox.client.ability.AbilityCooldownStore;
@@ -79,7 +79,6 @@ import ru.wilyfox.client.statistic.DailyBlocksStore;
 import ru.wilyfox.client.utility.Clicker;
 import ru.wilyfox.client.utility.AutoFish;
 import ru.wilyfox.client.utility.HudInputHandler;
-import ru.wilyfox.client.utility.MouseInputHandler;
 import ru.wilyfox.client.visibility.VisibilityStatusStore;
 import ru.wilyfox.client.wand.WandCooldownTracker;
 
@@ -133,7 +132,6 @@ public class Client {
         ru.wilyfox.client.command.FhCommands.register();
         new ClientEntityEventHandler(this.bossTracker).register();
         new HudInputHandler(hudRenderer).register();
-        new MouseInputHandler(hudRenderer).register();
         new QuickAccessInputHandler().register();
         DungeonMapTracker.getInstance().register();
 
@@ -146,6 +144,7 @@ public class Client {
         Clicker.register();
         AutoFish.register();
         AlchemyBrewingTracker.register();
+        ru.wilyfox.client.alchemy.AlchemyIngredientTracker.getInstance().register();
         ChatDispatchQueue.init();
         ActiveEffectChatTracker.register(activeEffectStore);
         ChatTabManager.getInstance().register();
@@ -187,14 +186,14 @@ public class Client {
         DiscordRpcService.bindBossDamageStore(bossDamageStore);
         DiscordRpcService.register();
         JoinWebhookNotifier.register();
-        final ResourceLocation FrogHelperLayer = ResourceLocation.fromNamespaceAndPath(MOD_ID, "hud-froghelper-layer");
-        final ResourceLocation FrogHelperSettingsLayer = ResourceLocation.fromNamespaceAndPath(MOD_ID, "hud-froghelper-settings-layer");
+        final Identifier FrogHelperLayer = Identifier.fromNamespaceAndPath(MOD_ID, "hud-froghelper-layer");
+        final Identifier FrogHelperSettingsLayer = Identifier.fromNamespaceAndPath(MOD_ID, "hud-froghelper-settings-layer");
 
-        HudLayerRegistrationCallback.EVENT.register(layeredDrawer -> {
+        {
             // Widgets + editor overlay render before chat; the settings panel renders after chat (above it).
-            layeredDrawer.attachLayerBefore(IdentifiedLayer.CHAT, FrogHelperLayer, this.hudRenderer::render);
-            layeredDrawer.attachLayerAfter(IdentifiedLayer.CHAT, FrogHelperSettingsLayer, this.hudRenderer::renderSettingsOverlay);
-        });
+            HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, FrogHelperLayer, this.hudRenderer::render);
+            HudElementRegistry.attachElementAfter(VanillaHudElements.CHAT, FrogHelperSettingsLayer, this.hudRenderer::renderSettingsOverlay);
+        }
 
         hudRenderer.registerWidget(
                 new BossHudWidget(5, 5, HudLayer.CONTENT, repository),

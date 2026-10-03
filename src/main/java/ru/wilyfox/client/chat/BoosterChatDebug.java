@@ -8,15 +8,21 @@ import java.util.Locale;
 import java.util.Set;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
+import static ru.wilyfox.client.debug.DebugLogger.isEnabled;
 import static ru.wilyfox.client.debug.DebugLogger.info;
 
 public final class BoosterChatDebug {
+    private static final int MAX_LOGGED_MESSAGES = 256;
     private static final Set<String> LOGGED_MESSAGES = new LinkedHashSet<>();
 
     private BoosterChatDebug() {
     }
 
-    public static void onIncomingMessage(Component component) {
+    public static synchronized void onIncomingMessage(Component component) {
+        if (!isEnabled()) {
+            LOGGED_MESSAGES.clear();
+            return;
+        }
         if (component == null) {
             return;
         }
@@ -46,6 +52,9 @@ public final class BoosterChatDebug {
 
         if (!LOGGED_MESSAGES.add(lower)) {
             return;
+        }
+        while (LOGGED_MESSAGES.size() > MAX_LOGGED_MESSAGES) {
+            LOGGED_MESSAGES.remove(LOGGED_MESSAGES.iterator().next());
         }
 
         info(LOGGER, "Booster chat debug: raw='{}', normalized='{}'", raw, normalized);

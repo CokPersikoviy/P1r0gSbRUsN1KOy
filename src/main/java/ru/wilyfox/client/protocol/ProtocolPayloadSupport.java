@@ -7,7 +7,7 @@ import com.google.gson.JsonParser;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomModelData;
@@ -232,18 +232,15 @@ final class ProtocolPayloadSupport {
     }
 
     static boolean shouldTriggerRuneSetCooldown(ProtocolState state, Map<String, Long> timers, long now) {
-        long elapsed = state.lastAbilityTimersAt > 0L ? Math.max(0L, now - state.lastAbilityTimersAt) : 0L;
-
         for (Map.Entry<String, Long> entry : timers.entrySet()) {
             long current = Math.max(0L, entry.getValue());
             if (current <= 0L) {
                 continue;
             }
 
-            long previousRaw = Math.max(0L, state.lastAbilityTimers.getOrDefault(entry.getKey(), 0L));
-            long previousRemaining = Math.max(0L, previousRaw - elapsed);
+            long previousRemaining = previousAbilityRemaining(state, entry.getKey(), now);
 
-            if (previousRemaining <= 0L || current > previousRemaining + 1_500L) {
+            if (previousRemaining <= 0L || current - previousRemaining > 1_500L) {
                 if (isSwapCdExempt(state, entry.getKey())) {
                     continue; // this ability's use does not lock rune-set swapping
                 }
@@ -252,6 +249,22 @@ final class ProtocolPayloadSupport {
         }
 
         return false;
+    }
+
+    static long previousAbilityRemaining(ProtocolState state, String id, long now) {
+        ProtocolState.AbilityTimerSample previous = state.abilityTimerHistory.get(id);
+        return previous == null ? 0L : previous.remainingAt(now);
+    }
+
+    static void rememberAbilityTimers(ProtocolState state, Map<String, Long> timers, long now) {
+        state.abilityTimerHistory.values().removeIf(sample -> sample.remainingAt(now) <= 0L);
+        timers.forEach((id, remaining) -> {
+            if (remaining > 0L) {
+                state.abilityTimerHistory.put(id, new ProtocolState.AbilityTimerSample(remaining, now));
+            } else {
+                state.abilityTimerHistory.remove(id);
+            }
+        });
     }
 
     static String formatEnergy(double energy) {
@@ -501,7 +514,7 @@ final class ProtocolPayloadSupport {
     }
 
     private static ItemStack createPetIcon(DwPetType type) {
-        ResourceLocation location = resolveItemLocation(type.material());
+        Identifier location = resolveItemLocation(type.material());
         ItemStack stack = location == null
                 ? new ItemStack(Items.BONE)
                 : new ItemStack(BuiltInRegistries.ITEM.getValue(location));
@@ -514,16 +527,16 @@ final class ProtocolPayloadSupport {
         return stack;
     }
 
-    private static ResourceLocation resolveItemLocation(String material) {
+    private static Identifier resolveItemLocation(String material) {
         if (material == null || material.isBlank()) {
             return null;
         }
 
-        ResourceLocation direct = ResourceLocation.tryParse(material);
+        Identifier direct = Identifier.tryParse(material);
         if (direct != null) {
             return direct;
         }
 
-        return ResourceLocation.tryParse(material.trim().toLowerCase(Locale.ROOT).replace(' ', '_'));
+        return Identifier.tryParse(material.trim().toLowerCase(Locale.ROOT).replace(' ', '_'));
     }
 }

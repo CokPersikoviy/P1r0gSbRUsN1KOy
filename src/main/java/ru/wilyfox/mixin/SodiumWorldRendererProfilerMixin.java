@@ -15,12 +15,12 @@ public class SodiumWorldRendererProfilerMixin {
     @Unique
     private final ProfilerScopeStack froghelper$sodiumBlockEntitiesScopes = new ProfilerScopeStack();
 
-    @Inject(method = "renderBlockEntities", at = @At("HEAD"), require = 0, remap = false)
+    @Inject(method = "extractBlockEntities", at = @At("HEAD"), require = 0, remap = false)
     private void froghelper$beginSodiumBlockEntities(CallbackInfo ci) {
         froghelper$sodiumBlockEntitiesScopes.push(ModProfiler.getInstance().scope("render/sodium/blockEntities"));
     }
 
-    @Inject(method = "renderBlockEntities", at = @At("RETURN"), require = 0, remap = false)
+    @Inject(method = "extractBlockEntities", at = @At("RETURN"), require = 0, remap = false)
     private void froghelper$endSodiumBlockEntities(CallbackInfo ci) {
         froghelper$sodiumBlockEntitiesScopes.closeLatest();
     }

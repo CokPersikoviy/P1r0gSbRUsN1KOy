@@ -28,7 +28,7 @@ public final class QuickAccessInputHandler {
 
             quickAccessHeld = currentlyHeld;
 
-            if (!enabled && client.screen instanceof QuickAccessScreen) {
+            if (!enabled && client.gui.screen() instanceof QuickAccessScreen) {
                 QuickAccessManager.getInstance().forceClose(client);
             }
         }
@@ -48,7 +48,7 @@ public final class QuickAccessInputHandler {
             return false;
         }
 
-        long window = client.getWindow().getWindow();
+        com.mojang.blaze3d.platform.Window window = client.getWindow();
         return com.mojang.blaze3d.platform.InputConstants.isKeyDown(window, keyCode);
     }
 }

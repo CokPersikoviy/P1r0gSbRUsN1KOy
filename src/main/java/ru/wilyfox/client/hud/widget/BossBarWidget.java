@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.BossHealthOverlay;
 import ru.wilyfox.bridge.BossHealthOverlayAccessor;
 import ru.wilyfox.client.hud.HudEditingScreen;
@@ -19,25 +19,25 @@ public class BossBarWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
 
-        BossHealthOverlay overlay = Minecraft.getInstance().gui.getBossOverlay();
+        BossHealthOverlay overlay = Minecraft.getInstance().gui.hud.getBossOverlay();
         if (overlay instanceof BossHealthOverlayAccessor accessor) {
             if (accessor.froghelper$getRenderedWidth() <= 0 || accessor.froghelper$getRenderedHeight() <= 0) {
                 if (isEditorPreview()) {
                     renderPlaceholder(context);
                 }
             } else {
-                context.pose().pushPose();
-                context.pose().translate(startX, startY, 0);
-                context.pose().scale(getScale(), getScale(), 1.0f);
+                context.pose().pushMatrix();
+                context.pose().translate(startX, startY);
+                context.pose().scale(getScale(), getScale());
 
                 accessor.froghelper$renderAt(context, 0, 0);
 
-                context.pose().popPose();
+                context.pose().popMatrix();
             }
         }
 
@@ -70,7 +70,7 @@ public class BossBarWidget extends AbstractWidget {
 
     @Override
     public int getWidth() {
-        BossHealthOverlay overlay = Minecraft.getInstance().gui.getBossOverlay();
+        BossHealthOverlay overlay = Minecraft.getInstance().gui.hud.getBossOverlay();
         if (overlay instanceof BossHealthOverlayAccessor accessor) {
             int width = accessor.froghelper$getRenderedWidth();
             if (width > 0) {
@@ -83,7 +83,7 @@ public class BossBarWidget extends AbstractWidget {
 
     @Override
     public int getHeight() {
-        BossHealthOverlay overlay = Minecraft.getInstance().gui.getBossOverlay();
+        BossHealthOverlay overlay = Minecraft.getInstance().gui.hud.getBossOverlay();
         if (overlay instanceof BossHealthOverlayAccessor accessor) {
             int height = accessor.froghelper$getRenderedHeight();
             if (height > 0) {
@@ -95,11 +95,11 @@ public class BossBarWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
     private boolean hasRenderedBossBar() {
-        BossHealthOverlay overlay = Minecraft.getInstance().gui.getBossOverlay();
+        BossHealthOverlay overlay = Minecraft.getInstance().gui.hud.getBossOverlay();
         if (overlay instanceof BossHealthOverlayAccessor accessor) {
             return accessor.froghelper$getRenderedWidth() > 0 && accessor.froghelper$getRenderedHeight() > 0;
         }
@@ -107,15 +107,15 @@ public class BossBarWidget extends AbstractWidget {
         return false;
     }
 
-    private void renderPlaceholder(GuiGraphics context) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(getScale(), getScale(), 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(getScale(), getScale());
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(Minecraft.getInstance().font, "Boss Bar", 6, 2, WidgetTheme.TITLE);
+        context.text(Minecraft.getInstance().font, "Boss Bar", 6, 2, WidgetTheme.TITLE);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 }
 

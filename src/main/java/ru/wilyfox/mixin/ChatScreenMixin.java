@@ -1,6 +1,6 @@
 package ru.wilyfox.mixin;
 
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -26,13 +26,15 @@ public abstract class ChatScreenMixin extends Screen {
         super(title);
     }
 
-    @Inject(method = "render", at = @At("TAIL"))
-    private void froghelper$renderTabs(GuiGraphics graphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+    @Inject(method = "extractRenderState", at = @At("TAIL"))
+    private void froghelper$renderTabs(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         ChatTabOverlay.getInstance().render(graphics, this.width, this.height, mouseX, mouseY);
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
-    private void froghelper$mouseClicked(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+    private void froghelper$mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
+        double mouseX = event.x(), mouseY = event.y();
+        int button = event.button();
         if (button == 0 && ChatTabOverlay.getInstance().mouseClicked(mouseX, mouseY, this.height)) {
             cir.setReturnValue(true);
             return;
@@ -45,13 +47,15 @@ public abstract class ChatScreenMixin extends Screen {
     }
 
     @Inject(method = "mouseClicked", at = @At("RETURN"), cancellable = true)
-    private void froghelper$copyChatMessage(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+    private void froghelper$copyChatMessage(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
+        double mouseX = event.x(), mouseY = event.y();
+        int button = event.button();
         if (button != 1 || cir.getReturnValue() || !ConfigManager.get().render.copyChatMessages || this.minecraft == null || this.minecraft.gui == null) {
             return;
         }
 
         if (ChatMessageCopyExtractor.copyHoveredMessage(
-                this.minecraft.gui.getChat(),
+                this.minecraft.gui.hud.getChat(),
                 mouseX,
                 mouseY,
                 ConfigManager.get().render.fullMessageCopy

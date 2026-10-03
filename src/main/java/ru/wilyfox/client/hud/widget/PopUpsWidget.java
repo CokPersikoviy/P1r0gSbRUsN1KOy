@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.WidgetChrome;
@@ -30,7 +30,7 @@ public final class PopUpsWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -45,9 +45,9 @@ public final class PopUpsWidget extends AbstractWidget {
         int stackWidth = getStackWidth(mc, notifications);
         int boxHeight = getNotificationHeight(mc);
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         int y = 0;
         for (int index = 0; index < notifications.size(); index++) {
@@ -61,7 +61,7 @@ public final class PopUpsWidget extends AbstractWidget {
             y += boxHeight + BOX_GAP;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -88,7 +88,7 @@ public final class PopUpsWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().popUps.active || Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return ConfigManager.get().popUps.active || Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
     @Override
@@ -96,20 +96,20 @@ public final class PopUpsWidget extends AbstractWidget {
         return "Pop-Ups";
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Pop-Ups", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No active pop-up's", PADDING_X, 16, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Pop-Ups", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No active pop-up's", PADDING_X, 16, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     private void renderNotification(
-            GuiGraphics context,
+            GuiGraphicsExtractor context,
             Minecraft mc,
             PopUpNotification notification,
             int x,
@@ -134,8 +134,8 @@ public final class PopUpsWidget extends AbstractWidget {
         int titleY = y + PADDING_Y;
         int messageY = titleY + mc.font.lineHeight + ROW_GAP / 2;
 
-        context.drawString(mc.font, notification.title(), textX, titleY, titleColor);
-        context.drawString(mc.font, trimToWidth(mc, notification.message(), width - PADDING_X * 2), textX, messageY, bodyColor);
+        context.text(mc.font, notification.title(), textX, titleY, titleColor);
+        context.text(mc.font, trimToWidth(mc, notification.message(), width - PADDING_X * 2), textX, messageY, bodyColor);
     }
 
     private List<PopUpNotification> getNotificationsForRender() {
@@ -188,7 +188,7 @@ public final class PopUpsWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
     private String trimToWidth(Minecraft mc, String text, int maxWidth) {

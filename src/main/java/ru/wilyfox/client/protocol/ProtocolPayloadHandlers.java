@@ -10,7 +10,6 @@ import ru.wilyfox.client.rune.RuneSetCooldownStore;
 
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,6 +18,7 @@ import java.util.stream.Collectors;
 import static ru.wilyfox.FrogHelper.LOGGER;
 import static ru.wilyfox.client.debug.DebugLogger.info;
 import static ru.wilyfox.client.debug.DebugLogger.warn;
+import static ru.wilyfox.client.debug.DebugLogger.isEnabled;
 
 final class ProtocolPayloadHandlers {
     private static final int BOSSTIMER_PREVIEW_LIMIT = 8;
@@ -43,6 +43,10 @@ final class ProtocolPayloadHandlers {
             DwBossTimersPacket packet = DwBossTimersDecoder.decode(data);
             applyBossTimers(state, packet);
 
+            if (!isEnabled()) {
+                return true;
+            }
+
             if (packet.timers().isEmpty()) {
                 info(LOGGER, "DW protocol: bosstimers parsed successfully, entries=0");
                 return true;
@@ -50,11 +54,11 @@ final class ProtocolPayloadHandlers {
 
             long min = packet.timers().values().stream().min(Long::compareTo).orElse(0L);
             long max = packet.timers().values().stream().max(Long::compareTo).orElse(0L);
-            String preview = packet.timers().entrySet().stream()
+            String preview = isEnabled() ? packet.timers().entrySet().stream()
                     .sorted(Map.Entry.comparingByValue())
                     .limit(BOSSTIMER_PREVIEW_LIMIT)
                     .map(entry -> entry.getKey() + "=" + ProtocolPayloadSupport.formatRemainingMillis(entry.getValue()))
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -76,22 +80,26 @@ final class ProtocolPayloadHandlers {
             DwBossTypesPacket packet = DwBossTypesDecoder.decode(data);
             applyBossTypes(state, packet);
 
+            if (!isEnabled()) {
+                return true;
+            }
+
             if (packet.types().isEmpty()) {
                 info(LOGGER, "DW protocol: bosstypes parsed successfully, entries=0");
                 return true;
             }
 
-            String preview = packet.types().values().stream()
+            String preview = isEnabled() ? packet.types().values().stream()
                     .sorted(Comparator.comparingInt(DwBossType::level))
                     .limit(BOSSTYPE_PREVIEW_LIMIT)
                     .map(type -> type.id() + "=" + type.name() + " lvl " + type.level())
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
-            String iconPreview = packet.types().values().stream()
+            String iconPreview = isEnabled() ? packet.types().values().stream()
                     .sorted(Comparator.comparingInt(DwBossType::level))
                     .limit(BOSSTYPE_PREVIEW_LIMIT)
                     .map(type -> type.id() + "={" + type.material() + ", cmd=" + type.customModelData() + "}")
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             long raidCount = packet.types().values().stream().filter(DwBossType::raid).count();
             info(
@@ -129,9 +137,9 @@ final class ProtocolPayloadHandlers {
                 state.activeRunesStore.replace(packet.runes());
             }
 
-            String preview = packet.runes().stream()
+            String preview = isEnabled() ? packet.runes().stream()
                     .limit(ACTIVE_RUNES_PREVIEW_LIMIT)
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -181,10 +189,10 @@ final class ProtocolPayloadHandlers {
                 return true;
             }
 
-            String preview = packet.types().values().stream()
+            String preview = isEnabled() ? packet.types().values().stream()
                     .limit(PETTYPE_PREVIEW_LIMIT)
                     .map(type -> type.id() + "=" + type.name())
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -207,10 +215,10 @@ final class ProtocolPayloadHandlers {
                 state.potionStore.replaceTypes(packet.entries());
             }
 
-            String preview = packet.entries().stream()
+            String preview = isEnabled() ? packet.entries().stream()
                     .limit(PETTYPE_PREVIEW_LIMIT)
                     .map(entry -> entry.id() + "={" + entry.modelId() + ", " + entry.name() + "}")
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -233,10 +241,10 @@ final class ProtocolPayloadHandlers {
                 state.sellerCooldownStore.replace(packet.entries());
             }
 
-            String preview = packet.entries().stream()
+            String preview = isEnabled() ? packet.entries().stream()
                     .limit(6)
                     .map(entry -> entry.id() + "=" + entry.name() + " (" + (entry.remainingMillis() < 0L ? "ready" : ProtocolPayloadSupport.formatRemainingMillis(entry.remainingMillis())) + ")")
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -299,10 +307,10 @@ final class ProtocolPayloadHandlers {
                 state.potionStore.applyUpdate(packet.entries());
             }
 
-            String preview = packet.entries().stream()
+            String preview = isEnabled() ? packet.entries().stream()
                     .limit(8)
                     .map(entry -> entry.id() + "=" + ProtocolPayloadSupport.formatRemainingMillis(entry.remainedMillis()) + " (" + entry.quality() + "%)")
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             long activeCount = packet.entries().stream()
                     .filter(entry -> entry.remainedMillis() > 0L && entry.quality() > 0)
@@ -329,9 +337,9 @@ final class ProtocolPayloadHandlers {
             List<ActivePetInfo> activePets = activePetsUpdate.orElseGet(List::of);
             java.util.Optional<List<ActiveMinerInfo>> activeMinersUpdate = ProtocolPayloadSupport.extractActiveMiners(state, packet);
             List<ActiveMinerInfo> activeMiners = activeMinersUpdate.orElseGet(List::of);
-            String keysPreview = packet.values().keySet().stream()
+            String keysPreview = isEnabled() ? packet.values().keySet().stream()
                     .sorted()
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
             updateGameLocation(state, packet);
             Integer currentBlocks = packet.values().containsKey("blocks")
                     ? ProtocolPayloadSupport.getInt(packet.values(), "blocks")
@@ -360,10 +368,10 @@ final class ProtocolPayloadHandlers {
                 );
             }
 
-            String preview = activePets.stream()
+            String preview = isEnabled() ? activePets.stream()
                     .limit(ACTIVE_PETS_PREVIEW_LIMIT)
                     .map(pet -> pet.name() + " [" + pet.level() + "] " + ProtocolPayloadSupport.formatEnergy(pet.energy()) + "\u26a1")
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -437,30 +445,12 @@ final class ProtocolPayloadHandlers {
     static boolean handleFishingSpots(ProtocolState state, byte[] data) {
         try {
             DwFishingSpotsPacket packet = DwFishingSpotsDecoder.decode(data);
-            LinkedHashSet<String> locationIds = packet.locations().keySet().stream()
-                    .map(DiamondWorldProtocolClient::normalizeLocationId)
-                    .filter(id -> id != null && !id.isBlank())
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
-            Map<String, String> locationNames = packet.locations().entrySet().stream()
-                    .map(entry -> Map.entry(
-                            DiamondWorldProtocolClient.normalizeLocationId(entry.getKey()),
-                            ProtocolPayloadSupport.normalizeStatisticString(entry.getValue())
-                    ))
-                    .filter(entry -> entry.getKey() != null && !entry.getKey().isBlank())
-                    .collect(Collectors.toMap(
-                            Map.Entry::getKey,
-                            entry -> entry.getValue() == null || entry.getValue().isBlank() ? entry.getKey() : entry.getValue(),
-                            (left, right) -> right,
-                            LinkedHashMap::new
-                    ));
+            applyFishingSpots(state, packet);
 
-            state.fishingLocationIds.addAll(locationIds);
-            state.fishingLocationNames.putAll(locationNames);
-
-            String preview = packet.locations().entrySet().stream()
+            String preview = isEnabled() ? packet.locations().entrySet().stream()
                     .limit(8)
                     .map(entry -> entry.getKey() + "=" + entry.getValue())
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -478,24 +468,12 @@ final class ProtocolPayloadHandlers {
     static boolean handleSpotNibbles(ProtocolState state, byte[] data) {
         try {
             DwSpotNibblesPacket packet = DwSpotNibblesDecoder.decode(data);
-            Map<String, Double> nibbles = packet.nibbles().entrySet().stream()
-                    .map(entry -> Map.entry(
-                            DiamondWorldProtocolClient.normalizeLocationId(entry.getKey()),
-                            entry.getValue()
-                    ))
-                    .filter(entry -> entry.getKey() != null && !entry.getKey().isBlank())
-                    .collect(Collectors.toMap(
-                            Map.Entry::getKey,
-                            entry -> entry.getValue() == null ? 0.0D : entry.getValue(),
-                            (left, right) -> right,
-                            LinkedHashMap::new
-                    ));
-            state.fishingNibbles.putAll(nibbles);
+            applySpotNibbles(state, packet);
 
-            String preview = state.fishingNibbles.entrySet().stream()
+            String preview = isEnabled() ? state.fishingNibbles.entrySet().stream()
                     .limit(8)
                     .map(entry -> entry.getKey() + "=" + String.format(java.util.Locale.ROOT, "%.3f", entry.getValue()))
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -520,6 +498,27 @@ final class ProtocolPayloadHandlers {
             warn(LOGGER, "DW protocol: failed to parse hourlyquestypes payload", exception);
             return false;
         }
+    }
+
+    static void applyFishingSpots(ProtocolState state, DwFishingSpotsPacket packet) {
+        packet.locations().forEach((rawId, rawName) -> {
+            String id = DiamondWorldProtocolClient.normalizeLocationId(rawId);
+            if (id == null) {
+                return;
+            }
+            String name = ProtocolPayloadSupport.normalizeStatisticString(rawName);
+            state.fishingLocationIds.add(id);
+            state.fishingLocationNames.put(id, name == null ? id : name);
+        });
+    }
+
+    static void applySpotNibbles(ProtocolState state, DwSpotNibblesPacket packet) {
+        packet.nibbles().forEach((rawId, value) -> {
+            String id = DiamondWorldProtocolClient.normalizeLocationId(rawId);
+            if (id != null) {
+                state.fishingNibbles.put(id, value == null ? 0.0D : value);
+            }
+        });
     }
 
     static boolean handleHourlyQuestInfo(ProtocolState state, byte[] data) {
@@ -553,10 +552,10 @@ final class ProtocolPayloadHandlers {
                 );
             }
 
-            String preview = packet.types().values().stream()
+            String preview = isEnabled() ? packet.types().values().stream()
                     .limit(STAFF_PREVIEW_LIMIT)
                     .map(type -> type.id() + "=" + type.name() + " (cmd=" + type.modelId() + ")")
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -578,11 +577,11 @@ final class ProtocolPayloadHandlers {
                 state.wandCooldownTracker.replaceProtocol(packet.timers());
             }
 
-            String preview = packet.timers().entrySet().stream()
+            String preview = isEnabled() ? packet.timers().entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
                     .limit(STAFF_PREVIEW_LIMIT)
                     .map(entry -> entry.getKey() + "=" + ProtocolPayloadSupport.formatRemainingMillis(entry.getValue()))
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -608,10 +607,10 @@ final class ProtocolPayloadHandlers {
                 );
             }
 
-            String preview = packet.types().values().stream()
+            String preview = isEnabled() ? packet.types().values().stream()
                     .limit(ABILITY_PREVIEW_LIMIT)
                     .map(type -> type.id() + "=" + type.name())
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -635,34 +634,28 @@ final class ProtocolPayloadHandlers {
                 RuneSetCooldownStore.update(RUNE_SET_COOLDOWN_MILLIS - RUNE_SET_COOLDOWN_REDUCTION_MILLIS);
             }
 
-            // TEMP diagnostic (render.debug) for T5 "first wind-rune press doesn't start the swap cd":
-            // dumps each ability's decayed previous vs current remaining and the trigger decision, so we
-            // can see WHY the first press isn't detected as a fresh ability use.
-            if (ru.wilyfox.client.debug.DebugLogger.isEnabled()) {
-                long elapsed = state.lastAbilityTimersAt > 0L ? Math.max(0L, now - state.lastAbilityTimersAt) : 0L;
+            if (isEnabled()) {
                 StringBuilder dump = new StringBuilder("\n=== ABILITYTIMERS (swap-cd trigger=")
-                        .append(swapTriggered).append(", elapsed=").append(elapsed).append("ms) ===");
+                        .append(swapTriggered).append(") ===");
                 for (Map.Entry<String, Long> entry : packet.timers().entrySet()) {
-                    long prev = Math.max(0L, state.lastAbilityTimers.getOrDefault(entry.getKey(), 0L));
                     dump.append("\n  ").append(entry.getKey())
-                            .append(": prevDecayed=").append(Math.max(0L, prev - elapsed))
+                            .append(": prevDecayed=").append(ProtocolPayloadSupport.previousAbilityRemaining(state, entry.getKey(), now))
                             .append(" current=").append(Math.max(0L, entry.getValue()));
                 }
                 info(LOGGER, "{}", dump.toString());
             }
 
-            state.lastAbilityTimers = new LinkedHashMap<>(packet.timers());
-            state.lastAbilityTimersAt = now;
+            ProtocolPayloadSupport.rememberAbilityTimers(state, packet.timers(), now);
 
             if (state.abilityCooldownStore != null) {
                 state.abilityCooldownStore.replaceCooldowns(packet.timers());
             }
 
-            String preview = packet.timers().entrySet().stream()
+            String preview = isEnabled() ? packet.timers().entrySet().stream()
                     .sorted(Map.Entry.comparingByValue())
                     .limit(ABILITY_PREVIEW_LIMIT)
                     .map(entry -> entry.getKey() + "=" + ProtocolPayloadSupport.formatRemainingMillis(entry.getValue()))
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -723,6 +716,10 @@ final class ProtocolPayloadHandlers {
         try {
             DwBossCollectPacket packet = DwBossCollectDecoder.decode(data);
             state.bossCollectibles = new LinkedHashMap<>(packet.collectibles());
+
+            if (!isEnabled()) {
+                return true;
+            }
 
             long nonEmptyGroups = packet.collectibles().values().stream()
                     .filter(values -> !values.isEmpty())
@@ -827,10 +824,10 @@ final class ProtocolPayloadHandlers {
                 state.potionStore.applyCooldownUpdate(packet.cooldowns());
             }
 
-            String preview = packet.cooldowns().entrySet().stream()
+            String preview = isEnabled() ? packet.cooldowns().entrySet().stream()
                     .limit(POTION_PREVIEW_LIMIT)
                     .map(entry -> entry.getKey() + "=" + ProtocolPayloadSupport.formatRemainingMillis(entry.getValue()))
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
             info(
                     LOGGER,
                     "DW protocol: potioncd parsed successfully, entries={}, first={}",
@@ -869,10 +866,9 @@ final class ProtocolPayloadHandlers {
             DwTokenPacket packet = DwTokenDecoder.decode(data);
             info(
                     LOGGER,
-                    "DW protocol: token parsed successfully, present={}, length={}, value={}",
+                    "DW protocol: token parsed successfully, present={}, length={}",
                     packet.value() != null,
-                    packet.value() != null ? packet.value().length() : 0,
-                    packet.value()
+                    packet.value() != null ? packet.value().length() : 0
             );
             return true;
         } catch (Exception exception) {
@@ -904,11 +900,11 @@ final class ProtocolPayloadHandlers {
             state.clanInfo = state.clanInfo.applyPartial(packet.values());
             state.capturedBossLevels = DwClanBossResolver.resolveLevels(state.clanInfo, state.bossTypes);
 
-            String preview = packet.values().entrySet().stream()
+            String preview = isEnabled() ? packet.values().entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
                     .limit(12)
                     .map(entry -> entry.getKey() + "=" + entry.getValue())
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,
@@ -957,11 +953,11 @@ final class ProtocolPayloadHandlers {
             long totalEntries = packet.boosters().values().stream()
                     .mapToLong(List::size)
                     .sum();
-            String preview = packet.boosters().entrySet().stream()
+            String preview = isEnabled() ? packet.boosters().entrySet().stream()
                     .flatMap(entry -> entry.getValue().stream()
                             .map(value -> entry.getKey() + "=x" + ProtocolPayloadSupport.formatCompactMultiplier(value.multiplier()) + " " + ProtocolPayloadSupport.formatRemainingMillis(value.remainingMillis())))
                     .limit(BOOSTER_PREVIEW_LIMIT)
-                    .collect(Collectors.joining(", "));
+                    .collect(Collectors.joining(", ")) : "";
 
             info(
                     LOGGER,

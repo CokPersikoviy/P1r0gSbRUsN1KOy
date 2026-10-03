@@ -1,6 +1,6 @@
 package ru.wilyfox.client.profiler;
 
-import com.mojang.blaze3d.platform.GlUtil;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.client.Minecraft;
@@ -210,10 +210,10 @@ final class ProfilerDiagnostics {
                 safeSystemProperty("java.vm.version"),
                 safeSystemProperty("java.version"),
                 safeSystemProperty("os.name") + " " + safeSystemProperty("os.version") + " " + safeSystemProperty("os.arch"),
-                safeGl(GlUtil::getCpuInfo),
-                safeGl(GlUtil::getVendor),
-                safeGl(GlUtil::getRenderer),
-                safeGl(GlUtil::getOpenGLVersion),
+                safeGl(() -> System.getenv("PROCESSOR_IDENTIFIER")),
+                safeGl(() -> RenderSystem.getDevice().getDeviceInfo().vendorName()),
+                safeGl(() -> RenderSystem.getDevice().getDeviceInfo().name()),
+                safeGl(() -> RenderSystem.getDevice().getDeviceInfo().backendName() + " " + RenderSystem.getDevice().getDeviceInfo().driverInfo()),
                 histogram.entries(),
                 histogram.error(),
                 Math.max(0L, System.nanoTime() - startedAt)
@@ -226,8 +226,8 @@ final class ProfilerDiagnostics {
         }
 
         ClientLevel level = minecraft.level;
-        String dimension = level != null ? level.dimension().location().toString() : "n/a";
-        String screen = minecraft.screen != null ? minecraft.screen.getClass().getSimpleName() : "none";
+        String dimension = level != null ? level.dimension().identifier().toString() : "n/a";
+        String screen = minecraft.gui.screen() != null ? minecraft.gui.screen().getClass().getSimpleName() : "none";
         String position = minecraft.player != null
                 ? formatPosition(minecraft.player.getX(), minecraft.player.getY(), minecraft.player.getZ())
                 : "n/a";
@@ -261,8 +261,8 @@ final class ProfilerDiagnostics {
 
         try {
             LevelRendererAccessorMixin renderer = (LevelRendererAccessorMixin) (LevelRenderer) minecraft.levelRenderer;
-            visibleEntities = renderer.froghelper$getVisibleEntityCount();
-            globalBlockEntities = renderer.froghelper$getGlobalBlockEntities().size();
+            visibleEntities = renderer.froghelper$getLevelRenderState().lastEntityRenderStateCount;
+            globalBlockEntities = level != null ? level.getGloballyRenderedBlockEntities().size() : 0;
         } catch (Throwable ignored) {
             // Optional diagnostic access must not affect the game.
         }
@@ -340,8 +340,8 @@ final class ProfilerDiagnostics {
         }
 
         ClientChunkCache chunkSource = level.getChunkSource();
-        ChunkPos center = level.getSharedSpawnPos() != null
-                ? new ChunkPos(level.getSharedSpawnPos())
+        ChunkPos center = level.getRespawnData().pos() != null
+                ? ChunkPos.containing(level.getRespawnData().pos())
                 : new ChunkPos(0, 0);
         if (Minecraft.getInstance().player != null) {
             center = Minecraft.getInstance().player.chunkPosition();
@@ -349,8 +349,8 @@ final class ProfilerDiagnostics {
 
         int radius = Math.max(2, Math.min(64, renderDistance + 2));
         int total = 0;
-        for (int chunkX = center.x - radius; chunkX <= center.x + radius; chunkX++) {
-            for (int chunkZ = center.z - radius; chunkZ <= center.z + radius; chunkZ++) {
+        for (int chunkX = center.x() - radius; chunkX <= center.x() + radius; chunkX++) {
+            for (int chunkZ = center.z() - radius; chunkZ <= center.z() + radius; chunkZ++) {
                 LevelChunk chunk = chunkSource.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
                 if (chunk == null) {
                     continue;

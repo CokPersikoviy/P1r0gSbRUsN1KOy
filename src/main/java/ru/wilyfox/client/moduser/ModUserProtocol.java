@@ -3,17 +3,17 @@ package ru.wilyfox.client.moduser;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+import ru.wilyfox.client.chat.ChatProtocolRoute;
 import ru.wilyfox.client.chat.ChatDispatchQueue;
+import ru.wilyfox.client.chat.MultipartChatMessageAssembler;
 import ru.wilyfox.client.hud.config.ConfigManager;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -27,13 +27,23 @@ public final class ModUserProtocol {
     private static final String TOKEN_SUFFIX = "}";
     private static final Pattern TOKEN_PATTERN =
             Pattern.compile("\\{fhmu:([A-Za-z0-9_-]+):([1-9]\\d*):([1-9]\\d*):([A-Za-z0-9_-]+)}");
+    private static final Pattern PLAYER_NAME_PATTERN = Pattern.compile("[A-Za-z0-9_]{3,16}");
     private static final int MAX_CHAT_LENGTH = 240;
     private static final long SEND_INTERVAL_MS = 3_000L;
     private static final int MAX_NAMES_PER_SYNC = 100;
+    private static final int MAX_INCOMING_PARTS = 32;
+    private static final int MAX_INCOMING_PAYLOAD_LENGTH = 8_192;
+    private static final long INCOMING_TTL_MS = 30_000L;
     private static final char TYPE_PAIR = 'P';
     private static final char TYPE_ACK = 'A';
 
-    private static final Map<String, IncomingBuffer> INCOMING = new HashMap<>();
+    private static final MultipartChatMessageAssembler INCOMING = new MultipartChatMessageAssembler(
+            64,
+            MAX_INCOMING_PARTS,
+            MAX_CHAT_LENGTH,
+            MAX_INCOMING_PAYLOAD_LENGTH,
+            INCOMING_TTL_MS
+    );
     private static final Set<String> PAIRED = new HashSet<>();
     private static final Set<String> ACKED = new HashSet<>();
 
@@ -47,11 +57,7 @@ public final class ModUserProtocol {
             return;
         }
         initialized = true;
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            INCOMING.clear();
-            PAIRED.clear();
-            ACKED.clear();
-        });
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> clearSession());
     }
 
     public static boolean isSocialsEnabled() {
@@ -64,9 +70,14 @@ public final class ModUserProtocol {
             return;
         }
 
+        clearSession();
+        ChatDispatchQueue.removeQueuedCommandsContaining(TOKEN_PREFIX);
+    }
+
+    private static synchronized void clearSession() {
+        INCOMING.clear();
         PAIRED.clear();
         ACKED.clear();
-        ChatDispatchQueue.removeQueuedCommandsContaining(TOKEN_PREFIX);
     }
 
     public static synchronized DebugSnapshot diagnosticSnapshot() {
@@ -93,33 +104,46 @@ public final class ModUserProtocol {
         if (!matcher.find()) {
             return false;
         }
-
-        String sender = extractSender(text);
-        String msgId = matcher.group(1);
-        int part = Integer.parseInt(matcher.group(2));
-        int total = Integer.parseInt(matcher.group(3));
-        String payloadPart = matcher.group(4);
-
-        String bufferKey = (sender == null ? "?" : sender.toLowerCase(Locale.ROOT)) + ":" + msgId;
-        IncomingBuffer buffer = INCOMING.computeIfAbsent(bufferKey, ignored -> new IncomingBuffer(total, sender));
-        buffer.put(part, payloadPart);
-        if (!buffer.isComplete()) {
+        if (!isSocialsEnabled()) {
             return true;
         }
-        INCOMING.remove(bufferKey);
 
-        String decoded = decode(buffer.join());
+        String sender = ChatProtocolRoute.extractIncomingSender(text, TOKEN_PREFIX);
+        String msgId = matcher.group(1);
+        int part = parsePositiveInt(matcher.group(2));
+        int total = parsePositiveInt(matcher.group(3));
+        String payloadPart = matcher.group(4);
+        if (part < 1 || total < 1) {
+            return true;
+        }
+
+        MultipartChatMessageAssembler.Result assembled = INCOMING.accept(
+                sender,
+                msgId,
+                part,
+                total,
+                payloadPart,
+                System.currentTimeMillis()
+        );
+        if (assembled.status() != MultipartChatMessageAssembler.Status.COMPLETE) {
+            return true;
+        }
+
+        String decoded = decode(assembled.payload());
         if (decoded == null || decoded.length() < 2 || decoded.charAt(1) != '|') {
             return true;
         }
 
         char type = decoded.charAt(0);
+        if (type != TYPE_PAIR && type != TYPE_ACK) {
+            return true;
+        }
         List<String> names = parseNames(decoded.substring(2));
-        boolean haveSender = buffer.sender != null && !buffer.sender.isBlank() && !isSelf(buffer.sender);
+        boolean haveSender = sender != null && !sender.isBlank() && !isSelf(sender);
         if (haveSender) {
-            ModUserStorage.markKnown(buffer.sender);
+            ModUserStorage.markKnown(sender);
             if (isSocialsEnabled()) {
-                PAIRED.add(buffer.sender.toLowerCase(Locale.ROOT));
+                PAIRED.add(sender.toLowerCase(Locale.ROOT));
             }
         }
         ModUserStorage.merge(names);
@@ -127,8 +151,8 @@ public final class ModUserProtocol {
         if (isSocialsEnabled()
                 && type == TYPE_PAIR
                 && haveSender
-                && ACKED.add(buffer.sender.toLowerCase(Locale.ROOT))) {
-            send(buffer.sender, TYPE_ACK);
+                && ACKED.add(sender.toLowerCase(Locale.ROOT))) {
+            send(sender, TYPE_ACK);
         }
         return true;
     }
@@ -160,15 +184,27 @@ public final class ModUserProtocol {
         }
     }
 
-    private static List<String> splitPayload(String target, String payload) {
+    static List<String> splitPayload(String target, String payload) {
         String msgId = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        int overhead = ("m " + target + " " + TOKEN_PREFIX + msgId + ":1:1:" + TOKEN_SUFFIX).length();
-        int limit = MAX_CHAT_LENGTH - overhead;
-        if (limit <= 0) {
-            return List.of();
+        int fixedOverhead = ("m " + target + " " + TOKEN_PREFIX + msgId + ":::" + TOKEN_SUFFIX).length();
+        int total = 1;
+        int limit;
+        while (true) {
+            // Both counters grow to two digits for larger syncs. Account for their actual width
+            // before splitting, otherwise the final private message exceeds the server limit.
+            limit = MAX_CHAT_LENGTH - fixedOverhead - 2 * Integer.toString(total).length();
+            if (limit <= 0) {
+                return List.of();
+            }
+            int requiredParts = Math.max(1, (payload.length() + limit - 1) / limit);
+            if (requiredParts > MAX_INCOMING_PARTS) {
+                return List.of();
+            }
+            if (requiredParts == total) {
+                break;
+            }
+            total = requiredParts;
         }
-
-        int total = Math.max(1, (payload.length() + limit - 1) / limit);
         List<String> chunks = new ArrayList<>(total);
         for (int part = 0; part < total; part++) {
             int from = part * limit;
@@ -178,15 +214,18 @@ public final class ModUserProtocol {
         return chunks;
     }
 
-    private static List<String> parseNames(String csv) {
+    static List<String> parseNames(String csv) {
         List<String> names = new ArrayList<>();
         if (csv == null || csv.isBlank()) {
             return names;
         }
         for (String part : csv.split(",")) {
             String name = part.trim();
-            if (!name.isBlank()) {
+            if (PLAYER_NAME_PATTERN.matcher(name).matches()) {
                 names.add(name);
+                if (names.size() >= MAX_NAMES_PER_SYNC) {
+                    break;
+                }
             }
         }
         return names;
@@ -204,59 +243,18 @@ public final class ModUserProtocol {
         }
     }
 
+    private static int parsePositiveInt(String value) {
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed > 0 ? parsed : -1;
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
+    }
+
     private static boolean isSelf(String name) {
         Minecraft minecraft = Minecraft.getInstance();
-        return minecraft.player != null && name.equalsIgnoreCase(minecraft.player.getGameProfile().getName());
-    }
-
-    private static String extractSender(String text) {
-        int tokenIndex = text.indexOf(TOKEN_PREFIX);
-        if (tokenIndex <= 0) {
-            return null;
-        }
-        String prefix = text.substring(0, tokenIndex).trim();
-        int pipeIndex = prefix.indexOf('|');
-        if (pipeIndex >= 0) {
-            prefix = prefix.substring(pipeIndex + 1).trim();
-        }
-        prefix = prefix.replace(":", " ");
-        String[] parts = prefix.split("\\s+");
-        for (int i = parts.length - 1; i >= 0; i--) {
-            String candidate = parts[i].replaceAll("[^A-Za-z0-9_]", "");
-            if (candidate.length() >= 3 && candidate.length() <= 16) {
-                return candidate;
-            }
-        }
-        return null;
-    }
-
-    private static final class IncomingBuffer {
-        private final String[] parts;
-        private final String sender;
-
-        private IncomingBuffer(int totalParts, String sender) {
-            this.parts = new String[Math.max(1, totalParts)];
-            this.sender = sender;
-        }
-
-        private void put(int partIndex, String payloadPart) {
-            if (partIndex >= 1 && partIndex <= parts.length) {
-                parts[partIndex - 1] = payloadPart;
-            }
-        }
-
-        private boolean isComplete() {
-            for (String part : parts) {
-                if (part == null) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        private String join() {
-            return String.join("", parts);
-        }
+        return minecraft.player != null && name.equalsIgnoreCase(minecraft.player.getGameProfile().name());
     }
 
     public record DebugSnapshot(int incomingBuffers, int pairedPlayers, int acknowledgedPlayers) {

@@ -14,7 +14,7 @@ public final class DwActiveRunesDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int count = DwProtocolCodec.readVarInt(buf);
+            int count = DwProtocolCodec.readCollectionSize(buf);
             List<String> runes = new ArrayList<>(Math.max(0, count));
 
             for (int i = 0; i < count; i++) {

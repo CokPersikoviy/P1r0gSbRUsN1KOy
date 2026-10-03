@@ -3,7 +3,7 @@ package ru.wilyfox.client.hud;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.WidgetLayoutConfig;
 import ru.wilyfox.client.hud.fishing.FishingSpotOverlayRenderer;
@@ -274,7 +274,7 @@ public class HudRenderer {
         return List.copyOf(widgets);
     }
 
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         try (ModProfiler.Scope renderScope = ModProfiler.getInstance().scope("hud/render")) {
             HudFrameClock.advance(); // one tick per HUD frame; widgets key per-frame caches off this
             int screenWidth = Minecraft.getInstance().getWindow().getGuiScaledWidth();
@@ -319,7 +319,7 @@ public class HudRenderer {
                     }
 
                     renderedWidgets++;
-                    try (ModProfiler.Scope widgetScope = ModProfiler.getInstance().scope("widget/" + widget.getClass().getSimpleName())) {
+                    try (ModProfiler.Scope widgetScope = ModProfiler.getInstance().typedScope("widget", widget.getClass().getSimpleName())) {
                         widget.render(context, tickCounter);
                     }
                 }
@@ -335,9 +335,9 @@ public class HudRenderer {
                             renderHoveredWidgetOutline(context, hoveredWidget);
                             renderHoveredWidgetMinimizeControl(context, hoveredWidget, mouseX, mouseY);
 
-                            if (Screen.hasAltDown()) {
+                            if (ru.wilyfox.utils.InputModifiers.hasAltDown()) {
                                 renderGroupTooltip(context, hoveredWidget);
-                            } else if (Screen.hasControlDown()) {
+                            } else if (ru.wilyfox.utils.InputModifiers.hasControlDown()) {
                                 renderScaleTooltip(context, hoveredWidget);
                             }
                         }
@@ -373,7 +373,7 @@ public class HudRenderer {
      * The settings panel, drawn in its own HUD layer AFTER vanilla chat so it sits above it. Captures
      * the screen here (this layer runs after chat) so the frosted panel blurs the game + chat behind it.
      */
-    public void renderSettingsOverlay(GuiGraphics context, DeltaTracker tickCounter) {
+    public void renderSettingsOverlay(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!settingsOpen) {
             return;
         }
@@ -383,7 +383,7 @@ public class HudRenderer {
         }
     }
 
-    public void renderLayer(HudLayer layer, GuiGraphics context, DeltaTracker tickCounter) {
+    public void renderLayer(HudLayer layer, GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         for (Widget widget : widgets) {
             if (!shouldRenderWidget(widget, editing)) {
                 continue;
@@ -423,7 +423,7 @@ public class HudRenderer {
             abstractWidget.setScreenAnchor(null);
             abstractWidget.clearWidgetSnap();
 
-            if (Screen.hasAltDown()) {
+            if (ru.wilyfox.utils.InputModifiers.hasAltDown()) {
                 beginGroupDrag(abstractWidget);
             } else {
                 // beginGroupDrag() always resets this state itself; a plain single-widget
@@ -447,11 +447,14 @@ public class HudRenderer {
             return;
         }
 
+        if (editing && draggedWidget != null) {
+            onMouseDragged(mouseX, mouseY, screenWidth, screenHeight, button);
+        }
         Widget releasedWidget = draggedWidget;
-        draggedWidget = null;
         if (draggingWidgetGroup) {
             finishGroupDrag();
         }
+        draggedWidget = null;
         activeScreenAnchor = null;
         activeDraggedCornerIndicator = null;
         activeTargetCornerIndicator = null;
@@ -467,7 +470,7 @@ public class HudRenderer {
             return;
         }
 
-        if (!editing || draggedWidget == null) {
+        if (!editing || draggedWidget == null || button != 0) {
             return;
         }
 
@@ -491,7 +494,7 @@ public class HudRenderer {
             updateDraggedGroupPositions(abstractWidget);
         }
 
-        boolean snappedToAnchor = applyScreenAnchorSnapping(draggedWidget, screenWidth, screenHeight, Screen.hasShiftDown());
+        boolean snappedToAnchor = applyScreenAnchorSnapping(draggedWidget, screenWidth, screenHeight, ru.wilyfox.utils.InputModifiers.hasShiftDown());
         if (!snappedToAnchor) {
             applyWidgetSnapping(screenWidth, screenHeight);
         } else if (draggedWidget instanceof AbstractWidget abstractWidget) {
@@ -538,7 +541,7 @@ public class HudRenderer {
         return settingsOpen && settingsPanel.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    public boolean onCharTyped(char codePoint, int modifiers) {
+    public boolean onCharTyped(int codePoint, int modifiers) {
         return settingsOpen && settingsPanel.charTyped(codePoint, modifiers);
     }
 
@@ -610,11 +613,11 @@ public class HudRenderer {
         return snapLayoutEngine.findAbstractWidget(configKey);
     }
 
-    private void renderHoveredWidgetOutline(GuiGraphics context, Widget hoveredWidget) {
+    private void renderHoveredWidgetOutline(GuiGraphicsExtractor context, Widget hoveredWidget) {
         HudEditorOverlayRenderer.renderHoveredWidgetOutline(overlayHost, context, hoveredWidget);
     }
 
-    private void renderHoveredWidgetMinimizeControl(GuiGraphics context, Widget hoveredWidget, double mouseX, double mouseY) {
+    private void renderHoveredWidgetMinimizeControl(GuiGraphicsExtractor context, Widget hoveredWidget, double mouseX, double mouseY) {
         if (!(hoveredWidget instanceof AbstractWidget abstractWidget)) {
             return;
         }
@@ -643,11 +646,7 @@ public class HudRenderer {
     }
 
     private void saveAllWidgetLayouts() {
-        for (Widget widget : widgets) {
-            if (widget instanceof AbstractWidget abstractWidget) {
-                ConfigManager.saveWidgetLayout(abstractWidget);
-            }
-        }
+        ConfigManager.saveWidgetLayouts(widgets);
     }
 
     private void normalizeWidgetSnapParents() {
@@ -698,7 +697,7 @@ public class HudRenderer {
         }
     }
 
-    private void renderScreenAnchors(GuiGraphics context, int screenWidth, int screenHeight) {
+    private void renderScreenAnchors(GuiGraphicsExtractor context, int screenWidth, int screenHeight) {
         HudEditorOverlayRenderer.renderScreenAnchors(
                 overlayHost,
                 context,
@@ -757,7 +756,7 @@ public class HudRenderer {
                 || anchor == ScreenAnchor.RIGHT_CENTER;
     }
 
-    private void renderWidgetSnapIndicators(GuiGraphics context) {
+    private void renderWidgetSnapIndicators(GuiGraphicsExtractor context) {
         HudEditorOverlayRenderer.renderWidgetSnapIndicators(overlayHost, context);
     }
 
@@ -844,7 +843,7 @@ public class HudRenderer {
         ConfigManager.saveWidgetLayout(abstractWidget);
     }
 
-    private void renderGroupTooltip(GuiGraphics context, Widget hovered) {
+    private void renderGroupTooltip(GuiGraphicsExtractor context, Widget hovered) {
         if (!(hovered instanceof AbstractWidget abstractWidget)) {
             return;
         }
@@ -883,11 +882,11 @@ public class HudRenderer {
         HudSurface.fillRounded(context, x, y, width, height, 3, WidgetTheme.TOOLTIP_BG);
         context.fill(x + 3, y, x + width - 3, y + 1, WidgetTheme.ACCENT_LINE);
 
-        context.pose().pushPose();
-        context.pose().translate(x + paddingX, y + (height - Minecraft.getInstance().font.lineHeight * labelScale) / 2.0f, 0);
-        context.pose().scale(labelScale, labelScale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(x + paddingX, y + (height - Minecraft.getInstance().font.lineHeight * labelScale) / 2.0f);
+        context.pose().scale(labelScale, labelScale);
 
-        context.drawString(
+        context.text(
                 Minecraft.getInstance().font,
                 text,
                 0,
@@ -895,10 +894,10 @@ public class HudRenderer {
                 WidgetTheme.TOOLTIP_TEXT
         );
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
-    private void renderScaleTooltip(GuiGraphics context, Widget hovered) {
+    private void renderScaleTooltip(GuiGraphicsExtractor context, Widget hovered) {
         if (!(hovered instanceof AbstractWidget scalableWidget)) {
             return;
         }
@@ -931,11 +930,11 @@ public class HudRenderer {
         HudSurface.fillRounded(context, x, y, width, height, 3, WidgetTheme.TOOLTIP_BG);
         context.fill(x + 3, y, x + width - 3, y + 1, WidgetTheme.ACCENT_LINE);
 
-        context.pose().pushPose();
-        context.pose().translate(x + paddingX, y + (height - Minecraft.getInstance().font.lineHeight * labelScale) / 2.0f, 0);
-        context.pose().scale(labelScale, labelScale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(x + paddingX, y + (height - Minecraft.getInstance().font.lineHeight * labelScale) / 2.0f);
+        context.pose().scale(labelScale, labelScale);
 
-        context.drawString(
+        context.text(
                 Minecraft.getInstance().font,
                 text,
                 0,
@@ -943,6 +942,6 @@ public class HudRenderer {
                 WidgetTheme.TOOLTIP_TEXT
         );
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 }

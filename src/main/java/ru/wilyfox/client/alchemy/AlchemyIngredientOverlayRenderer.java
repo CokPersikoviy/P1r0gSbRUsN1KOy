@@ -2,7 +2,7 @@ package ru.wilyfox.client.alchemy;
 
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.phys.Vec3;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.client.hud.widget.WidgetUtils;
@@ -14,14 +14,14 @@ public final class AlchemyIngredientOverlayRenderer {
     private AlchemyIngredientOverlayRenderer() {
     }
 
-    public static void render(GuiGraphics context) {
+    public static void render(GuiGraphicsExtractor context) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.gameRenderer == null) {
             return;
         }
 
-        Camera camera = mc.gameRenderer.getMainCamera();
-        Vec3 cameraPos = camera.getPosition();
+        Camera camera = mc.gameRenderer.mainCamera();
+        Vec3 cameraPos = camera.position();
         long now = System.currentTimeMillis();
 
         for (AlchemyIngredientSpot spot : AlchemyIngredientTracker.getInstance().getActiveSpots()) {

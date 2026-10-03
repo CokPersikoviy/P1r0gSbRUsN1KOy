@@ -7,6 +7,25 @@ public class QuickAccessConfig {
     public boolean active = true;
     public List<QuickAccessSectionConfig> sections = createDefaultSections();
 
+    public static void sanitizeSections(List<QuickAccessSectionConfig> sections) {
+        for (int sectionIndex = 0; sectionIndex < sections.size(); sectionIndex++) {
+            QuickAccessSectionConfig section = sections.get(sectionIndex);
+            if (section == null) {
+                section = new QuickAccessSectionConfig();
+                sections.set(sectionIndex, section);
+            }
+            if (section.title == null) section.title = "Section";
+            if (section.items == null) section.items = new ArrayList<>();
+            section.items.removeIf(java.util.Objects::isNull);
+            for (QuickAccessItemConfig item : section.items) {
+                if (item.title == null) item.title = "Action";
+                if (item.command == null) item.command = "";
+                if (item.itemId == null || item.itemId.isBlank()) item.itemId = "minecraft:paper";
+                item.customModelData = Math.max(0, item.customModelData);
+            }
+        }
+    }
+
     public static List<QuickAccessSectionConfig> createDefaultSections() {
         List<QuickAccessSectionConfig> sections = new ArrayList<>();
 

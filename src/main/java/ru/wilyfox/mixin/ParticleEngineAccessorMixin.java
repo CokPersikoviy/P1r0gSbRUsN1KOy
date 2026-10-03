@@ -13,7 +13,7 @@ import java.util.Queue;
 @Mixin(ParticleEngine.class)
 public interface ParticleEngineAccessorMixin {
     @Accessor("particles")
-    Map<ParticleRenderType, Queue<Particle>> froghelper$getParticles();
+    Map<ParticleRenderType, net.minecraft.client.particle.ParticleGroup<?>> froghelper$getParticles();
 
     @Accessor("trackingEmitters")
     Queue<TrackingEmitter> froghelper$getTrackingEmitters();

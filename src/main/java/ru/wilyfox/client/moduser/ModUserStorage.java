@@ -6,14 +6,13 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import ru.wilyfox.client.clan.PlayerClanChatParser;
+import ru.wilyfox.utils.AtomicFileWriter;
 
 import java.io.Reader;
-import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -170,7 +169,7 @@ public final class ModUserStorage {
     private static boolean isSelf(String name) {
         Minecraft minecraft = Minecraft.getInstance();
         return minecraft.player != null
-                && name.equalsIgnoreCase(minecraft.player.getGameProfile().getName());
+                && name.equalsIgnoreCase(minecraft.player.getGameProfile().name());
     }
 
     private static String normalize(String name) {
@@ -212,18 +211,16 @@ public final class ModUserStorage {
 
     private static void save() {
         try {
-            Files.createDirectories(STORAGE_PATH.getParent());
             ModUsersFile file = new ModUsersFile();
             file.names = new ArrayList<>(new LinkedHashSet<>(DISPLAY.values()));
-            try (Writer writer = Files.newBufferedWriter(STORAGE_PATH)) {
-                GSON.toJson(file, writer);
-            }
+            AtomicFileWriter.write(STORAGE_PATH, writer -> GSON.toJson(file, writer));
         } catch (Exception exception) {
             error(LOGGER, "Failed to save FrogHelper mod-user storage to {}", STORAGE_PATH, exception);
         }
     }
 
     private static final class ModUsersFile {
+        @com.google.gson.annotations.SerializedName("names")
         private List<String> names = new ArrayList<>();
     }
 }

@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
@@ -29,7 +29,7 @@ public class CycleSettingsComponent<T> extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
 
         boolean hovered = isHovered(mouseX, mouseY);
@@ -39,7 +39,7 @@ public class CycleSettingsComponent<T> extends SettingsComponent {
         HudSurface.fillRounded(context, x, y, width, height, 4, rowBg);
 
         int textY = y + (height - mc.font.lineHeight) / 2;
-        context.drawString(mc.font, label, x + 8, textY, textColor);
+        context.text(mc.font, label, x + 8, textY, textColor);
 
         String valueText = labelMapper.apply(getter.get());
         int maxValueWidth = Math.min(128, width / 2);
@@ -47,7 +47,7 @@ public class CycleSettingsComponent<T> extends SettingsComponent {
         int valueX = x + width - 8 - valueWidth;
 
         HudSurface.fillRounded(context, valueX, y + 3, valueWidth, height - 6, 3, hovered ? WidgetTheme.PANEL_BG : WidgetTheme.BAR_BG);
-        context.drawCenteredString(mc.font, valueText, valueX + valueWidth / 2, textY, WidgetTheme.TITLE);
+        context.centeredText(mc.font, valueText, valueX + valueWidth / 2, textY, WidgetTheme.TITLE);
     }
 
     @Override

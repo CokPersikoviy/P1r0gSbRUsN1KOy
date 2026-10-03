@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.utility.BlockBreakCounter;
@@ -13,20 +13,20 @@ public class BlocksPerSecondWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!ConfigManager.get().blocksPerSecondWidget.active) {
             return;
         }
 
         String text = "B/s: " + BlockBreakCounter.getBreakPerSecond();
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
-        context.drawString(Minecraft.getInstance().font, text, 0, 0, WidgetTheme.TEXT_SOFT);
+        context.text(Minecraft.getInstance().font, text, 0, 0, WidgetTheme.TEXT_SOFT);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override

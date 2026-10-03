@@ -1,7 +1,7 @@
 package ru.wilyfox.client.clan;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import ru.wilyfox.client.hud.config.ConfigManager;
@@ -24,18 +24,18 @@ public final class ClanSiegeMapScreen extends Screen {
     }
 
     @Override
-    protected void renderBlurredBackground() {
+    protected void extractBlurredBackground(GuiGraphicsExtractor graphics) {
     }
 
     @Override
     public void tick() {
         if (!canOpen() && minecraft != null) {
-            minecraft.setScreen(null);
+            minecraft.gui.setScreen(null);
         }
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         int size = Math.max(128, Math.min(width, height) - 32);
         int left = (width - size) / 2;
         int top = (height - size) / 2;

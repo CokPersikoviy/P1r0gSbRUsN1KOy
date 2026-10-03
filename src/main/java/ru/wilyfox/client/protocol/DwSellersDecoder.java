@@ -14,7 +14,7 @@ public final class DwSellersDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int count = DwProtocolCodec.readVarInt(buf);
+            int count = DwProtocolCodec.readCollectionSize(buf);
             List<DwSellerEntry> entries = new ArrayList<>(Math.max(4, count));
 
             for (int i = 0; i < count; i++) {

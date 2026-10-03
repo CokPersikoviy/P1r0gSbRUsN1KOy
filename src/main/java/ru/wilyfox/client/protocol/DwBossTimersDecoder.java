@@ -14,7 +14,7 @@ public final class DwBossTimersDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int count = DwProtocolCodec.readVarInt(buf);
+            int count = DwProtocolCodec.readCollectionSize(buf);
             if (count < 0 || count > 1024) {
                 throw new IllegalArgumentException("DW bosstimers count is out of range: " + count);
             }

@@ -30,8 +30,8 @@ final class ProtocolTransport {
 
         state.initialized = true;
 
-        PayloadTypeRegistry.playC2S().register(DwHandshakePayload.TYPE, DwHandshakePayload.STREAM_CODEC);
-        PayloadTypeRegistry.playS2C().register(DwEvoPlusPayload.TYPE, DwEvoPlusPayload.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(DwHandshakePayload.TYPE, DwHandshakePayload.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(DwEvoPlusPayload.TYPE, DwEvoPlusPayload.STREAM_CODEC);
 
         ClientPlayNetworking.registerGlobalReceiver(DwEvoPlusPayload.TYPE, (payload, context) -> {
             ModProfiler.getInstance().recordProtocolPayloadReceived(payload.data().length);

@@ -5,6 +5,7 @@ import com.google.gson.JsonParser;
 import com.mojang.authlib.GameProfile;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.loader.api.FabricLoader;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 
 import java.net.URI;
@@ -43,6 +44,10 @@ public final class JoinWebhookNotifier {
     }
 
     public static void register() {
+        // Tests connect to local worlds; never publish those synthetic sessions externally.
+        if (FabricLoader.getInstance().isModLoaded("froghelper-test")) {
+            return;
+        }
         if (!REGISTERED.compareAndSet(false, true)) {
             return;
         }
@@ -55,17 +60,17 @@ public final class JoinWebhookNotifier {
     }
 
     private static void onJoin(GameProfile profile) {
-        if (profile == null || profile.getName() == null || profile.getName().isBlank()) {
+        if (profile == null || profile.name() == null || profile.name().isBlank()) {
             return;
         }
 
         Session session;
         synchronized (ACTIVE_SESSION_LOCK) {
-            if (activeSession != null && activeSession.isOnlineFor(profile.getName())) {
+            if (activeSession != null && activeSession.isOnlineFor(profile.name())) {
                 return;
             }
 
-            session = new Session(profile.getName(), profile.getId(), Instant.now());
+            session = new Session(profile.name(), profile.id(), Instant.now());
             activeSession = session;
         }
 

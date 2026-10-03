@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.item.ItemStack;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
@@ -26,7 +26,7 @@ public class CraftRecipeWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!ConfigManager.get().craftRecipe.active) {
             return;
         }
@@ -47,43 +47,43 @@ public class CraftRecipeWidget extends AbstractWidget {
 
         int lineHeight = mc.font.lineHeight + LINE_GAP;
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, getUnscaledWidth(), getUnscaledHeight());
 
         int y = PADDING_Y;
         if (compact) {
-            context.drawString(mc.font, tracker.getTitle(), PADDING_X, y, WidgetTheme.TITLE);
+            context.text(mc.font, tracker.getTitle(), PADDING_X, y, WidgetTheme.TITLE);
             y += lineHeight + 2;
         } else {
             ItemStack icon = tracker.getIcon();
             int iconY = y + Math.max(0, (mc.font.lineHeight - ICON_SIZE) / 2);
-            context.renderItem(icon, PADDING_X, iconY);
+            context.item(icon, PADDING_X, iconY);
 
             int textX = PADDING_X + ICON_SIZE + ICON_TEXT_GAP;
-            context.drawString(mc.font, tracker.getTitle(), textX, y, WidgetTheme.TITLE);
+            context.text(mc.font, tracker.getTitle(), textX, y, WidgetTheme.TITLE);
             y += lineHeight;
 
             String craftTimeLine = tracker.getCraftTimeLine();
             if (!craftTimeLine.isBlank()) {
-                context.drawString(mc.font, craftTimeLine, textX, y, WidgetTheme.TEXT_SECONDARY);
+                context.text(mc.font, craftTimeLine, textX, y, WidgetTheme.TEXT_SECONDARY);
                 y += lineHeight;
             }
 
             y += 2;
         }
 
-        context.drawString(mc.font, "Ingredients:", PADDING_X, y, WidgetTheme.TEXT_SECONDARY);
+        context.text(mc.font, "Ingredients:", PADDING_X, y, WidgetTheme.TEXT_SECONDARY);
         y += lineHeight;
 
         for (String line : recipeLines) {
-            context.drawString(mc.font, line, PADDING_X, y, WidgetTheme.TEXT_SOFT);
+            context.text(mc.font, line, PADDING_X, y, WidgetTheme.TEXT_SOFT);
             y += lineHeight;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -144,19 +144,19 @@ public class CraftRecipeWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Craft Recipe", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No recipe selected", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Craft Recipe", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No recipe selected", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 }
 

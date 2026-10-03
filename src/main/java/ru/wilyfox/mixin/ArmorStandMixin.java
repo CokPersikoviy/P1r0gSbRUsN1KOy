@@ -23,42 +23,21 @@ import ru.wilyfox.bridge.AccessoryArmorStandAccess;
 @Mixin(ArmorStand.class)
 public abstract class ArmorStandMixin implements AccessoryArmorStandAccess {
     @Unique
-    private boolean froghelper$selfAccessory;
-
-    @Inject(method = "setItemSlot", at = @At("TAIL"))
-    private void froghelper$markSelfAccessory(EquipmentSlot slot, ItemStack stack, CallbackInfo ci) {
-        if (slot != EquipmentSlot.HEAD || froghelper$selfAccessory) {
-            return;
-        }
-
-        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
-        if (data == null) {
-            return;
-        }
-
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player == null) {
-            return;
-        }
-
-        String name = minecraft.player.getGameProfile().getName();
-        if (froghelper$isAccessoryOwner(data.getUnsafe(), name)) {
-            froghelper$selfAccessory = true;
-        }
-    }
-
-    @Unique
     private static boolean froghelper$isAccessoryOwner(CompoundTag tag, String name) {
-        CompoundTag bukkit = tag.getCompound("PublicBukkitValues");
+        CompoundTag bukkit = tag.getCompoundOrEmpty("PublicBukkitValues");
         if (bukkit.contains("diamondworld:accessory_owner")
-                && bukkit.getString("diamondworld:accessory_owner").equalsIgnoreCase(name)) {
+                && bukkit.getStringOr("diamondworld:accessory_owner", "").equalsIgnoreCase(name)) {
             return true;
         }
-        return tag.contains("accessory_owner") && tag.getString("accessory_owner").equalsIgnoreCase(name);
+        return tag.contains("accessory_owner") && tag.getStringOr("accessory_owner", "").equalsIgnoreCase(name);
     }
 
     @Override
     public boolean froghelper$isSelfAccessory() {
-        return froghelper$selfAccessory;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) return false;
+        ItemStack head = ((ArmorStand) (Object) this).getItemBySlot(EquipmentSlot.HEAD);
+        CustomData data = head.get(DataComponents.CUSTOM_DATA);
+        return data != null && froghelper$isAccessoryOwner(data.copyTag(), minecraft.player.getGameProfile().name());
     }
 }

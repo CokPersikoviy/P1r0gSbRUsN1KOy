@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -46,7 +46,7 @@ public final class EntityInspectWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!ConfigManager.get().entityInspect.active) {
             return;
         }
@@ -57,13 +57,13 @@ public final class EntityInspectWidget extends AbstractWidget {
             return;
         }
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0F);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         renderCard(context, mc, snapshot);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -87,23 +87,23 @@ public final class EntityInspectWidget extends AbstractWidget {
         return "Entity Inspect";
     }
 
-    private void renderCard(GuiGraphics context, Minecraft mc, InspectSnapshot snapshot) {
+    private void renderCard(GuiGraphicsExtractor context, Minecraft mc, InspectSnapshot snapshot) {
         HudSurface.drawPanel(context, CARD_WIDTH, CARD_HEIGHT);
         context.fill(0, HEADER_HEIGHT, CARD_WIDTH, HEADER_HEIGHT + 1, WidgetTheme.BAR_BG);
 
-        context.drawString(mc.font, "Entity Inspect", 8, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "EntityType: " + snapshot.entityType, 8, HEADER_HEIGHT + 4, WidgetTheme.TEXT_SOFT);
+        context.text(mc.font, "Entity Inspect", 8, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "EntityType: " + snapshot.entityType, 8, HEADER_HEIGHT + 4, WidgetTheme.TEXT_SOFT);
 
         int previewX2 = PREVIEW_BOX_X + PREVIEW_BOX_SIZE;
         int previewY2 = PREVIEW_BOX_Y + PREVIEW_BOX_SIZE;
         context.fill(PREVIEW_BOX_X, PREVIEW_BOX_Y, previewX2, previewY2, WidgetTheme.WIDGET_PANEL_BG_SOFT);
         context.fill(PREVIEW_BOX_X, PREVIEW_BOX_Y, previewX2, PREVIEW_BOX_Y + 1, WidgetTheme.WIDGET_ACCENT_LINE);
 
-        context.renderItem(snapshot.previewItem, PREVIEW_BOX_X + 34, PREVIEW_BOX_Y + 18);
-        context.drawCenteredString(mc.font, snapshot.previewLabel, PREVIEW_BOX_X + PREVIEW_BOX_SIZE / 2, PREVIEW_BOX_Y + 44, WidgetTheme.TEXT_SECONDARY);
+        context.item(snapshot.previewItem, PREVIEW_BOX_X + 34, PREVIEW_BOX_Y + 18);
+        context.centeredText(mc.font, snapshot.previewLabel, PREVIEW_BOX_X + PREVIEW_BOX_SIZE / 2, PREVIEW_BOX_Y + 44, WidgetTheme.TEXT_SECONDARY);
 
         int nameColor = snapshot.displayName.isBlank() ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_PRIMARY;
-        context.drawString(mc.font, "Name: " + (snapshot.displayName.isBlank() ? "-" : snapshot.displayName), PREVIEW_BOX_X, PREVIEW_BOX_Y + PREVIEW_BOX_SIZE + 8, nameColor);
+        context.text(mc.font, "Name: " + (snapshot.displayName.isBlank() ? "-" : snapshot.displayName), PREVIEW_BOX_X, PREVIEW_BOX_Y + PREVIEW_BOX_SIZE + 8, nameColor);
 
         int y = SLOT_Y;
         for (SlotInfo slot : snapshot.slots) {
@@ -111,44 +111,44 @@ public final class EntityInspectWidget extends AbstractWidget {
             y += SLOT_ROW_GAP;
         }
 
-        context.drawString(mc.font, "Block:", PREVIEW_BOX_X, BLOCK_SECTION_Y, WidgetTheme.TEXT_SECONDARY);
+        context.text(mc.font, "Block:", PREVIEW_BOX_X, BLOCK_SECTION_Y, WidgetTheme.TEXT_SECONDARY);
         int blockY = BLOCK_SECTION_Y + LINE_HEIGHT + 1;
         for (String line : snapshot.blockLines) {
-            context.drawString(mc.font, trimToWidth(mc, line), PREVIEW_BOX_X, blockY, WidgetTheme.TEXT_SOFT);
+            context.text(mc.font, trimToWidth(mc, line), PREVIEW_BOX_X, blockY, WidgetTheme.TEXT_SOFT);
             blockY += LINE_HEIGHT;
         }
 
-        context.drawString(mc.font, "Matcher:", PREVIEW_BOX_X, MATCHER_SECTION_Y, WidgetTheme.TEXT_SECONDARY);
+        context.text(mc.font, "Matcher:", PREVIEW_BOX_X, MATCHER_SECTION_Y, WidgetTheme.TEXT_SECONDARY);
         int matcherY = MATCHER_SECTION_Y + LINE_HEIGHT + 1;
         for (String line : snapshot.matcherLines) {
-            context.drawString(mc.font, trimToWidth(mc, line), PREVIEW_BOX_X, matcherY, WidgetTheme.TEXT_SOFT);
+            context.text(mc.font, trimToWidth(mc, line), PREVIEW_BOX_X, matcherY, WidgetTheme.TEXT_SOFT);
             matcherY += LINE_HEIGHT;
         }
 
-        context.drawString(mc.font, "Nearby:", PREVIEW_BOX_X, NEARBY_SECTION_Y, WidgetTheme.TEXT_SECONDARY);
+        context.text(mc.font, "Nearby:", PREVIEW_BOX_X, NEARBY_SECTION_Y, WidgetTheme.TEXT_SECONDARY);
         int nearbyY = NEARBY_SECTION_Y + LINE_HEIGHT + 1;
         for (String line : snapshot.nearbyLines) {
-            context.drawString(mc.font, trimToWidth(mc, line), PREVIEW_BOX_X, nearbyY, WidgetTheme.TEXT_SOFT);
+            context.text(mc.font, trimToWidth(mc, line), PREVIEW_BOX_X, nearbyY, WidgetTheme.TEXT_SOFT);
             nearbyY += LINE_HEIGHT;
         }
     }
 
-    private void renderSlotRow(GuiGraphics context, Minecraft mc, SlotInfo slot, int y) {
+    private void renderSlotRow(GuiGraphicsExtractor context, Minecraft mc, SlotInfo slot, int y) {
         int rowWidth = CARD_WIDTH - SLOT_X - 8;
         context.fill(SLOT_X, y - 2, SLOT_X + rowWidth, y + 43, WidgetTheme.WIDGET_PANEL_BG_SOFT);
         context.fill(SLOT_X, y - 2, SLOT_X + 1, y + 43, WidgetTheme.WIDGET_ACCENT_LINE);
 
-        context.drawString(mc.font, slot.label, SLOT_X + 6, y, WidgetTheme.TEXT_SECONDARY);
-        context.drawString(mc.font, slot.material, SLOT_X + 54, y, slot.empty ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SOFT);
+        context.text(mc.font, slot.label, SLOT_X + 6, y, WidgetTheme.TEXT_SECONDARY);
+        context.text(mc.font, slot.material, SLOT_X + 54, y, slot.empty ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SOFT);
 
         if (slot.empty) {
-            context.drawString(mc.font, "empty", SLOT_X + 54, y + LINE_HEIGHT, WidgetTheme.TEXT_MUTED);
+            context.text(mc.font, "empty", SLOT_X + 54, y + LINE_HEIGHT, WidgetTheme.TEXT_MUTED);
             return;
         }
 
-        context.drawString(mc.font, "CMD: " + slot.customModelData, SLOT_X + 54, y + LINE_HEIGHT, WidgetTheme.TEXT_ACCENT);
-        context.drawString(mc.font, trimToWidth(mc, "Model: " + slot.itemModel), SLOT_X + 6, y + LINE_HEIGHT * 2, WidgetTheme.TEXT_SECONDARY);
-        context.drawString(mc.font, trimToWidth(mc, slot.name), SLOT_X + 6, y + LINE_HEIGHT * 3, WidgetTheme.TEXT_PRIMARY);
+        context.text(mc.font, "CMD: " + slot.customModelData, SLOT_X + 54, y + LINE_HEIGHT, WidgetTheme.TEXT_ACCENT);
+        context.text(mc.font, trimToWidth(mc, "Model: " + slot.itemModel), SLOT_X + 6, y + LINE_HEIGHT * 2, WidgetTheme.TEXT_SECONDARY);
+        context.text(mc.font, trimToWidth(mc, slot.name), SLOT_X + 6, y + LINE_HEIGHT * 3, WidgetTheme.TEXT_PRIMARY);
     }
 
     private InspectSnapshot buildSnapshot(Minecraft mc) {

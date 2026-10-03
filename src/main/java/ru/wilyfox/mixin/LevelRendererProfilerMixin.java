@@ -14,12 +14,12 @@ public class LevelRendererProfilerMixin {
     @Unique
     private final ProfilerScopeStack froghelper$worldRenderScopes = new ProfilerScopeStack();
 
-    @Inject(method = "renderLevel", at = @At("HEAD"))
+    @Inject(method = "render", at = @At("HEAD"))
     private void froghelper$beginWorldRender(CallbackInfo ci) {
         froghelper$worldRenderScopes.push(ModProfiler.getInstance().scope("render/world"));
     }
 
-    @Inject(method = "renderLevel", at = @At("RETURN"))
+    @Inject(method = "render", at = @At("RETURN"))
     private void froghelper$endWorldRender(CallbackInfo ci) {
         froghelper$worldRenderScopes.closeLatest();
     }

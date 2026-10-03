@@ -15,7 +15,7 @@ final class SodiumBrushableBlockEntityCullingImpl {
 
     static void register() {
         BlockEntityRenderHandler.instance().addRenderPredicate(
-                BlockEntityType.BRUSHABLE_BLOCK,
+                net.minecraft.world.level.block.entity.BlockEntityTypes.BRUSHABLE_BLOCK,
                 ACTIVE_BRUSHING_ONLY
         );
     }

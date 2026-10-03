@@ -8,6 +8,7 @@ import java.util.HexFormat;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
 import static ru.wilyfox.client.debug.DebugLogger.warn;
+import static ru.wilyfox.client.debug.DebugLogger.isEnabled;
 
 final class ProtocolDebugLogger {
     private static final int HEX_PREVIEW_BYTES = 128;
@@ -17,6 +18,9 @@ final class ProtocolDebugLogger {
     }
 
     static void logPayloadSampleIfNeeded(ProtocolState state, String subchannel, byte[] data) {
+        if (!isEnabled() || "token".equals(subchannel)) {
+            return;
+        }
         int seen = state.payloadSampleCounts.getOrDefault(subchannel, 0);
         if (seen >= ProtocolState.PAYLOAD_SAMPLE_LIMIT_PER_SUBCHANNEL) {
             return;
@@ -40,6 +44,10 @@ final class ProtocolDebugLogger {
     }
 
     private static void logPayloadStructure(String reason, String subchannel, byte[] data, Exception exception, boolean decodeEnvelope) {
+        if ("token".equals(subchannel)) {
+            warn(LOGGER, "DW protocol: {} for subchannel=token, totalBytes={}, contents=<redacted>", reason, data.length);
+            return;
+        }
         PayloadBody body = decodeEnvelope ? extractEnvelopeBody(data) : PayloadBody.raw(data);
         String label = subchannel == null ? "<unknown>" : subchannel;
 
@@ -79,7 +87,7 @@ final class ProtocolDebugLogger {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            buf.readUtf();
+            DwProtocolCodec.readString(buf);
             int bodyStart = buf.readerIndex();
             int readable = buf.readableBytes();
             byte[] body = new byte[readable];
@@ -144,7 +152,7 @@ final class ProtocolDebugLogger {
     private static String attemptReadVarInt(byte[] data) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
         try {
-            return Integer.toString(buf.readVarInt());
+            return Integer.toString(DwProtocolCodec.readVarInt(buf));
         } catch (Exception ignored) {
             return null;
         } finally {
@@ -155,7 +163,7 @@ final class ProtocolDebugLogger {
     private static String attemptReadInt(byte[] data) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
         try {
-            return Integer.toString(buf.readInt());
+            return Integer.toString(DwProtocolCodec.readInt(buf));
         } catch (Exception ignored) {
             return null;
         } finally {
@@ -166,7 +174,7 @@ final class ProtocolDebugLogger {
     private static String attemptReadLong(byte[] data) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
         try {
-            return Long.toString(buf.readLong());
+            return Long.toString(DwProtocolCodec.readLong(buf));
         } catch (Exception ignored) {
             return null;
         } finally {
@@ -177,7 +185,7 @@ final class ProtocolDebugLogger {
     private static String attemptReadDouble(byte[] data) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
         try {
-            return Double.toString(buf.readDouble());
+            return Double.toString(DwProtocolCodec.readDouble(buf));
         } catch (Exception ignored) {
             return null;
         } finally {
@@ -188,7 +196,7 @@ final class ProtocolDebugLogger {
     private static String attemptReadBoolean(byte[] data) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
         try {
-            return Boolean.toString(buf.readBoolean());
+            return Boolean.toString(DwProtocolCodec.readBoolean(buf));
         } catch (Exception ignored) {
             return null;
         } finally {
@@ -199,7 +207,7 @@ final class ProtocolDebugLogger {
     private static String attemptReadUtf(byte[] data) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
         try {
-            String value = buf.readUtf();
+            String value = DwProtocolCodec.readString(buf);
             return '"' + (value.length() > 80 ? value.substring(0, 80) + "..." : value) + '"';
         } catch (Exception ignored) {
             return null;

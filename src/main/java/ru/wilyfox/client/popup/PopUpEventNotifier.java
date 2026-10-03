@@ -380,7 +380,7 @@ public final class PopUpEventNotifier {
 
         Minecraft minecraft = Minecraft.getInstance();
         if (ConfigManager.get().alchemy.potionExpirationChat && minecraft.player != null) {
-            minecraft.player.displayClientMessage(Component.literal(message), false);
+            minecraft.gui.hud.getChat().addClientSystemMessage(Component.literal(message));
         }
     }
 

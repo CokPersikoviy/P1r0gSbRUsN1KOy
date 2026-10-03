@@ -96,7 +96,7 @@ public final class ModProfiler {
             synchronized (this) {
                 lifetimeJoinCount++;
             }
-            recordTimelineEvent("connection/join", handler.getLocalGameProfile().getName());
+            recordTimelineEvent("connection/join", handler.getLocalGameProfile().name());
             observeDimension(client, true);
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
@@ -422,7 +422,7 @@ public final class ModProfiler {
 
     private static String currentDimension(Minecraft minecraft) {
         return minecraft != null && minecraft.level != null
-                ? minecraft.level.dimension().location().toString()
+                ? minecraft.level.dimension().identifier().toString()
                 : "n/a";
     }
 
@@ -1768,18 +1768,18 @@ public final class ModProfiler {
     ) {
         private static SessionContext capture() {
             Minecraft minecraft = Minecraft.getInstance();
-            Screen screen = minecraft.screen;
+            Screen screen = minecraft.gui.screen();
             ServerData server = minecraft.getCurrentServer();
             String serverName = server != null ? server.name : (minecraft.hasSingleplayerServer() ? "singleplayer" : "menu");
             String screenName = screen != null ? screen.getClass().getSimpleName() : "none";
             String screenTitle = screen != null ? screen.getTitle().getString() : "n/a";
-            String dimension = minecraft.level != null ? minecraft.level.dimension().location().toString() : "n/a";
-            String playerName = minecraft.player != null ? minecraft.player.getGameProfile().getName() : "n/a";
+            String dimension = minecraft.level != null ? minecraft.level.dimension().identifier().toString() : "n/a";
+            String playerName = minecraft.player != null ? minecraft.player.getGameProfile().name() : "n/a";
             String fps = safeStaticInt(minecraft.getFps());
             String windowSize = minecraft.getWindow().getGuiScaledWidth() + "x" + minecraft.getWindow().getGuiScaledHeight();
             return new SessionContext(
                     INSTANCE.resolveModVersion(MOD_ID),
-                    SharedConstants.getCurrentVersion().getName(),
+                    SharedConstants.getCurrentVersion().name(),
                     INSTANCE.resolveModVersion("fabricloader"),
                     FabricLoader.getInstance().getEnvironmentType().name().toLowerCase(Locale.ROOT),
                     INSTANCE.safeValue(serverName),

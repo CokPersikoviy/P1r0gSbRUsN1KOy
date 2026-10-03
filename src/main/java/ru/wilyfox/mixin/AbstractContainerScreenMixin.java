@@ -1,7 +1,7 @@
 package ru.wilyfox.mixin;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.ContainerScreen;
@@ -40,7 +40,9 @@ public abstract class AbstractContainerScreenMixin {
     protected Slot hoveredSlot;
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
-    private void froghelper$inspectRecipes(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+    private void froghelper$inspectRecipes(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
+        double mouseX = event.x(), mouseY = event.y();
+        int button = event.button();
         if (button != 1) {
             return;
         }
@@ -67,7 +69,8 @@ public abstract class AbstractContainerScreenMixin {
     }
 
     @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
-    private void froghelper$handleRuneSetSwitch(int keyCode, int scanCode, int modifiers, CallbackInfoReturnable<Boolean> cir) {
+    private void froghelper$handleRuneSetSwitch(net.minecraft.client.input.KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
+        int keyCode = event.key(), scanCode = event.scancode(), modifiers = event.modifiers();
         Screen screen = (Screen) (Object) this;
         if (RuneSetSwitcher.handleScreenKeyPressed(screen.getTitle(), menu, keyCode, scanCode)) {
             cir.setReturnValue(true);
@@ -75,21 +78,23 @@ public abstract class AbstractContainerScreenMixin {
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
-    private void froghelper$handleRuneSetMouseSwitch(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+    private void froghelper$handleRuneSetMouseSwitch(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
+        double mouseX = event.x(), mouseY = event.y();
+        int button = event.button();
         Screen screen = (Screen) (Object) this;
         if (RuneSetSwitcher.handleScreenMouseClicked(screen.getTitle(), menu, button)) {
             cir.setReturnValue(true);
         }
     }
 
-    @Inject(method = "render", at = @At("TAIL"))
-    private void froghelper$renderRuneSetEffect(GuiGraphics context, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+    @Inject(method = "extractRenderState", at = @At("TAIL"))
+    private void froghelper$renderRuneSetEffect(GuiGraphicsExtractor context, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("ui/containerOverlay/render")) {
             froghelper$renderContainerOverlays(context);
         }
     }
 
-    private void froghelper$renderContainerOverlays(GuiGraphics context) {
+    private void froghelper$renderContainerOverlays(GuiGraphicsExtractor context) {
         Screen screen = (Screen) (Object) this;
         BossMenuIconCollector.inspect(screen.getTitle(), menu);
 

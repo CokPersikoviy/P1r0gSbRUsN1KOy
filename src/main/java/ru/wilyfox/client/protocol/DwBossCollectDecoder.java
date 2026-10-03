@@ -16,12 +16,12 @@ public final class DwBossCollectDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int groups = DwProtocolCodec.readVarInt(buf);
+            int groups = DwProtocolCodec.readCollectionSize(buf);
             Map<String, Set<String>> collectibles = new LinkedHashMap<>();
 
             for (int i = 0; i < groups; i++) {
                 String key = DwProtocolCodec.readString(buf);
-                int valuesCount = DwProtocolCodec.readVarInt(buf);
+                int valuesCount = DwProtocolCodec.readCollectionSize(buf);
                 Set<String> values = new LinkedHashSet<>();
 
                 for (int valueIndex = 0; valueIndex < valuesCount; valueIndex++) {

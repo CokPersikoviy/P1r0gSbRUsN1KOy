@@ -1,7 +1,7 @@
 package ru.wilyfox.client.alchemy;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -48,7 +48,7 @@ public final class AutoBrewingCostOverlay {
         return new OverlayData("\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c \u0430\u0432\u0442\u043e\u0432\u0430\u0440\u043a\u0438", lines);
     }
 
-    public static void render(GuiGraphics context, int x, int y, OverlayData data) {
+    public static void render(GuiGraphicsExtractor context, int x, int y, OverlayData data) {
         Minecraft minecraft = Minecraft.getInstance();
         int lineHeight = minecraft.font.lineHeight + 1;
         int width = minecraft.font.width(data.title());
@@ -60,10 +60,10 @@ public final class AutoBrewingCostOverlay {
 
         HudSurface.drawPanel(context, x, y, width, height, WidgetChrome.FROST, HudSurface.nativeRenderer());
         int textY = y + 5;
-        context.drawString(minecraft.font, data.title(), x + 6, textY, WidgetTheme.TITLE);
+        context.text(minecraft.font, data.title(), x + 6, textY, WidgetTheme.TITLE);
         textY += lineHeight + 2;
         for (String line : data.lines()) {
-            context.drawString(minecraft.font, line, x + 6, textY, WidgetTheme.TEXT_SOFT);
+            context.text(minecraft.font, line, x + 6, textY, WidgetTheme.TEXT_SOFT);
             textY += lineHeight;
         }
     }

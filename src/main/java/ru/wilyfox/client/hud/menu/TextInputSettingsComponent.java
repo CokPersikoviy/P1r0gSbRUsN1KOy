@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.lwjgl.glfw.GLFW;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.widget.HudSurface;
@@ -36,7 +36,7 @@ public class TextInputSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
         boolean hovered = isHovered(mouseX, mouseY);
 
@@ -48,7 +48,7 @@ public class TextInputSettingsComponent extends SettingsComponent {
         HudSurface.fillRounded(context, x, y, width, height, 4, rowBg);
 
         int textY = y + (height - mc.font.lineHeight) / 2;
-        context.drawString(mc.font, label, x + 8, textY, textColor);
+        context.text(mc.font, label, x + 8, textY, textColor);
 
         int boxWidth = Math.max(120, width / 2);
         int boxX = x + width - 8 - boxWidth;
@@ -65,7 +65,7 @@ public class TextInputSettingsComponent extends SettingsComponent {
         int valueX = boxX + 5;
         int valueY = boxY + (boxHeight - mc.font.lineHeight) / 2;
 
-        context.drawString(mc.font, display.text(), valueX, valueY, value.isBlank() ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SOFT);
+        context.text(mc.font, display.text(), valueX, valueY, value.isBlank() ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SOFT);
 
         if (focused && shouldShowCursor()) {
             int visibleCursor = Math.max(0, Math.min(display.text().length(), cursorPosition - display.startIndex() + display.prefixLength()));
@@ -154,12 +154,12 @@ public class TextInputSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public boolean charTyped(char codePoint, int modifiers) {
+    public boolean charTyped(int codePoint, int modifiers) {
         if (!focused || Character.isISOControl(codePoint)) {
             return false;
         }
 
-        insertText(String.valueOf(codePoint));
+        insertText(new String(Character.toChars(codePoint)));
         return true;
     }
 

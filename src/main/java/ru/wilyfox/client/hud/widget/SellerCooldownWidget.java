@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.SellerCooldownFilter;
@@ -27,7 +27,7 @@ public final class SellerCooldownWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -48,14 +48,14 @@ public final class SellerCooldownWidget extends AbstractWidget {
         int height = getUnscaledHeight(mc, entries.size());
         int y = PADDING_Y;
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
 
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, "Sellers", PADDING_X, y, WidgetTheme.TITLE);
+            context.text(mc.font, "Sellers", PADDING_X, y, WidgetTheme.TITLE);
             y += mc.font.lineHeight + 3;
         }
 
@@ -65,12 +65,12 @@ public final class SellerCooldownWidget extends AbstractWidget {
             int stateColor = ready ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_SECONDARY;
             int stateWidth = mc.font.width(state);
 
-            context.drawString(mc.font, entry.name() + ":", PADDING_X, y, WidgetTheme.TEXT_SOFT);
-            context.drawString(mc.font, state, width - PADDING_X - stateWidth, y, stateColor);
+            context.text(mc.font, entry.name() + ":", PADDING_X, y, WidgetTheme.TEXT_SOFT);
+            context.text(mc.font, state, width - PADDING_X - stateWidth, y, stateColor);
             y += mc.font.lineHeight + LINE_GAP;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -116,7 +116,7 @@ public final class SellerCooldownWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
     private List<SellerCooldownStore.Entry> getVisibleEntries() {
@@ -141,15 +141,15 @@ public final class SellerCooldownWidget extends AbstractWidget {
                 : String.format(Locale.ROOT, "%02d:%02d", minutes, seconds);
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Sellers", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No sellers", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Sellers", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No sellers", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 }

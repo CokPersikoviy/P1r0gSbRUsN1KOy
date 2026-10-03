@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
@@ -22,7 +22,7 @@ public class PotionRecipeWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isConfiguredVisible()) {
             return;
         }
@@ -38,25 +38,25 @@ public class PotionRecipeWidget extends AbstractWidget {
 
         int lineHeight = mc.font.lineHeight + LINE_GAP;
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, getUnscaledWidth(), getUnscaledHeight());
 
         int y = PADDING_Y;
-        context.drawString(mc.font, tracker.getTitle(), PADDING_X, y, WidgetTheme.TITLE);
+        context.text(mc.font, tracker.getTitle(), PADDING_X, y, WidgetTheme.TITLE);
         y += lineHeight + 2;
 
-        context.drawString(mc.font, "Recipe:", PADDING_X, y, WidgetTheme.TEXT_SECONDARY);
+        context.text(mc.font, "Recipe:", PADDING_X, y, WidgetTheme.TEXT_SECONDARY);
         y += lineHeight;
 
         for (String line : recipeLines) {
-            context.drawString(mc.font, line, PADDING_X, y, WidgetTheme.TEXT_SOFT);
+            context.text(mc.font, line, PADDING_X, y, WidgetTheme.TEXT_SOFT);
             y += lineHeight;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -109,7 +109,7 @@ public class PotionRecipeWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
     private boolean isConfiguredVisible() {
@@ -117,19 +117,19 @@ public class PotionRecipeWidget extends AbstractWidget {
                 && (isEditorPreview() || ConfigManager.get().potionRecipe.visibility.isVisible());
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         if (isEditorPreview()) {
             HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         } else {
             HudSurface.drawPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         }
-        context.drawString(mc.font, "Potion Recipe", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "\u0420\u0435\u0446\u0435\u043f\u0442 \u043d\u0435 \u0432\u044b\u0431\u0440\u0430\u043d", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Potion Recipe", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "\u0420\u0435\u0446\u0435\u043f\u0442 \u043d\u0435 \u0432\u044b\u0431\u0440\u0430\u043d", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 }

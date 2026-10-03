@@ -16,6 +16,7 @@ import static ru.wilyfox.client.debug.DebugLogger.info;
 public class BossTracker {
     private final Set<Integer> pendingEntityIds = new HashSet<>();
     private final BossRepository repository;
+    private ClientLevel trackedWorld;
 
     private String pendingBossName = null;
     private Long pendingBossTimeMillis = null;
@@ -25,10 +26,26 @@ public class BossTracker {
     }
 
     public void onEntityLoad(Entity entity) {
+        if (entity.level() instanceof ClientLevel world) observeWorld(world);
         pendingEntityIds.add(entity.getId());
     }
 
+    public void reset() {
+        pendingEntityIds.clear();
+        pendingBossName = null;
+        pendingBossTimeMillis = null;
+        trackedWorld = null;
+    }
+
+    private void observeWorld(ClientLevel world) {
+        if (trackedWorld != world) {
+            reset();
+            trackedWorld = world;
+        }
+    }
+
     public void onWorldTick(ClientLevel world) {
+        observeWorld(world);
         Iterator<Integer> it = pendingEntityIds.iterator();
 
         while (it.hasNext()) {
@@ -47,14 +64,16 @@ public class BossTracker {
             String raw = entity.getCustomName().getString();
             String clean = Formatting.sanitize(raw);
 
-            if (BossName.getBossName(clean) != null) {
-                pendingBossName = BossName.getBossName(clean);
+            String bossName = BossName.getBossName(clean);
+            if (bossName != null) {
+                pendingBossName = bossName;
                 it.remove();
                 tryCommit();
                 continue;
             }
 
-            long millis = Formatting.parseTimeToMillis(clean);
+            // Name sanitization removes punctuation, including the colons in HH:MM:SS.
+            long millis = Formatting.parseTimeToMillis(raw);
             if (millis != -1) {
                 pendingBossTimeMillis = millis;
                 it.remove();

@@ -85,7 +85,7 @@ public final class AlchemyBrewingTracker {
     }
 
     private static Double findBrewingTime(Minecraft minecraft) {
-        if (!(minecraft.gui.getBossOverlay() instanceof BossHealthOverlayAccessor accessor)) {
+        if (!(minecraft.gui.hud.getBossOverlay() instanceof BossHealthOverlayAccessor accessor)) {
             return null;
         }
 

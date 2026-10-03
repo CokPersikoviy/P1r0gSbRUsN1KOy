@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.layer.HudLayer;
 
 public interface Widget {
@@ -21,7 +21,7 @@ public interface Widget {
 
     boolean isVisible();
 
-    void render(GuiGraphics context, DeltaTracker tickCounter);
+    void render(GuiGraphicsExtractor context, DeltaTracker tickCounter);
 
     default boolean isHovered(double mouseX, double mouseY) {
         return mouseX >= getStartX()

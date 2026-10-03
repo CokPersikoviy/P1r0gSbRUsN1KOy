@@ -42,26 +42,26 @@ public class ClientPacketListenerMixin {
         DungeonMapTracker.getInstance().updateMapId(packet.mapId());
     }
 
-    @Inject(method = "handleParticleEvent", at = @At("HEAD"))
+    @Inject(method = "handleParticleEvent", at = @At("TAIL"))
     private void froghelper$trackAlchemyIngredientParticlePacket(ClientboundLevelParticlesPacket packet, CallbackInfo ci) {
         if (packet.getParticle().getType() == ParticleTypes.HAPPY_VILLAGER) {
             AlchemyIngredientTracker.getInstance().addParticle(packet.getX(), packet.getY(), packet.getZ());
         }
     }
 
-    @Inject(method = "handleLogin", at = @At("HEAD"))
+    @Inject(method = "handleLogin", at = @At("TAIL"))
     private void froghelper$resetUsefulHighlightOnLogin(ClientboundLoginPacket packet, CallbackInfo ci) {
         ModProfiler.getInstance().recordClientEvent("login", packet.getClass().getSimpleName());
         UsefulWorldHighlightRenderHook.onPlayerTeleport();
     }
 
-    @Inject(method = "handleRespawn", at = @At("HEAD"))
+    @Inject(method = "handleRespawn", at = @At("TAIL"))
     private void froghelper$resetUsefulHighlightOnRespawn(ClientboundRespawnPacket packet, CallbackInfo ci) {
         ModProfiler.getInstance().recordClientEvent("respawn", packet.getClass().getSimpleName());
         UsefulWorldHighlightRenderHook.onPlayerTeleport();
     }
 
-    @Inject(method = "handleMovePlayer", at = @At("HEAD"))
+    @Inject(method = "handleMovePlayer", at = @At("TAIL"))
     private void froghelper$resetUsefulHighlightOnTeleport(ClientboundPlayerPositionPacket packet, CallbackInfo ci) {
         ModProfiler.getInstance().recordClientEvent("teleport", packet.getClass().getSimpleName());
         UsefulWorldHighlightRenderHook.onPlayerTeleport();

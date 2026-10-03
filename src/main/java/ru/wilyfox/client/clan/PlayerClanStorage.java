@@ -4,9 +4,9 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.network.chat.Component;
+import ru.wilyfox.utils.AtomicFileWriter;
 
 import java.io.Reader;
-import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -141,16 +141,12 @@ public final class PlayerClanStorage {
     private static void save() {
         Path storagePath = storagePath();
         try {
-            Files.createDirectories(storagePath.getParent());
-
             PlayerClanStorageFile file = new PlayerClanStorageFile();
             for (Map.Entry<String, PlayerClanEntry> entry : ENTRIES.entrySet()) {
                 file.entries.put(entry.getKey(), entry.getValue());
             }
 
-            try (Writer writer = Files.newBufferedWriter(storagePath)) {
-                GSON.toJson(file, writer);
-            }
+            AtomicFileWriter.write(storagePath, writer -> GSON.toJson(file, writer));
         } catch (Exception exception) {
             error(LOGGER, "Failed to save FrogHelper clan storage to {}", storagePath, exception);
         }

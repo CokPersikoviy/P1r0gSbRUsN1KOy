@@ -14,7 +14,7 @@ public final class DwClanInfoDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int size = DwProtocolCodec.readVarInt(buf);
+            int size = DwProtocolCodec.readCollectionSize(buf);
             Map<String, String> values = new LinkedHashMap<>();
             for (int i = 0; i < size; i++) {
                 values.put(DwProtocolCodec.readString(buf), DwProtocolCodec.readString(buf));

@@ -187,7 +187,7 @@ public final class AutoBossAnnouncer {
             return null;
         }
 
-        BossHealthOverlay overlay = minecraft.gui.getBossOverlay();
+        BossHealthOverlay overlay = minecraft.gui.hud.getBossOverlay();
         if (!(overlay instanceof BossHealthOverlayAccessor accessor)) {
             return null;
         }
@@ -266,7 +266,7 @@ public final class AutoBossAnnouncer {
     private static void showLocalMessage(String message) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.gui != null) {
-            minecraft.gui.getChat().addMessage(Component.literal(message));
+            minecraft.gui.hud.getChat().addClientSystemMessage(Component.literal(message));
         }
     }
 

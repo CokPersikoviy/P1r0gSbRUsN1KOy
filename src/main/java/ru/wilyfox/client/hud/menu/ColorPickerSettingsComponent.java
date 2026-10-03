@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.lwjgl.glfw.GLFW;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.widget.HudSurface;
@@ -52,7 +52,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         syncFromConfig();
 
         Minecraft minecraft = Minecraft.getInstance();
@@ -72,7 +72,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
         String displayLabel = labelTruncated
                 ? minecraft.font.plainSubstrByWidth(label, Math.max(0, labelMaxWidth - minecraft.font.width("..."))) + "..."
                 : label;
-        context.drawString(
+        context.text(
                 minecraft.font,
                 displayLabel,
                 x + 8,
@@ -231,12 +231,12 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public boolean charTyped(char codePoint, int modifiers) {
-        if (!hexFocused || !isHexDigit(codePoint)) {
+    public boolean charTyped(int codePoint, int modifiers) {
+        if (!hexFocused || (codePoint > 127 || !isHexDigit((char) codePoint))) {
             return false;
         }
 
-        insertHexDigit(Character.toUpperCase(codePoint));
+        insertHexDigit((char) Character.toUpperCase(codePoint));
         return true;
     }
 
@@ -250,7 +250,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
         }
     }
 
-    private void renderHexField(GuiGraphics context, Minecraft minecraft, int hexX, int mouseX, int mouseY) {
+    private void renderHexField(GuiGraphicsExtractor context, Minecraft minecraft, int hexX, int mouseX, int mouseY) {
         int boxY = controlY();
         int boxHeight = controlHeight();
         boolean hovered = contains(mouseX, mouseY, hexX, boxY, HEX_WIDTH, boxHeight);
@@ -282,7 +282,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
                     WidgetTheme.ACCENT_LINE
             );
         }
-        context.drawString(
+        context.text(
                 minecraft.font,
                 hexDraft,
                 valueX,
@@ -297,7 +297,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
         }
     }
 
-    private void renderSwatch(GuiGraphics context, int swatchX, int mouseX, int mouseY) {
+    private void renderSwatch(GuiGraphicsExtractor context, int swatchX, int mouseX, int mouseY) {
         int swatchY = swatchY();
         boolean hovered = contains(mouseX, mouseY, swatchX, swatchY, SWATCH_SIZE, SWATCH_SIZE);
         int border = hovered || expanded ? WidgetTheme.TITLE : WidgetTheme.TEXT_MUTED;
@@ -313,7 +313,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
         );
     }
 
-    private void renderPencil(GuiGraphics context, Minecraft minecraft, int pencilX, int mouseX, int mouseY) {
+    private void renderPencil(GuiGraphicsExtractor context, Minecraft minecraft, int pencilX, int mouseX, int mouseY) {
         int pencilY = pencilY();
         boolean hovered = contains(mouseX, mouseY, pencilX, pencilY, PENCIL_SIZE, PENCIL_SIZE);
         HudSurface.fillRounded(
@@ -325,7 +325,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
                 3,
                 hovered || expanded ? WidgetTheme.PANEL_BG_SOFT : WidgetTheme.BAR_BG
         );
-        context.drawCenteredString(
+        context.centeredText(
                 minecraft.font,
                 "\u270E",
                 pencilX + PENCIL_SIZE / 2,
@@ -334,7 +334,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
         );
     }
 
-    private void renderPicker(GuiGraphics context, Minecraft minecraft) {
+    private void renderPicker(GuiGraphicsExtractor context, Minecraft minecraft) {
         int paletteX = paletteX();
         int paletteY = paletteY();
         int paletteWidth = paletteWidth();
@@ -378,7 +378,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
                 color >> 8 & 0xFF,
                 color & 0xFF
         );
-        context.drawString(
+        context.text(
                 minecraft.font,
                 rgbText,
                 paletteX,

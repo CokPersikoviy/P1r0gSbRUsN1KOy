@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
@@ -17,7 +17,7 @@ public class StatusSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
         String value = valueSupplier.get();
         if (value == null || value.isBlank()) {
@@ -25,8 +25,8 @@ public class StatusSettingsComponent extends SettingsComponent {
         }
 
         HudSurface.fillRounded(context, x, y, width, height, 4, WidgetTheme.PANEL_BG_SOFT);
-        context.drawString(mc.font, label, x + 8, y + 6, WidgetTheme.TEXT_MUTED, false);
-        context.drawString(mc.font, value, x + 8, y + height - mc.font.lineHeight - 6, getStatusColor(value), false);
+        context.text(mc.font, label, x + 8, y + 6, WidgetTheme.TEXT_MUTED, false);
+        context.text(mc.font, value, x + 8, y + height - mc.font.lineHeight - 6, getStatusColor(value), false);
     }
 
     @Override

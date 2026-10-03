@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.menu;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.lwjgl.glfw.GLFW;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.RunesBagConfig;
@@ -30,7 +30,7 @@ public class KeybindSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
         boolean hovered = isHovered(mouseX, mouseY);
         int rowBg = hovered ? WidgetTheme.PANEL_BG : WidgetTheme.PANEL_BG_SOFT;
@@ -39,7 +39,7 @@ public class KeybindSettingsComponent extends SettingsComponent {
         HudSurface.fillRounded(context, x, y, width, height, 4, rowBg);
 
         int textY = y + (height - mc.font.lineHeight) / 2;
-        context.drawString(mc.font, label, x + 8, textY, textColor);
+        context.text(mc.font, label, x + 8, textY, textColor);
 
         String keyText = listening ? "> ... <" : keyName(getter.getAsInt());
         int boxWidth = Math.max(52, Math.min(128, mc.font.width(keyText) + 16));
@@ -51,7 +51,7 @@ public class KeybindSettingsComponent extends SettingsComponent {
             context.fill(boxX + 3, y + 3, boxX + boxWidth - 3, y + 4, WidgetTheme.ACCENT_LINE);
         }
         int keyColor = listening ? WidgetTheme.STATUS_WARNING : WidgetTheme.TITLE;
-        context.drawCenteredString(mc.font, keyText, boxX + boxWidth / 2, textY, keyColor);
+        context.centeredText(mc.font, keyText, boxX + boxWidth / 2, textY, keyColor);
     }
 
     @Override

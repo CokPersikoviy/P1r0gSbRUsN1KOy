@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
@@ -14,7 +14,7 @@ public class ActionSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
         boolean hovered = isHovered(mouseX, mouseY);
 
@@ -24,7 +24,7 @@ public class ActionSettingsComponent extends SettingsComponent {
         }
 
         int textY = y + (height - mc.font.lineHeight) / 2;
-        context.drawCenteredString(mc.font, label, x + width / 2, textY, hovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_SOFT);
+        context.centeredText(mc.font, label, x + width / 2, textY, hovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_SOFT);
     }
 
     @Override

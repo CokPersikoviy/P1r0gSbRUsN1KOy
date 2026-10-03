@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "froghelper-test",
+  "version": "1.0.0",
+  "name": "FrogHelper migration smoke tests",
+  "environment": "client",
+  "entrypoints": {"fabric-client-gametest": ["ru.wilyfox.MigrationClientTest", "ru.wilyfox.HudDragClientTest", "ru.wilyfox.HudBlurClientTest"]},
+  "depends": {"froghelper": "*", "fabric-client-gametest-api-v1": "*"}
+}

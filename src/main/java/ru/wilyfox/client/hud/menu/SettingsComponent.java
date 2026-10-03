@@ -1,6 +1,6 @@
 package ru.wilyfox.client.hud.menu;
 
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.util.function.BooleanSupplier;
 
@@ -100,7 +100,7 @@ public abstract class SettingsComponent implements MenuElement {
     }
 
     @Override
-    public boolean charTyped(char codePoint, int modifiers) {
+    public boolean charTyped(int codePoint, int modifiers) {
         return false;
     }
 
@@ -108,7 +108,7 @@ public abstract class SettingsComponent implements MenuElement {
     }
 
     @Override
-    public abstract void render(GuiGraphics context, int mouseX, int mouseY);
+    public abstract void render(GuiGraphicsExtractor context, int mouseX, int mouseY);
 
     @Override
     public abstract boolean mouseClicked(double mouseX, double mouseY, int button);

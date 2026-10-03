@@ -1,6 +1,8 @@
 package ru.wilyfox.client.alchemy;
 
 import net.minecraft.client.Minecraft;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.gui.components.LerpingBossEvent;
 import net.minecraft.world.BossEvent;
 import net.minecraft.core.BlockPos;
@@ -16,8 +18,16 @@ import java.util.Map;
 public final class AlchemyIngredientTracker {
     private static final AlchemyIngredientTracker INSTANCE = new AlchemyIngredientTracker();
     private static final long LIFETIME_MS = 2_000L;
+    private static final long CLEANUP_INTERVAL_MS = 50L;
 
     private final Map<Long, AlchemyIngredientSpot> spots = new LinkedHashMap<>();
+    private ClientLevel trackedLevel;
+    private boolean registered;
+    private long bossBarCheckedTick = Long.MIN_VALUE;
+    private boolean alchemyBossBar;
+    private long lastCleanupMillis;
+    private boolean snapshotDirty;
+    private List<AlchemyIngredientSpot> snapshot = List.of();
 
     private AlchemyIngredientTracker() {
     }
@@ -26,8 +36,20 @@ public final class AlchemyIngredientTracker {
         return INSTANCE;
     }
 
+    public void register() {
+        if (registered) return;
+        registered = true;
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            clear();
+            trackedLevel = null;
+            bossBarCheckedTick = Long.MIN_VALUE;
+            alchemyBossBar = false;
+        });
+    }
+
     public void addParticle(double x, double y, double z) {
-        if (!ConfigManager.get().render.showAlchemyIngredientMarkers || !hasAlchemyBossBar()) {
+        syncLevel();
+        if (trackedLevel == null || !ConfigManager.get().render.showAlchemyIngredientMarkers || !hasAlchemyBossBarThisTick()) {
             clear();
             return;
         }
@@ -36,41 +58,73 @@ public final class AlchemyIngredientTracker {
         Vec3 position = new Vec3(x, y, z);
         long blockKey = BlockPos.containing(x, y, z).asLong();
         spots.put(blockKey, new AlchemyIngredientSpot(position, now));
+        snapshotDirty = true;
         cleanup(now);
     }
 
     public List<AlchemyIngredientSpot> getActiveSpots() {
-        if (!ConfigManager.get().render.showAlchemyIngredientMarkers) {
+        syncLevel();
+        if (trackedLevel == null || !ConfigManager.get().render.showAlchemyIngredientMarkers || !hasAlchemyBossBarThisTick()) {
             clear();
             return List.of();
         }
 
         cleanup(System.currentTimeMillis());
-        return List.copyOf(spots.values());
+        if (snapshotDirty) {
+            snapshot = List.copyOf(spots.values());
+            snapshotDirty = false;
+        }
+        return snapshot;
     }
 
     public void clear() {
         spots.clear();
+        snapshot = List.of();
+        snapshotDirty = false;
+        lastCleanupMillis = 0L;
+    }
+
+    private void syncLevel() {
+        ClientLevel current = Minecraft.getInstance().level;
+        if (trackedLevel != current) {
+            clear();
+            trackedLevel = current;
+            bossBarCheckedTick = Long.MIN_VALUE;
+            alchemyBossBar = false;
+        }
+    }
+
+    private boolean hasAlchemyBossBarThisTick() {
+        long tick = trackedLevel.getGameTime();
+        if (bossBarCheckedTick != tick) {
+            alchemyBossBar = hasAlchemyBossBar();
+            bossBarCheckedTick = tick;
+        }
+        return alchemyBossBar;
     }
 
     public int diagnosticSpotCount() {
+        syncLevel();
         cleanup(System.currentTimeMillis());
         return spots.size();
     }
 
     private void cleanup(long now) {
+        if (now >= lastCleanupMillis && now - lastCleanupMillis < CLEANUP_INTERVAL_MS) return;
+        lastCleanupMillis = now;
         Iterator<AlchemyIngredientSpot> iterator = spots.values().iterator();
         while (iterator.hasNext()) {
             AlchemyIngredientSpot spot = iterator.next();
             if (now - spot.createdAtMillis() > LIFETIME_MS) {
                 iterator.remove();
+                snapshotDirty = true;
             }
         }
     }
 
     private static boolean hasAlchemyBossBar() {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.gui == null || !(minecraft.gui.getBossOverlay() instanceof BossHealthOverlayAccessor accessor)) {
+        if (minecraft.gui == null || !(minecraft.gui.hud.getBossOverlay() instanceof BossHealthOverlayAccessor accessor)) {
             return false;
         }
 

@@ -14,7 +14,7 @@ public final class DwPotionCooldownsDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int count = DwProtocolCodec.readVarInt(buf);
+            int count = DwProtocolCodec.readCollectionSize(buf);
             Map<Integer, Long> cooldowns = new LinkedHashMap<>(Math.max(4, count));
 
             for (int i = 0; i < count; i++) {

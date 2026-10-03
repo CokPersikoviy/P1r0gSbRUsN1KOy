@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.item.ItemStack;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
@@ -49,7 +49,7 @@ public class PotionTimersWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -70,15 +70,15 @@ public class PotionTimersWidget extends AbstractWidget {
         int height = getUnscaledHeight(entries.size());
         int rowHeight = Math.max(ICON_SIZE, mc.font.lineHeight);
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
 
         int y = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, "Potion Cooldowns", PADDING_X, y, WidgetTheme.TITLE);
+            context.text(mc.font, "Potion Cooldowns", PADDING_X, y, WidgetTheme.TITLE);
             y += mc.font.lineHeight + 4;
         }
 
@@ -87,7 +87,7 @@ public class PotionTimersWidget extends AbstractWidget {
             y += rowHeight + ROW_GAP;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -110,13 +110,13 @@ public class PotionTimersWidget extends AbstractWidget {
         return "Potion Cooldowns";
     }
 
-    private void renderRow(GuiGraphics context, Minecraft mc, PotionStore.CooldownPotionEntry entry, int width, int y, int rowHeight) {
+    private void renderRow(GuiGraphicsExtractor context, Minecraft mc, PotionStore.CooldownPotionEntry entry, int width, int y, int rowHeight) {
         int iconX = PADDING_X;
         int iconY = y + Math.max(0, (rowHeight - ICON_SIZE) / 2);
         if (showIcons()) {
             ItemStack icon = entry.icon();
             if (!icon.isEmpty()) {
-                context.renderItem(icon, iconX, iconY);
+                context.item(icon, iconX, iconY);
             }
         }
 
@@ -129,8 +129,8 @@ public class PotionTimersWidget extends AbstractWidget {
         int timeWidth = mc.font.width(timeText);
         int rightX = width - PADDING_X;
 
-        context.drawString(mc.font, nameText, textX, textY, ready ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SOFT);
-        context.drawString(mc.font, timeText, rightX - timeWidth, textY, ready ? WidgetTheme.STATUS_SUCCESS : WidgetTheme.TEXT_SECONDARY);
+        context.text(mc.font, nameText, textX, textY, ready ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SOFT);
+        context.text(mc.font, timeText, rightX - timeWidth, textY, ready ? WidgetTheme.STATUS_SUCCESS : WidgetTheme.TEXT_SECONDARY);
     }
 
     private static String formatTimer(long remainingMillis) {
@@ -168,7 +168,7 @@ public class PotionTimersWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
     private static boolean showIcons() {
@@ -183,15 +183,15 @@ public class PotionTimersWidget extends AbstractWidget {
         return Math.max(0, ConfigManager.get().potionTimers.belowZeroSeconds) * 1000L;
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Potion Cooldowns", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No potion cooldowns", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Potion Cooldowns", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No potion cooldowns", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 }

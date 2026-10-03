@@ -14,7 +14,7 @@ public final class DwStatisticInfoDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int count = DwProtocolCodec.readVarInt(buf);
+            int count = DwProtocolCodec.readCollectionSize(buf);
             Map<String, String> values = new LinkedHashMap<>();
 
             for (int i = 0; i < count; i++) {

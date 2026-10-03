@@ -120,14 +120,14 @@ public final class ChatTabManager {
             return;
         }
 
-        ChatComponent chat = minecraft.gui.getChat();
+        ChatComponent chat = minecraft.gui.hud.getChat();
 
         rebuilding = true;
         try {
             chat.clearMessages(false);
 
             for (ChatMessageEntry entry : getMessages(activeTab)) {
-                ChatMessageDecorator.withTimestamp(entry.timestamp(), () -> chat.addMessage(entry.component().copy()));
+                ChatMessageDecorator.withTimestamp(entry.timestamp(), () -> chat.addClientSystemMessage(entry.component().copy()));
             }
         } finally {
             rebuilding = false;

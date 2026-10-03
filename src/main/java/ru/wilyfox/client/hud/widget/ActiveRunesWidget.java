@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
@@ -28,7 +28,7 @@ public class ActiveRunesWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -47,21 +47,21 @@ public class ActiveRunesWidget extends AbstractWidget {
 
         int lineStep = mc.font.lineHeight + LINE_GAP;
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, getUnscaledWidth(), getUnscaledHeight());
 
         int y = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, "Active Runes", PADDING_X, y, WidgetTheme.TITLE);
+            context.text(mc.font, "Active Runes", PADDING_X, y, WidgetTheme.TITLE);
             y += lineStep + 2;
         }
 
         for (int i = 0; i < runes.size(); i++) {
             int color = i < 3 ? WidgetTheme.TEXT_SOFT : WidgetTheme.TEXT_SECONDARY;
-            context.drawString(mc.font, Formatting.stripMinecraftFormatting(runes.get(i)), PADDING_X, y, color);
+            context.text(mc.font, Formatting.stripMinecraftFormatting(runes.get(i)), PADDING_X, y, color);
             y += lineStep;
         }
 
@@ -70,7 +70,7 @@ public class ActiveRunesWidget extends AbstractWidget {
             HudSurface.drawBar(context, 0, barY, getUnscaledWidth(), BAR_HEIGHT, RuneSetCooldownStore.getProgress(), WidgetTheme.BAR_FILL);
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -121,19 +121,19 @@ public class ActiveRunesWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Active Runes", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No active set", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Active Runes", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No active set", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 }
 

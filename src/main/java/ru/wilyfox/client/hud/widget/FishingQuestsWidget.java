@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import ru.wilyfox.client.hud.HudEditingScreen;
@@ -35,22 +35,22 @@ public final class FishingQuestsWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
 
         Minecraft mc = Minecraft.getInstance();
         List<QuestView> quests = buildViews();
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0F);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         if (quests.isEmpty()) {
             HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-            context.drawString(mc.font, "Fishing Quests", PADDING_X, 6, WidgetTheme.TITLE);
-            context.drawString(mc.font, "No active quests", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
-            context.pose().popPose();
+            context.text(mc.font, "Fishing Quests", PADDING_X, 6, WidgetTheme.TITLE);
+            context.text(mc.font, "No active quests", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+            context.pose().popMatrix();
             return;
         }
 
@@ -58,21 +58,21 @@ public final class FishingQuestsWidget extends AbstractWidget {
         HudSurface.drawPanel(context, width, getUnscaledHeight(quests, mc));
         int y = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, "Fishing Quests", PADDING_X, y, WidgetTheme.TITLE);
+            context.text(mc.font, "Fishing Quests", PADDING_X, y, WidgetTheme.TITLE);
             y += mc.font.lineHeight + 3;
         }
 
         ItemStack icon = new ItemStack(Items.PAPER);
         for (QuestView quest : quests) {
-            context.renderItem(icon, PADDING_X, y);
+            context.item(icon, PADDING_X, y);
             int textX = PADDING_X + ICON_SIZE + ICON_GAP;
             for (QuestLine line : quest.lines()) {
-                context.drawString(mc.font, line.text(), textX, y, line.color());
+                context.text(mc.font, line.text(), textX, y, line.color());
                 y += mc.font.lineHeight + 1;
             }
             y += ROW_GAP;
         }
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -232,7 +232,7 @@ public final class FishingQuestsWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
     private record QuestView(String type, List<QuestLine> lines) {

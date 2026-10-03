@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.widget.HudSurface;
@@ -29,7 +29,7 @@ public class ToggleSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
 
         boolean hovered = isHovered(mouseX, mouseY);
@@ -41,7 +41,7 @@ public class ToggleSettingsComponent extends SettingsComponent {
         HudSurface.fillRounded(context, x, y, width, height, 4, rowBg);
 
         int textY = y + (height - mc.font.lineHeight) / 2;
-        context.drawString(mc.font, label, x + 8, textY, textColor);
+        context.text(mc.font, label, x + 8, textY, textColor);
         renderWarning(context, mc, mouseX, mouseY, textY);
 
         String stateText = value ? "ON" : "OFF";
@@ -65,10 +65,10 @@ public class ToggleSettingsComponent extends SettingsComponent {
         if (value) {
             context.fill(pillX + 3, pillY, pillX + pillWidth - 3, pillY + 1, WidgetTheme.ACCENT_LINE);
         }
-        context.drawCenteredString(mc.font, stateText, pillX + pillWidth / 2, pillY + 2, pillTextColor);
+        context.centeredText(mc.font, stateText, pillX + pillWidth / 2, pillY + 2, pillTextColor);
     }
 
-    private void renderWarning(GuiGraphics context, Minecraft mc, int mouseX, int mouseY, int textY) {
+    private void renderWarning(GuiGraphicsExtractor context, Minecraft mc, int mouseX, int mouseY, int textY) {
         if (warningTooltip == null || warningTooltip.isBlank()) {
             return;
         }
@@ -83,7 +83,7 @@ public class ToggleSettingsComponent extends SettingsComponent {
 
         context.fill(left + iconSize / 2, top, right, bottom, WidgetTheme.STATUS_WARNING);
         context.fill(left, bottom, left + iconSize / 2, top, WidgetTheme.STATUS_WARNING);
-        context.drawCenteredString(
+        context.centeredText(
                 mc.font,
                 "!",
                 left + iconSize / 2,
@@ -93,7 +93,7 @@ public class ToggleSettingsComponent extends SettingsComponent {
 
         boolean warningHovered = mouseX >= left && mouseX <= right && mouseY >= top && mouseY <= bottom;
         if (warningHovered) {
-            context.renderTooltip(mc.font, Component.literal(warningTooltip), mouseX, mouseY);
+            context.setTooltipForNextFrame(mc.font, Component.literal(warningTooltip), mouseX, mouseY);
         }
     }
 

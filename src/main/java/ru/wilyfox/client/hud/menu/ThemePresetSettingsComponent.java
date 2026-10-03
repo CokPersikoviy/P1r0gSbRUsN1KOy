@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.ThemePreset;
 import ru.wilyfox.client.hud.widget.HudSurface;
@@ -20,7 +20,7 @@ public final class ThemePresetSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
         boolean hovered = isHovered(mouseX, mouseY);
         boolean selected = ConfigManager.get().theme.preset == preset;
@@ -42,7 +42,7 @@ public final class ThemePresetSettingsComponent extends SettingsComponent {
         renderSwapButton(context, swapX, swapY, swapHovered, selected);
         renderColorPreview(context, previewX, previewY, colors, selected);
 
-        context.drawString(mc.font, label, previewX + COLOR_PREVIEW_SIZE + 6, textY, textColor);
+        context.text(mc.font, label, previewX + COLOR_PREVIEW_SIZE + 6, textY, textColor);
 
         String stateText = selected ? "Current" : "Apply";
         int chipWidth = 42;
@@ -51,7 +51,7 @@ public final class ThemePresetSettingsComponent extends SettingsComponent {
         if (selected) {
             context.fill(chipX, y + 3, chipX + chipWidth, y + 4, WidgetTheme.ACCENT_LINE);
         }
-        context.drawCenteredString(mc.font, stateText, chipX + chipWidth / 2, textY, selected ? WidgetTheme.TITLE : WidgetTheme.TEXT_SECONDARY);
+        context.centeredText(mc.font, stateText, chipX + chipWidth / 2, textY, selected ? WidgetTheme.TITLE : WidgetTheme.TEXT_SECONDARY);
     }
 
     @Override
@@ -126,7 +126,7 @@ public final class ThemePresetSettingsComponent extends SettingsComponent {
     }
 
     private static void renderSwapButton(
-            GuiGraphics context,
+            GuiGraphicsExtractor context,
             int buttonX,
             int buttonY,
             boolean hovered,
@@ -155,7 +155,7 @@ public final class ThemePresetSettingsComponent extends SettingsComponent {
     }
 
     private static void renderColorPreview(
-            GuiGraphics context,
+            GuiGraphicsExtractor context,
             int previewX,
             int previewY,
             PaletteColors colors,

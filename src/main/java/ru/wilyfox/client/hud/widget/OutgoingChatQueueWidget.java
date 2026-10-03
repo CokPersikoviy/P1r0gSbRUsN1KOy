@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.chat.ChatDispatchQueue;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
@@ -19,7 +19,7 @@ public class OutgoingChatQueueWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -37,15 +37,15 @@ public class OutgoingChatQueueWidget extends AbstractWidget {
         int width = hasContent ? getUnscaledWidth(mc, title, preview) : EMPTY_WIDTH;
         int height = getUnscaledHeight(mc);
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
-        context.drawString(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
-        context.drawString(mc.font, preview, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, hasContent ? WidgetTheme.TEXT_PRIMARY : WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
+        context.text(mc.font, preview, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, hasContent ? WidgetTheme.TEXT_PRIMARY : WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -71,7 +71,7 @@ public class OutgoingChatQueueWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().outgoingChatQueue.active || Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return ConfigManager.get().outgoingChatQueue.active || Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
     @Override

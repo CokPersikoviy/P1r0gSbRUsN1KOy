@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.item.ItemStack;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
@@ -30,7 +30,7 @@ public class ActiveMinersWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -51,15 +51,15 @@ public class ActiveMinersWidget extends AbstractWidget {
         int height = getUnscaledHeight();
         int rowHeight = Math.max(ICON_SIZE, mc.font.lineHeight);
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
 
         int y = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, "Miners", PADDING_X, y, WidgetTheme.TITLE);
+            context.text(mc.font, "Miners", PADDING_X, y, WidgetTheme.TITLE);
             y += mc.font.lineHeight + 4;
         }
 
@@ -68,7 +68,7 @@ public class ActiveMinersWidget extends AbstractWidget {
             y += rowHeight + ROW_GAP;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -128,27 +128,27 @@ public class ActiveMinersWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Miners", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No active miners", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Miners", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No active miners", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
-    private void renderMinerRow(GuiGraphics context, Minecraft mc, ActiveMinerInfo miner, int width, int y, int rowHeight) {
+    private void renderMinerRow(GuiGraphicsExtractor context, Minecraft mc, ActiveMinerInfo miner, int width, int y, int rowHeight) {
         int iconX = PADDING_X;
         int iconY = y + Math.max(0, (rowHeight - ICON_SIZE) / 2);
         ItemStack icon = miner.icon();
         if (!icon.isEmpty()) {
-            context.renderItem(icon, iconX, iconY);
+            context.item(icon, iconX, iconY);
         }
 
         String levelText = formatLevel(miner.level());
@@ -162,10 +162,10 @@ public class ActiveMinersWidget extends AbstractWidget {
         int stateX = width - PADDING_X - stateWidth;
 
         if (!levelText.isEmpty()) {
-            context.drawString(mc.font, levelText, textX, textBaseY, WidgetTheme.TEXT_SECONDARY);
+            context.text(mc.font, levelText, textX, textBaseY, WidgetTheme.TEXT_SECONDARY);
         }
-        context.drawString(mc.font, resourceText, resourceX, textBaseY, WidgetTheme.TEXT_PRIMARY);
-        context.drawString(mc.font, stateText, stateX, textBaseY, getLineColor(miner));
+        context.text(mc.font, resourceText, resourceX, textBaseY, WidgetTheme.TEXT_PRIMARY);
+        context.text(mc.font, stateText, stateX, textBaseY, getLineColor(miner));
     }
 
     private String formatLevel(int level) {

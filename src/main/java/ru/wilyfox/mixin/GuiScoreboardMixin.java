@@ -3,8 +3,8 @@ package ru.wilyfox.mixin;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.Hud;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.numbers.StyledFormat;
 import net.minecraft.world.scores.DisplaySlot;
@@ -30,7 +30,7 @@ import java.util.Locale;
 import static ru.wilyfox.FrogHelper.LOGGER;
 import static ru.wilyfox.client.debug.DebugLogger.info;
 
-@Mixin(Gui.class)
+@Mixin(Hud.class)
 public abstract class GuiScoreboardMixin implements ScoreboardSidebarAccessor {
     private static final Comparator<PlayerScoreEntry> SCORE_ORDER = Comparator
             .comparingInt(PlayerScoreEntry::value)
@@ -42,13 +42,13 @@ public abstract class GuiScoreboardMixin implements ScoreboardSidebarAccessor {
     private Minecraft minecraft;
 
     @Invoker("displayScoreboardSidebar")
-    protected abstract void froghelper$invokeDisplayScoreboardSidebar(GuiGraphics guiGraphics, Objective objective);
+    protected abstract void froghelper$invokeDisplayScoreboardSidebar(GuiGraphicsExtractor guiGraphics, Objective objective);
 
     @Shadow
     public abstract Font getFont();
 
-    @Inject(method = "renderScoreboardSidebar", at = @At("HEAD"), cancellable = true)
-    private void froghelper$cancelVanillaScoreboard(GuiGraphics guiGraphics, net.minecraft.client.DeltaTracker tickCounter, CallbackInfo ci) {
+    @Inject(method = "extractScoreboardSidebar", at = @At("HEAD"), cancellable = true)
+    private void froghelper$cancelVanillaScoreboard(GuiGraphicsExtractor guiGraphics, net.minecraft.client.DeltaTracker tickCounter, CallbackInfo ci) {
         froghelper$logBoosterLines();
 
         if (ConfigManager.get().scoreboard.active) {
@@ -57,7 +57,7 @@ public abstract class GuiScoreboardMixin implements ScoreboardSidebarAccessor {
     }
 
     @Override
-    public void froghelper$renderAt(GuiGraphics context, int startX, int startY) {
+    public void froghelper$renderAt(GuiGraphicsExtractor context, int startX, int startY) {
         Objective objective = froghelper$getSidebarObjective();
         if (objective == null) {
             return;
@@ -66,10 +66,10 @@ public abstract class GuiScoreboardMixin implements ScoreboardSidebarAccessor {
         int defaultX = froghelper$getDefaultX();
         int defaultY = froghelper$getDefaultY();
 
-        context.pose().pushPose();
-        context.pose().translate(startX - defaultX, startY - defaultY, 0);
+        context.pose().pushMatrix();
+        context.pose().translate(startX - defaultX, startY - defaultY);
         froghelper$invokeDisplayScoreboardSidebar(context, objective);
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -128,7 +128,7 @@ public abstract class GuiScoreboardMixin implements ScoreboardSidebarAccessor {
 
         PlayerTeam playerTeam = scoreboard.getPlayersTeam(minecraft.player.getScoreboardName());
         if (playerTeam != null) {
-            DisplaySlot teamSlot = DisplaySlot.teamColorToSlot(playerTeam.getColor());
+            DisplaySlot teamSlot = playerTeam.getColor().map(net.minecraft.world.scores.TeamColor::displaySlot).orElse(null);
             if (teamSlot != null) {
                 objective = scoreboard.getDisplayObjective(teamSlot);
             }

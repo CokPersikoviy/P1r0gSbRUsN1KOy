@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.item.Items;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
@@ -29,7 +29,7 @@ public final class FishingNibblesWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!ConfigManager.get().fishing.showFishingNibblesWidget) {
             return;
         }
@@ -41,13 +41,13 @@ public final class FishingNibblesWidget extends AbstractWidget {
         Minecraft mc = Minecraft.getInstance();
         List<String> lines = buildLines();
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0F);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         if (lines.isEmpty()) {
             renderPlaceholder(context, mc);
-            context.pose().popPose();
+            context.pose().popMatrix();
             return;
         }
 
@@ -55,7 +55,7 @@ public final class FishingNibblesWidget extends AbstractWidget {
 
         int y = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, "Fishing Nibbles", PADDING_X, y, WidgetTheme.TITLE);
+            context.text(mc.font, "Fishing Nibbles", PADDING_X, y, WidgetTheme.TITLE);
             y += mc.font.lineHeight + LINE_GAP + 1;
         }
 
@@ -63,14 +63,14 @@ public final class FishingNibblesWidget extends AbstractWidget {
         for (String line : lines) {
             if (isDimensionHeader(line)) {
                 int centeredX = Math.max(PADDING_X, (panelWidth - mc.font.width(line)) / 2);
-                context.drawString(mc.font, line, centeredX, y, WidgetTheme.TEXT_MUTED);
+                context.text(mc.font, line, centeredX, y, WidgetTheme.TEXT_MUTED);
             } else {
-                context.drawString(mc.font, line, PADDING_X, y, WidgetTheme.TEXT_SOFT);
+                context.text(mc.font, line, PADDING_X, y, WidgetTheme.TEXT_SOFT);
             }
             y += mc.font.lineHeight + LINE_GAP;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -211,12 +211,12 @@ public final class FishingNibblesWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Fishing Nibbles", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No fishing data", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Fishing Nibbles", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No fishing data", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
     }
 }

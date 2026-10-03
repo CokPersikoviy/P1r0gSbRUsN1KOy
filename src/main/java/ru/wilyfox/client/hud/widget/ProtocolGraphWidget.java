@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
@@ -39,7 +39,7 @@ public final class ProtocolGraphWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -54,9 +54,9 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         double localMouseX = (mouseGuiX - startX) / scale;
         double localMouseY = (mouseGuiY - startY) / scale;
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, panelWidth, panelHeight);
 
@@ -65,7 +65,7 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         renderNodes(context, mc, snapshot, layout);
         renderFooter(context, mc, snapshot, panelHeight);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
 
         PositionedNode hoveredNode = layout.findHoveredNode(localMouseX, localMouseY);
         if (hoveredNode != null) {
@@ -93,8 +93,8 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         return "Protocol Graph";
     }
 
-    private void renderHeader(GuiGraphics context, Minecraft mc, GraphSnapshot snapshot, int panelWidth) {
-        context.drawString(mc.font, "Protocol Graph", PADDING_X, PADDING_Y, WidgetTheme.TITLE);
+    private void renderHeader(GuiGraphicsExtractor context, Minecraft mc, GraphSnapshot snapshot, int panelWidth) {
+        context.text(mc.font, "Protocol Graph", PADDING_X, PADDING_Y, WidgetTheme.TITLE);
 
         long activeNodes = snapshot.nodes().stream()
                 .filter(node -> isRecentlyActive(node.lastActiveAt(), snapshot.capturedAt()))
@@ -103,7 +103,7 @@ public final class ProtocolGraphWidget extends AbstractWidget {
                 .filter(edge -> isRecentlyActive(edge.lastActiveAt(), snapshot.capturedAt()))
                 .count();
         String meta = "nodes " + activeNodes + "  edges " + activeEdges;
-        context.drawString(
+        context.text(
                 mc.font,
                 meta,
                 Math.max(PADDING_X, panelWidth - PADDING_X - mc.font.width(meta)),
@@ -111,10 +111,10 @@ public final class ProtocolGraphWidget extends AbstractWidget {
                 WidgetTheme.TEXT_SECONDARY
         );
 
-        context.drawString(mc.font, "Input, decode, handle, store, state, widget", PADDING_X, PADDING_Y + 12, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Input, decode, handle, store, state, widget", PADDING_X, PADDING_Y + 12, WidgetTheme.TEXT_MUTED);
     }
 
-    private void renderFooter(GuiGraphics context, Minecraft mc, GraphSnapshot snapshot, int panelHeight) {
+    private void renderFooter(GuiGraphicsExtractor context, Minecraft mc, GraphSnapshot snapshot, int panelHeight) {
         GraphNodeSnapshot hottestInput = snapshot.nodes().stream()
                 .filter(node -> node.kind() == GraphNodeKind.INPUT)
                 .max(Comparator.comparingLong(GraphNodeSnapshot::lastActiveAt).thenComparingInt(GraphNodeSnapshot::hits))
@@ -123,10 +123,10 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         String text = hottestInput == null || hottestInput.lastActiveAt() <= 0L
                 ? "No runtime activity yet"
                 : "Latest input: " + hottestInput.label() + "  hits " + hottestInput.hits() + "  errors " + hottestInput.errors();
-        context.drawString(mc.font, text, PADDING_X, panelHeight - FOOTER_HEIGHT + 4, WidgetTheme.TEXT_SECONDARY);
+        context.text(mc.font, text, PADDING_X, panelHeight - FOOTER_HEIGHT + 4, WidgetTheme.TEXT_SECONDARY);
     }
 
-    private void renderEdges(GuiGraphics context, GraphSnapshot snapshot, Layout layout) {
+    private void renderEdges(GuiGraphicsExtractor context, GraphSnapshot snapshot, Layout layout) {
         Map<String, PositionedNode> visibleNodes = layout.nodesById();
 
         for (GraphEdgeSnapshot edge : snapshot.edges()) {
@@ -141,7 +141,7 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         }
     }
 
-    private void renderNodes(GuiGraphics context, Minecraft mc, GraphSnapshot snapshot, Layout layout) {
+    private void renderNodes(GuiGraphicsExtractor context, Minecraft mc, GraphSnapshot snapshot, Layout layout) {
         for (PositionedNode node : layout.nodes()) {
             GraphNodeSnapshot snapshotNode = node.node();
             int dotColor = nodeColor(snapshotNode, snapshot.capturedAt());
@@ -260,7 +260,7 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         return restored;
     }
 
-    private void drawEdge(GuiGraphics context, int x1, int y1, int x2, int y2, int color, GraphEdgeSnapshot edge, long now) {
+    private void drawEdge(GuiGraphicsExtractor context, int x1, int y1, int x2, int y2, int color, GraphEdgeSnapshot edge, long now) {
         drawSegment(context, x1, y1, x2, y2, color);
 
         for (long pulseStartedAt : edge.pulseStartedAt()) {
@@ -276,7 +276,7 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         }
     }
 
-    private void drawSegment(GuiGraphics context, int x1, int y1, int x2, int y2, int color) {
+    private void drawSegment(GuiGraphicsExtractor context, int x1, int y1, int x2, int y2, int color) {
         int dx = x2 - x1;
         int dy = y2 - y1;
         int steps = Math.max(Math.abs(dx), Math.abs(dy));
@@ -293,7 +293,7 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         }
     }
 
-    private void fillCircle(GuiGraphics context, int centerX, int centerY, int radius, int color) {
+    private void fillCircle(GuiGraphicsExtractor context, int centerX, int centerY, int radius, int color) {
         for (int dy = -radius; dy <= radius; dy++) {
             for (int dx = -radius; dx <= radius; dx++) {
                 if (dx * dx + dy * dy <= radius * radius) {
@@ -368,7 +368,7 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         return Math.max(MIN_GRAPH_HEIGHT, requiredHeight);
     }
 
-    private void renderNodeTooltip(GuiGraphics context, Minecraft mc, GraphNodeSnapshot node, int mouseX, int mouseY, long now) {
+    private void renderNodeTooltip(GuiGraphicsExtractor context, Minecraft mc, GraphNodeSnapshot node, int mouseX, int mouseY, long now) {
         String age = node.lastActiveAt() <= 0L ? "never" : formatAge(now - node.lastActiveAt());
         List<Component> lines = List.of(
                 Component.literal(node.label()),
@@ -377,7 +377,7 @@ public final class ProtocolGraphWidget extends AbstractWidget {
                 Component.literal("bytes: " + node.bytes()),
                 Component.literal("last: " + age)
         );
-        context.renderTooltip(mc.font, lines, Optional.empty(), mouseX, mouseY);
+        context.setTooltipForNextFrame(mc.font, lines, Optional.empty(), mouseX, mouseY);
     }
 
     private String formatAge(long ageMs) {

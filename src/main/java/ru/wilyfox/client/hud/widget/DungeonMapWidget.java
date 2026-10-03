@@ -2,9 +2,8 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import ru.wilyfox.client.dungeon.DungeonMapTracker;
@@ -26,15 +25,15 @@ public final class DungeonMapWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!ConfigManager.get().dungeonMap.active) {
             return;
         }
 
         Minecraft mc = Minecraft.getInstance();
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0F);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         if (DiamondWorldProtocolClient.isSiegeLocation()) {
             HudSurface.drawPanel(context, OUTER_SIZE, OUTER_SIZE);
@@ -50,13 +49,13 @@ public final class DungeonMapWidget extends AbstractWidget {
             if (tileCount == 0) {
                 renderPlaceholder(context, mc);
             }
-            context.pose().popPose();
+            context.pose().popMatrix();
             return;
         }
 
         if (!canRenderLiveMap(mc)) {
             renderPlaceholder(context, mc);
-            context.pose().popPose();
+            context.pose().popMatrix();
             return;
         }
 
@@ -64,16 +63,16 @@ public final class DungeonMapWidget extends AbstractWidget {
         MapItemSavedData mapData = mc.level.getMapData(mapId);
         if (mapData == null) {
             renderPlaceholder(context, mc);
-            context.pose().popPose();
+            context.pose().popMatrix();
             return;
         }
 
-        ResourceLocation texture = mc.getMapTextureManager().prepareMapTexture(mapId, mapData);
+        Identifier texture = mc.getMapTextureManager().prepareMapTexture(mapId, mapData);
 
         HudSurface.drawPanel(context, OUTER_SIZE, OUTER_SIZE);
 
         context.blit(
-                RenderType::guiTextured,
+                net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
                 texture,
                 MAP_DRAW_OFFSET,
                 MAP_DRAW_OFFSET,
@@ -81,11 +80,13 @@ public final class DungeonMapWidget extends AbstractWidget {
                 MAP_UV_OFFSET,
                 MAP_SIZE,
                 MAP_SIZE,
+                MAP_UV_SIZE,
+                MAP_UV_SIZE,
                 128,
                 128
         );
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -117,10 +118,10 @@ public final class DungeonMapWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
         HudSurface.drawPlaceholderPanel(context, OUTER_SIZE, OUTER_SIZE);
 
         int gridColor = WidgetTheme.GRID_LINE;
@@ -129,7 +130,7 @@ public final class DungeonMapWidget extends AbstractWidget {
             context.fill(12, offset, OUTER_SIZE - 12, offset + 1, gridColor);
         }
 
-        context.drawCenteredString(mc.font, "Dungeon / Siege", OUTER_SIZE / 2, OUTER_SIZE / 2 - 6, WidgetTheme.TITLE);
-        context.drawCenteredString(mc.font, "Waiting for map", OUTER_SIZE / 2, OUTER_SIZE / 2 + 6, WidgetTheme.TEXT_MUTED);
+        context.centeredText(mc.font, "Dungeon / Siege", OUTER_SIZE / 2, OUTER_SIZE / 2 - 6, WidgetTheme.TITLE);
+        context.centeredText(mc.font, "Waiting for map", OUTER_SIZE / 2, OUTER_SIZE / 2 + 6, WidgetTheme.TEXT_MUTED);
     }
 }

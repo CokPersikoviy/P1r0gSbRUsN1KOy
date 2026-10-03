@@ -1,11 +1,12 @@
 package ru.wilyfox.client.protocol;
 
 import java.lang.management.ManagementFactory;
-import java.lang.management.OperatingSystemMXBean;
-import java.lang.reflect.Method;
+import com.sun.management.OperatingSystemMXBean;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -21,12 +22,21 @@ final class DwHandshakeFingerprint {
     private DwHandshakeFingerprint() {
     }
 
+    private static final class Cached {
+        private static final String VALUE = calculate();
+    }
+
     static String generate() {
+        return Cached.VALUE;
+    }
+
+    private static String calculate() {
         List<String> parts = new ArrayList<>();
         addSystemProperties(parts);
         addMemoryInfo(parts);
         addFileStores(parts);
         addEnvironment(parts);
+        addPlatformFiles(parts);
 
         parts.removeIf(part -> part == null || part.isBlank());
         parts.sort(String::compareTo);
@@ -35,81 +45,82 @@ final class DwHandshakeFingerprint {
     }
 
     private static void addSystemProperties(List<String> parts) {
-        addProperty(parts, "cpu.arch", "os.arch", false);
-        addProperty(parts, "os.arch", "os.arch", true);
-        addProperty(parts, "os.name", "os.name", false);
-        addProperty(parts, "os.version", "os.version", false);
-        addProperty(parts, "user.home", "user.home", false);
-        addProperty(parts, "user.name", "user.name", false);
+        addProperty(parts, "os.arch");
+        addProperty(parts, "os.name");
+        addProperty(parts, "os.version");
+        addProperty(parts, "user.home");
+        addProperty(parts, "user.name");
 
         int processors = Runtime.getRuntime().availableProcessors();
-        parts.add("cpu.count=" + processors);
         parts.add("cpu.cores=" + processors);
     }
 
     private static void addMemoryInfo(List<String> parts) {
         try {
-            OperatingSystemMXBean operatingSystemMxBean = ManagementFactory.getOperatingSystemMXBean();
-            Method method = operatingSystemMxBean.getClass().getMethod("getTotalMemorySize");
-            method.setAccessible(true);
-            Object value = method.invoke(operatingSystemMxBean);
-            if (value instanceof Long totalMemory) {
-                parts.add("mem.total=" + totalMemory);
+            if (ManagementFactory.getOperatingSystemMXBean() instanceof OperatingSystemMXBean bean) {
+                parts.add("mem.total=" + bean.getTotalMemorySize());
             }
         } catch (Exception ignored) {
         }
     }
 
     private static void addFileStores(List<String> parts) {
-        List<FileStore> fileStores = new ArrayList<>();
-        for (FileStore fileStore : FileSystems.getDefault().getFileStores()) {
-            fileStores.add(fileStore);
-        }
-
-        fileStores.sort(Comparator.comparing(fileStore -> safeFileStoreName(fileStore).toLowerCase(Locale.ROOT)));
-
-        for (FileStore fileStore : fileStores) {
-            try {
-                parts.add("fs:" + safeFileStoreName(fileStore) + "=" + fileStore.getTotalSpace());
-            } catch (Exception ignored) {
+        try {
+            List<FileStore> stores = new ArrayList<>();
+            FileSystems.getDefault().getFileStores().forEach(stores::add);
+            stores.sort(Comparator.comparing(FileStore::name));
+            for (FileStore store : stores) {
+                try {
+                    parts.add("fs:" + store.name() + "=" + store.getTotalSpace());
+                } catch (Exception ignored) {
+                }
             }
+        } catch (Exception ignored) {
+            // Inaccessible storage is omitted, as in EvoPlus.
         }
     }
 
     private static void addEnvironment(List<String> parts) {
         Map<String, String> environment = System.getenv();
         addEnvironment(parts, "computername", environment.get("COMPUTERNAME"));
+        addEnvironment(parts, "hostname", environment.get("HOSTNAME"));
         addEnvironment(parts, "cpu.id", environment.get("PROCESSOR_IDENTIFIER"));
+        addEnvironment(parts, "cpu.arch", environment.get("PROCESSOR_ARCHITECTURE"));
+        addEnvironment(parts, "cpu.count", environment.get("NUMBER_OF_PROCESSORS"));
     }
 
-    private static void addProperty(List<String> parts, String label, String propertyKey, boolean uppercase) {
-        String value = System.getProperty(propertyKey, "");
-        if (value.isBlank()) {
+    private static void addPlatformFiles(List<String> parts) {
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        if (!os.contains("nux") && !os.contains("nix")) {
             return;
         }
+        addPlatformFile(parts, "machine.uuid", "/sys/class/dmi/id/product_uuid");
+        addPlatformFile(parts, "mb.serial", "/sys/class/dmi/id/board_serial");
+        addPlatformFile(parts, "product.serial", "/sys/class/dmi/id/product_serial");
+        addPlatformFile(parts, "chassis.serial", "/sys/class/dmi/id/chassis_serial");
+        addPlatformFile(parts, "machine.id", "/etc/machine-id");
+    }
 
-        if (uppercase) {
-            value = value.toUpperCase(Locale.ROOT);
+    private static void addPlatformFile(List<String> parts, String label, String path) {
+        try {
+            String value = Files.readString(Path.of(path)).trim();
+            if (!value.isBlank()) {
+                parts.add(label + "=" + value);
+            }
+        } catch (Exception ignored) {
         }
+    }
 
-        parts.add(label + "=" + value);
+    private static void addProperty(List<String> parts, String key) {
+        parts.add(key + "=" + System.getProperty(key, ""));
     }
 
     private static void addEnvironment(List<String> parts, String label, String value) {
-        if (value == null || value.isBlank()) {
+        if (value == null) {
             return;
         }
 
         parts.add(label + "=" + value);
-    }
-
-    private static String safeFileStoreName(FileStore fileStore) {
-        try {
-            String name = fileStore.name();
-            return name == null ? "" : name;
-        } catch (Exception ignored) {
-            return "";
-        }
     }
 
     private static String sha256Hex(String value) {

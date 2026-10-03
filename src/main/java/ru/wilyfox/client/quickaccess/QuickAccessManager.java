@@ -17,14 +17,14 @@ public final class QuickAccessManager {
     }
 
     public void open(Minecraft client) {
-        if (client == null || client.screen != null) {
+        if (client == null || client.gui.screen() != null) {
             return;
         }
 
         QuickAccessScreen screen = new QuickAccessScreen();
         activeScreen = screen;
         heldOpen = true;
-        client.setScreen(screen);
+        client.gui.setScreen(screen);
     }
 
     public void release(Minecraft client) {
@@ -33,13 +33,13 @@ public final class QuickAccessManager {
         }
 
         heldOpen = false;
-        if (!(client.screen instanceof QuickAccessScreen screen) || screen != activeScreen) {
+        if (!(client.gui.screen() instanceof QuickAccessScreen screen) || screen != activeScreen) {
             activeScreen = null;
             return;
         }
 
         QuickAccessItemConfig hovered = screen.getHoveredItem();
-        client.setScreen(null);
+        client.gui.setScreen(null);
         activeScreen = null;
 
         if (hovered == null) {
@@ -59,8 +59,8 @@ public final class QuickAccessManager {
 
     public void forceClose(Minecraft client) {
         heldOpen = false;
-        if (client.screen == activeScreen) {
-            client.setScreen(null);
+        if (client.gui.screen() == activeScreen) {
+            client.gui.setScreen(null);
         }
         activeScreen = null;
     }

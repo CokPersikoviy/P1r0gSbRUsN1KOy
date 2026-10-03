@@ -1,17 +1,16 @@
 package ru.wilyfox.client.rune;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class ActiveRunesStore {
-    private List<String> runes = new ArrayList<>();
+    private List<String> runes = List.of();
 
     public void replace(List<String> updatedRunes) {
-        this.runes = new ArrayList<>(updatedRunes);
+        this.runes = List.copyOf(updatedRunes);
     }
 
     public List<String> getAll() {
-        return List.copyOf(runes);
+        return runes;
     }
 
     public boolean isEmpty() {
@@ -19,6 +18,6 @@ public class ActiveRunesStore {
     }
 
     public void clear() {
-        runes.clear();
+        runes = List.of();
     }
 }

@@ -1,16 +1,13 @@
 package ru.wilyfox.client.highlight;
 
 import com.mojang.authlib.properties.Property;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.gizmos.Gizmos;
+import net.minecraft.gizmos.GizmoStyle;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.RenderStateShard;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.component.DataComponents;
@@ -70,30 +67,12 @@ public final class UsefulWorldHighlightRenderHook {
     private static final long DIRTY_CHUNK_MARK_COOLDOWN_MS = 500L;
     private static final int HORIZONTAL_SCAN_RADIUS = 32;
     private static final int VERTICAL_SCAN_RADIUS = 20;
-    private static final float LINE_ALPHA = 1.0F;
     private static final double GOLDEN_CRYSTAL_CLUSTER_RADIUS = 1.6D;
     private static final String GOLDEN_CRYSTAL_MODEL_PREFIX = "modelengine:fragment_";
     private static final String GOLDEN_CRYSTAL_FIRE_PREFIX = "modelengine:internal_fire/";
     private static final double GOLDEN_CRYSTAL_BOX_WIDTH = 0.58D;
     private static final double GOLDEN_CRYSTAL_BOX_HEIGHT = 0.46D;
     private static final double GOLDEN_CRYSTAL_BOX_Y_OFFSET = 0.28D;
-    private static final RenderType USEFUL_HIGHLIGHT_NO_DEPTH = RenderType.create(
-            "froghelper_useful_highlight_no_depth",
-            DefaultVertexFormat.POSITION_COLOR_NORMAL,
-            VertexFormat.Mode.LINES,
-            1536,
-            false,
-            false,
-            RenderType.CompositeState.builder()
-                    .setShaderState(RenderStateShard.RENDERTYPE_LINES_SHADER)
-                    .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
-                    .setDepthTestState(RenderStateShard.NO_DEPTH_TEST)
-                    .setCullState(RenderStateShard.NO_CULL)
-                    .setWriteMaskState(RenderStateShard.COLOR_WRITE)
-                    .setLayeringState(RenderStateShard.VIEW_OFFSET_Z_LAYERING_FORWARD)
-                    .setLineState(RenderStateShard.DEFAULT_LINE)
-                    .createCompositeState(false)
-    );
 
     private static final List<ColoredBox> CACHED_BOXES = new ArrayList<>();
     private static final List<ColoredBox> BLOCK_BOXES = new ArrayList<>();
@@ -114,13 +93,26 @@ public final class UsefulWorldHighlightRenderHook {
     private static int lastMaxChunkZ = Integer.MIN_VALUE;
     private static boolean waitingForWorldContext;
     private static long gameLocationRevisionAtTransition;
-    private static String lastWorldContextKey;
+    private static CurrentServerInfo lastServerInfo;
+    private static String lastGameLocation;
+    private static ClientLevel cachedLevel;
+    private static boolean registered;
 
     private UsefulWorldHighlightRenderHook() {
     }
 
     public static void register() {
-        WorldRenderEvents.AFTER_ENTITIES.register(UsefulWorldHighlightRenderHook::onAfterEntities);
+        if (registered) return;
+        registered = true;
+        LevelRenderEvents.BEFORE_GIZMOS.register(UsefulWorldHighlightRenderHook::onAfterEntities);
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            clearCache();
+            cachedLevel = null;
+            lastServerInfo = null;
+            lastGameLocation = null;
+            waitingForWorldContext = false;
+            gameLocationRevisionAtTransition = 0L;
+        });
     }
 
     public static void onPlayerTeleport() {
@@ -153,7 +145,7 @@ public final class UsefulWorldHighlightRenderHook {
                 return;
             }
 
-            long chunkKey = ChunkPos.asLong(SectionPos.blockToSectionCoord(blockPos.getX()), SectionPos.blockToSectionCoord(blockPos.getZ()));
+            long chunkKey = ChunkPos.pack(SectionPos.blockToSectionCoord(blockPos.getX()), SectionPos.blockToSectionCoord(blockPos.getZ()));
             DIRTY_CHUNK_KEYS.add(chunkKey);
             Set<Long> dirtyPositions = DIRTY_BLOCK_POSITIONS.computeIfAbsent(chunkKey, unused -> new LinkedHashSet<>());
             boolean added = dirtyPositions.add(blockPos.asLong());
@@ -183,13 +175,18 @@ public final class UsefulWorldHighlightRenderHook {
         );
     }
 
-    private static void onAfterEntities(WorldRenderContext context) {
+    private static void onAfterEntities(LevelRenderContext context) {
         try (ModProfiler.Scope ignored = profile("frame")) {
             Minecraft mc = Minecraft.getInstance();
-            if (mc.level == null || mc.player == null || context.matrixStack() == null || context.consumers() == null) {
+            if (mc.level == null || mc.player == null) {
                 count("frame/skippedNoContext");
                 clearCache();
                 return;
+            }
+
+            if (cachedLevel != mc.level) {
+                clearCache();
+                cachedLevel = mc.level;
             }
 
             if (!ConfigManager.get().render.usefulItemsHighlight) {
@@ -209,22 +206,13 @@ public final class UsefulWorldHighlightRenderHook {
                 return;
             }
 
-            Vec3 cameraPos = mc.gameRenderer.getMainCamera().getPosition();
-            PoseStack poseStack = context.matrixStack();
-            VertexConsumer lineConsumer = context.consumers().getBuffer(USEFUL_HIGHLIGHT_NO_DEPTH);
-
             count("frame/cachedBoxes", CACHED_BOXES.size());
-            try (ModProfiler.Scope drawScope = profile("drawBoxes")) {
+            try (var collection = context.levelRenderer().collectPerFrameRenderThreadGizmos();
+                 ModProfiler.Scope drawScope = profile("drawBoxes")) {
                 for (ColoredBox coloredBox : CACHED_BOXES) {
-                    ShapeRenderer.renderLineBox(
-                            poseStack,
-                            lineConsumer,
-                            coloredBox.box.move(-cameraPos.x, -cameraPos.y, -cameraPos.z),
-                            coloredBox.red,
-                            coloredBox.green,
-                            coloredBox.blue,
-                            LINE_ALPHA
-                    );
+                    int color = 0xFF000000 | (Math.round(coloredBox.red * 255) << 16)
+                            | (Math.round(coloredBox.green * 255) << 8) | Math.round(coloredBox.blue * 255);
+                    Gizmos.cuboid(coloredBox.box, GizmoStyle.stroke(color, 2.0F)).setAlwaysOnTop();
                 }
             }
         }
@@ -248,9 +236,12 @@ public final class UsefulWorldHighlightRenderHook {
 
     private static boolean shouldWaitForWorldContext() {
         long locationRevision = DiamondWorldProtocolClient.getGameLocationRevision();
-        String contextKey = currentWorldContextKey();
-        boolean contextChanged = lastWorldContextKey != null && !Objects.equals(lastWorldContextKey, contextKey);
-        lastWorldContextKey = contextKey;
+        CurrentServerInfo serverInfo = DiamondWorldProtocolClient.getCurrentServerInfo();
+        String gameLocation = DiamondWorldProtocolClient.getCurrentGameLocation();
+        boolean contextChanged = lastServerInfo != null
+                && (!Objects.equals(lastServerInfo, serverInfo) || !Objects.equals(lastGameLocation, gameLocation));
+        lastServerInfo = serverInfo;
+        lastGameLocation = gameLocation;
 
         if (contextChanged) {
             clearCache();
@@ -269,11 +260,6 @@ public final class UsefulWorldHighlightRenderHook {
         }
 
         return true;
-    }
-
-    private static String currentWorldContextKey() {
-        CurrentServerInfo serverInfo = DiamondWorldProtocolClient.getCurrentServerInfo();
-        return serverInfo + "\u0000" + DiamondWorldProtocolClient.getCurrentGameLocation();
     }
 
     private static void refreshBlockCacheIfNeeded(Minecraft mc) {
@@ -303,7 +289,9 @@ public final class UsefulWorldHighlightRenderHook {
                     || maxChunkX != lastMaxChunkX
                     || minChunkZ != lastMinChunkZ
                     || maxChunkZ != lastMaxChunkZ;
-            boolean refreshExpired = gameTime - lastBlockRefreshTick >= BLOCK_SCAN_REFRESH_TICKS;
+            boolean refreshExpired = lastBlockRefreshTick == Long.MIN_VALUE
+                    || gameTime < lastBlockRefreshTick
+                    || gameTime - lastBlockRefreshTick >= BLOCK_SCAN_REFRESH_TICKS;
             // PENDING_BLOCK_SCAN_KEYS empty means the current window has been fully scanned at
             // least once - unlike BLOCK_BOXES.isEmpty(), this stays true even when the scan
             // legitimately found nothing nearby, so the fast path doesn't get skipped every frame.
@@ -327,7 +315,7 @@ public final class UsefulWorldHighlightRenderHook {
             try (ModProfiler.Scope buildWindowScope = profile("refreshBlockCache/buildWindow")) {
                 for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
                     for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
-                        long chunkKey = ChunkPos.asLong(chunkX, chunkZ);
+                        long chunkKey = ChunkPos.pack(chunkX, chunkZ);
                         activeChunkKeys.add(chunkKey);
                         ChunkScanResult cached = BLOCK_CHUNK_CACHE.get(chunkKey);
                         if (cached == null || refreshExpired || chunkWindowChanged) {
@@ -563,7 +551,10 @@ public final class UsefulWorldHighlightRenderHook {
                 return;
             }
 
-            if (gameTime - lastEntityScanTick < ENTITY_SCAN_INTERVAL_TICKS && !ENTITY_BOXES.isEmpty()) {
+            // A successful empty scan is still a cached result. Rechecking it every tick
+            // made an empty mine more expensive than one with highlighted entities.
+            if (lastEntityScanTick != Long.MIN_VALUE && gameTime >= lastEntityScanTick
+                    && gameTime - lastEntityScanTick < ENTITY_SCAN_INTERVAL_TICKS) {
                 count("refreshEntityCache/skippedInterval");
                 return;
             }
@@ -709,7 +700,7 @@ public final class UsefulWorldHighlightRenderHook {
         }
 
         private static boolean isLegacyGoldenCrystal(ArmorStand stand) {
-            for (ItemStack stack : stand.getArmorSlots()) {
+            for (ItemStack stack : java.util.List.of(stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD), stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST), stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS), stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET))) {
                 if (matchesCustomModel(stack, GOLDEN_CRYSTAL_MODEL_ID)) {
                     return true;
                 }
@@ -753,7 +744,7 @@ public final class UsefulWorldHighlightRenderHook {
         }
 
         private static boolean isEmptyArmorStand(ArmorStand stand) {
-            for (ItemStack stack : stand.getArmorSlots()) {
+            for (ItemStack stack : java.util.List.of(stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD), stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST), stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS), stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET))) {
                 if (!stack.isEmpty()) {
                     return false;
                 }
@@ -853,10 +844,7 @@ public final class UsefulWorldHighlightRenderHook {
         }
 
         private static HighlightBlockType from(BlockState blockState, BlockEntity blockEntity) {
-            if (!isMineHighlightLocation()) {
-                return null;
-            }
-
+            // All block scans are already gated on the mine location by refreshBlockCacheIfNeeded.
             if (blockState.getBlock() instanceof PlayerHeadBlock || blockState.getBlock() instanceof PlayerWallHeadBlock) {
                 String texture = readSkullTextureValue(blockEntity);
                 if (texture == null) {
@@ -930,7 +918,7 @@ public final class UsefulWorldHighlightRenderHook {
                 return null;
             }
 
-            Collection<Property> textures = profile.properties().get("textures");
+            Collection<Property> textures = profile.partialProfile().properties().get("textures");
             if (textures == null || textures.isEmpty()) {
                 return null;
             }
@@ -1012,7 +1000,7 @@ public final class UsefulWorldHighlightRenderHook {
 
     private static ChunkScanResult rescanDirtyPositions(Minecraft mc, LevelChunk chunk, Set<Long> dirtyPositions) {
         try (ModProfiler.Scope ignored = profile("rescanDirtyPositions")) {
-            ChunkScanResult current = BLOCK_CHUNK_CACHE.get(chunk.getPos().toLong());
+            ChunkScanResult current = BLOCK_CHUNK_CACHE.get(chunk.getPos().pack());
             Map<Long, ColoredBox> boxesByBlockPos = current == null
                     ? new HashMap<>()
                     : new HashMap<>(current.boxesByBlockPos);

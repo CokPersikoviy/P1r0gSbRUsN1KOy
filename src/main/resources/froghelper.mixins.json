@@ -1,8 +1,7 @@
 {
 	"required": true,
 	"package": "ru.wilyfox.mixin",
-	"refmap": "froghelper.refmap.json",
-	"compatibilityLevel": "JAVA_21",
+	"compatibilityLevel": "JAVA_25",
 	"mixins": [
 		"ClientPacketListenerMixin",
 		"MinecraftProfilerMixin",
@@ -21,10 +20,12 @@
 		"ConnectionMixin",
 		"GameRendererMixin",
 		"GuiScoreboardMixin",
+		"GuiGraphicsExtractorMixin",
 		"ItemInHandRendererMixin",
 		"LightningBoltRendererMixin",
 		"MultiPlayerGameModeMixin",
 		"ParticleEngineMixin",
+		"ClientLevelParticlesMixin",
 		"ParticleEngineAccessorMixin",
 		"PlayerFishingAccessorMixin",
 		"PlayerRendererMixin",
@@ -35,7 +36,8 @@
 		"MapTextureManagerAccessorMixin",
 		"SoundManagerAccessorMixin",
 		"SoundEngineAccessorMixin",
-		"SodiumWorldRendererProfilerMixin"
+		"SodiumWorldRendererProfilerMixin",
+		"RenderTypeInvoker"
 	],
 	"injectors": {
 		"defaultRequire": 1

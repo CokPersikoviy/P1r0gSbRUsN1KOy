@@ -3,19 +3,18 @@
 	"id": "froghelper",
 	"version": "${version}",
 	"name": "FrogHelper",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"description": "Client-side HUD, protocol integration and quality-of-life tools for DiamondWorld.",
 	"authors": [
-		"Me!"
+		"WilyFox"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"sources": "https://github.com/CokPersikoviy/P1r0gSbRUsN1KOy"
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/froghelper/icon.png",
-	"environment": "*",
+	"environment": "client",
 	"entrypoints": {
-		"main": [
+		"client": [
 			"ru.wilyfox.FrogHelper"
 		]
 	},
@@ -23,9 +22,9 @@
 		"froghelper.mixins.json"
 	],
 	"depends": {
-		"fabricloader": ">=0.18.4",
-		"minecraft": "~1.21.4",
-		"java": ">=21",
-		"fabric-api": "*"
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": ">=0.161.0"
 	}
 }

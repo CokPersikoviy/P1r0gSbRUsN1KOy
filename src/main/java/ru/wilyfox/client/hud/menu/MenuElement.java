@@ -1,14 +1,14 @@
 package ru.wilyfox.client.hud.menu;
 
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 public interface MenuElement {
-    void render(GuiGraphics context, int mouseX, int mouseY);
+    void render(GuiGraphicsExtractor context, int mouseX, int mouseY);
     boolean mouseClicked(double mouseX, double mouseY, int button);
     boolean mouseReleased(double mouseX, double mouseY, int button);
     boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY);
     boolean keyPressed(int keyCode, int scanCode, int modifiers);
-    boolean charTyped(char codePoint, int modifiers);
+    boolean charTyped(int codePoint, int modifiers);
 
     int getX();
     int getY();

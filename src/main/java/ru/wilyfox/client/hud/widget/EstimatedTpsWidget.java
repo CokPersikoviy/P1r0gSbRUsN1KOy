@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
@@ -19,7 +19,7 @@ public class EstimatedTpsWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -43,23 +43,23 @@ public class EstimatedTpsWidget extends AbstractWidget {
         int width = getUnscaledWidth(mc, title, currentLine, onePercentLine, pointOnePercentLine);
         int height = getUnscaledHeight(mc);
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
         int lineY = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, title, PADDING_X, lineY, WidgetTheme.TITLE);
+            context.text(mc.font, title, PADDING_X, lineY, WidgetTheme.TITLE);
             lineY += mc.font.lineHeight + 2;
         }
-        context.drawString(mc.font, currentLine, PADDING_X, lineY, getMetricColor(snapshot.currentTps()));
+        context.text(mc.font, currentLine, PADDING_X, lineY, getMetricColor(snapshot.currentTps()));
         lineY += mc.font.lineHeight + 2;
-        context.drawString(mc.font, onePercentLine, PADDING_X, lineY, getMetricColor(snapshot.onePercentLow()));
+        context.text(mc.font, onePercentLine, PADDING_X, lineY, getMetricColor(snapshot.onePercentLow()));
         lineY += mc.font.lineHeight + 2;
-        context.drawString(mc.font, pointOnePercentLine, PADDING_X, lineY, getMetricColor(snapshot.pointOnePercentLow()));
+        context.text(mc.font, pointOnePercentLine, PADDING_X, lineY, getMetricColor(snapshot.pointOnePercentLow()));
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -105,21 +105,21 @@ public class EstimatedTpsWidget extends AbstractWidget {
         return Math.max(EMPTY_HEIGHT, PADDING_Y * 2 + mc.font.lineHeight * lines + 6);
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc, String subtitle) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc, String subtitle) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Estimated TPS", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, subtitle, PADDING_X, 18, WidgetTheme.TEXT_MUTED);
-        context.drawString(mc.font, "Packet timing heuristic", PADDING_X, 29, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Estimated TPS", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, subtitle, PADDING_X, 18, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Packet timing heuristic", PADDING_X, 29, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
     private String formatMetric(Double value) {

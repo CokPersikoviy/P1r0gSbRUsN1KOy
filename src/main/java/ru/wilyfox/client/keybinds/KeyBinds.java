@@ -2,7 +2,7 @@ package ru.wilyfox.client.keybinds;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
 import org.lwjgl.glfw.GLFW;
@@ -10,9 +10,9 @@ import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.clan.ClanSiegeMapScreen;
 
 public final class KeyBinds {
-    public static final String CATEGORY = "FrogHelper";
+    public static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(net.minecraft.resources.Identifier.fromNamespaceAndPath("froghelper", "main"));
 
-    public static final KeyMapping AUTO_ATTACK = KeyBindingHelper.registerKeyBinding(
+    public static final KeyMapping AUTO_ATTACK = KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                     "Clicker",
                     InputConstants.Type.KEYSYM,
@@ -22,7 +22,7 @@ public final class KeyBinds {
     );
 
 
-    public static final KeyMapping EDITING_MODE = KeyBindingHelper.registerKeyBinding(
+    public static final KeyMapping EDITING_MODE = KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                     "Editing Mode",
                     InputConstants.Type.KEYSYM,
@@ -31,7 +31,7 @@ public final class KeyBinds {
             )
     );
 
-    public static final KeyMapping QUICK_ACCESS = KeyBindingHelper.registerKeyBinding(
+    public static final KeyMapping QUICK_ACCESS = KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                     "Quick Access",
                     InputConstants.Type.KEYSYM,
@@ -40,7 +40,7 @@ public final class KeyBinds {
             )
     );
 
-    public static final KeyMapping SETTINGS_MENU = KeyBindingHelper.registerKeyBinding(
+    public static final KeyMapping SETTINGS_MENU = KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                     "Settings Menu",
                     InputConstants.Type.KEYSYM,
@@ -49,7 +49,7 @@ public final class KeyBinds {
             )
     );
 
-    // public static final KeyMapping PING_MARKER = KeyBindingHelper.registerKeyBinding(
+    // public static final KeyMapping PING_MARKER = KeyMappingHelper.registerKeyMapping(
     //         new KeyMapping(
     //                 "Ping Marker",
     //                 InputConstants.Type.MOUSE,
@@ -58,7 +58,7 @@ public final class KeyBinds {
     //         )
     // );
 
-    public static final KeyMapping CLAN_HIDE = KeyBindingHelper.registerKeyBinding(
+    public static final KeyMapping CLAN_HIDE = KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                     "Clan Hide",
                     InputConstants.Type.KEYSYM,
@@ -67,7 +67,7 @@ public final class KeyBinds {
             )
     );
 
-    public static final KeyMapping CLAN_SIEGE_MAP = KeyBindingHelper.registerKeyBinding(
+    public static final KeyMapping CLAN_SIEGE_MAP = KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                     "Clan Siege Map",
                     InputConstants.Type.KEYSYM,
@@ -76,7 +76,7 @@ public final class KeyBinds {
             )
     );
 
-    public static final KeyMapping RUNES_BAG = KeyBindingHelper.registerKeyBinding(
+    public static final KeyMapping RUNES_BAG = KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                     "Runes Bag",
                     InputConstants.Type.KEYSYM,
@@ -85,7 +85,7 @@ public final class KeyBinds {
             )
     );
 
-    public static final KeyMapping SOCIAL = KeyBindingHelper.registerKeyBinding(
+    public static final KeyMapping SOCIAL = KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                     "Social",
                     InputConstants.Type.KEYSYM,
@@ -119,7 +119,7 @@ public final class KeyBinds {
 
             while (CLAN_SIEGE_MAP.consumeClick()) {
                 if (ClanSiegeMapScreen.canOpen()) {
-                    client.setScreen(new ClanSiegeMapScreen());
+                    client.gui.setScreen(new ClanSiegeMapScreen());
                 }
             }
 
@@ -128,7 +128,7 @@ public final class KeyBinds {
             }
 
             while (SOCIAL.consumeClick()) {
-                client.setScreen(new ru.wilyfox.client.moduser.SocialScreen());
+                client.gui.setScreen(new ru.wilyfox.client.moduser.SocialScreen());
             }
         }
     }

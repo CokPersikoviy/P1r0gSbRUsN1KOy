@@ -1,5 +1,5 @@
 plugins {
-	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 	id 'maven-publish'
 }
 
@@ -8,13 +8,6 @@ group = project.maven_group
 
 base {
 	archivesName = project.archives_base_name
-}
-
-loom {
-	mixin {
-		useLegacyMixinAp = true
-		defaultRefmapName = "froghelper.refmap.json"
-	}
 }
 
 repositories {
@@ -27,22 +20,18 @@ repositories {
 	// for more information about repositories.
 }
 
-configurations {
-	proguard
-}
-
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	mappings loom.officialMojangMappings()
-	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
-	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-	modCompileOnly "maven.modrinth:sodium:mc1.21.4-0.6.13-fabric"
-	proguard "com.guardsquare:proguard-base:7.5.0"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	compileOnly "maven.modrinth:sodium:mc26.2-0.9.2-fabric"
+	if (project.hasProperty("withSodium")) runtimeOnly "maven.modrinth:sodium:mc26.2-0.9.2-fabric"
 	testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.10.2"
+	testRuntimeOnly "org.jetbrains.kotlin:kotlin-stdlib:2.3.21"
 	
 }
 
@@ -55,22 +44,23 @@ processResources {
 }
 
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 21
+	it.options.release = 25
 	it.options.encoding = 'UTF-8'
 }
 
 tasks.withType(Test).configureEach {
 	useJUnitPlatform()
+	if (project.hasProperty("evoReference")) {
+		systemProperty "froghelper.evoReference", file(project.property("evoReference")).absolutePath
+	}
 }
 
 java {
-	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
-	// if it is present.
-	// If you remove this line, sources will not be generated.
+	// Minecraft 26.2 uses official names; the normal jar is the distributable artifact.
 	withSourcesJar()
 
-	sourceCompatibility = JavaVersion.VERSION_21
-	targetCompatibility = JavaVersion.VERSION_21
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
 }
 
 jar {
@@ -78,96 +68,6 @@ jar {
 
 	from("LICENSE") {
 		rename { "${it}_${inputs.properties.archivesName}"}
-	}
-}
-
-def obfuscationDir = layout.buildDirectory.dir("obfuscation")
-def obfuscatedJar = layout.buildDirectory.file("libs/${project.archives_base_name}-${project.version}-release-obf.jar")
-
-tasks.register("prepareObfuscationConfig") {
-	dependsOn tasks.named("remapJar")
-
-	doLast {
-		def remapJarTask = tasks.named("remapJar").get()
-		def injarPath = remapJarTask.archiveFile.get().asFile.absolutePath.replace('\\', '/')
-		def outjarPath = obfuscatedJar.get().asFile.absolutePath.replace('\\', '/')
-		def dictDir = file("${projectDir}/gradle/obfuscation")
-		def javaHome = System.getProperty("java.home").replace('\\', '/')
-		def jmodsDir = "${javaHome}/jmods"
-
-		def libraryJars = [] as LinkedHashSet<String>
-		fileTree(dir: jmodsDir, include: ["*.jmod"]).files.each { file ->
-			libraryJars << file.absolutePath.replace('\\', '/')
-		}
-		configurations.runtimeClasspath.resolve().each { file ->
-			libraryJars << file.absolutePath.replace('\\', '/')
-		}
-		fileTree(dir: "${projectDir}/.gradle/loom-cache/minecraftMaven", include: ["**/*.jar"]).files.each { file ->
-			libraryJars << file.absolutePath.replace('\\', '/')
-		}
-
-		def configFile = obfuscationDir.get().file("proguard-release.pro").asFile
-		configFile.parentFile.mkdirs()
-		configFile.text = """\
--injars '${injarPath}'
--outjars '${outjarPath}'
--forceprocessing
--dontshrink
--dontoptimize
--ignorewarnings
--dontnote
--useuniqueclassmembernames
--overloadaggressively
--allowaccessmodification
--adaptclassstrings
--renamesourcefileattribute x
--repackageclasses ''
--flattenpackagehierarchy ''
--classobfuscationdictionary '${new File(dictDir, "class-dictionary.txt").absolutePath.replace('\\', '/')}'
--packageobfuscationdictionary '${new File(dictDir, "package-dictionary.txt").absolutePath.replace('\\', '/')}'
--obfuscationdictionary '${new File(dictDir, "member-dictionary.txt").absolutePath.replace('\\', '/')}'
--adaptresourcefilenames **.json,**.accesswidener
--adaptresourcefilecontents fabric.mod.json,froghelper.mixins.json
--keepattributes RuntimeVisibleAnnotations,RuntimeInvisibleAnnotations,RuntimeVisibleParameterAnnotations,RuntimeInvisibleParameterAnnotations,AnnotationDefault,InnerClasses,EnclosingMethod,Record,Signature
--keep class ru.wilyfox.FrogHelper { *; }
--keep class ru.wilyfox.mixin.** { *; }
--keep class ru.wilyfox.mixin.ItemInHandRendererMixin { *; }
--keep class ru.wilyfox.client.hud.HudEditingScreen { *; }
--keep class ru.wilyfox.client.quickaccess.QuickAccessScreen { *; }
--keep class ru.wilyfox.client.quickaccess.QuickAccessEditorScreen { *; }
--keep class ru.wilyfox.client.hud.config.ConfigManager { *; }
--keep class ru.wilyfox.client.hud.config.RenderConfig { *; }
--keep class ru.wilyfox.client.protocol.DwHandshakePayload { *; }
--keep class ru.wilyfox.client.protocol.DwEvoPlusPayload { *; }
--keep enum * { *; }
--keepclassmembernames class ru.wilyfox.client.hud.config.** { <fields>; }
--keepclassmembernames class ru.wilyfox.client.quickaccess.** { <fields>; }
--keepclassmembernames class ru.wilyfox.client.clan.PlayerClanEntry { <fields>; }
--keepclassmembernames class ru.wilyfox.client.clan.PlayerClanStorageFile { <fields>; }
--keepclassmembers class * implements net.minecraft.network.protocol.common.custom.CustomPacketPayload { *; }
--keep class * implements net.fabricmc.api.ModInitializer { *; }
--keep class * implements net.fabricmc.api.ClientModInitializer { *; }
--keepclassmembers class ru.wilyfox.mixin.** { *; }
--keep class net.fabricmc.** { *; }
--keep class org.spongepowered.asm.mixin.** { *; }
--keep class com.llamalad7.mixinextras.** { *; }
-"""
-		libraryJars.each { libraryJar ->
-			configFile << "-libraryjars '${libraryJar}'\n"
-		}
-	}
-}
-
-tasks.register("releaseObfuscatedJar", JavaExec) {
-	group = "build"
-	description = "Builds an obfuscated release jar intended to be harder to reverse engineer."
-	dependsOn tasks.named("prepareObfuscationConfig")
-	classpath = configurations.proguard
-	mainClass = "proguard.ProGuard"
-	inputs.file(tasks.named("remapJar").flatMap { it.archiveFile })
-	outputs.file(obfuscatedJar)
-	doFirst {
-		args = ["@${obfuscationDir.get().file('proguard-release.pro').asFile.absolutePath}"]
 	}
 }
 
@@ -187,4 +87,13 @@ publishing {
 		// The repositories here will be used for publishing your artifact, not for
 		// retrieving dependencies.
 	}
+}
+
+// Keep migration smoke tests in a separate mod, outside the release jar.
+fabricApi.configureTests {
+    createSourceSet = true
+    modId = "froghelper-test"
+    enableGameTests = false
+    enableClientGameTests = true
+    eula = true
 }

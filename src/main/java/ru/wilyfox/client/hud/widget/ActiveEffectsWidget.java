@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.effect.ActiveEffectKind;
 import ru.wilyfox.client.effect.ActiveEffectStore;
 import ru.wilyfox.client.effect.ActiveEffectStore.Entry;
@@ -41,7 +41,7 @@ public final class ActiveEffectsWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -58,15 +58,15 @@ public final class ActiveEffectsWidget extends AbstractWidget {
         int width = getUnscaledWidth(entries);
         int height = getUnscaledHeight(entries.size());
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0F);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
 
         int y = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, "Active Effects", PADDING_X, y, WidgetTheme.TITLE);
+            context.text(mc.font, "Active Effects", PADDING_X, y, WidgetTheme.TITLE);
             y += mc.font.lineHeight + ROW_GAP;
         }
 
@@ -77,8 +77,8 @@ public final class ActiveEffectsWidget extends AbstractWidget {
                     ? WidgetTheme.HARD_ACCENT
                     : WidgetTheme.STATUS_SUCCESS;
 
-            context.drawString(mc.font, entry.displayName(), PADDING_X, y, nameColor);
-            context.drawString(
+            context.text(mc.font, entry.displayName(), PADDING_X, y, nameColor);
+            context.text(
                     mc.font,
                     remaining,
                     width - PADDING_X - timeWidth,
@@ -88,7 +88,7 @@ public final class ActiveEffectsWidget extends AbstractWidget {
             y += mc.font.lineHeight + ROW_GAP;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -149,18 +149,18 @@ public final class ActiveEffectsWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0F);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Active Effects", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No active effects", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Active Effects", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No active effects", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 }

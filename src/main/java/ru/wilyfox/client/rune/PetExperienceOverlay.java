@@ -1,22 +1,17 @@
 package ru.wilyfox.client.rune;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.CustomData;
 import ru.wilyfox.client.hud.config.WidgetChrome;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
-import ru.wilyfox.utils.Formatting;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -49,7 +44,7 @@ public final class PetExperienceOverlay {
         ));
     }
 
-    public static void render(GuiGraphics context, int x, int y, OverlayData data) {
+    public static void render(GuiGraphicsExtractor context, int x, int y, OverlayData data) {
         Minecraft mc = Minecraft.getInstance();
         int lineHeight = mc.font.lineHeight + 1;
         int maxWidth = mc.font.width(data.title());
@@ -61,7 +56,7 @@ public final class PetExperienceOverlay {
         HudSurface.drawPanel(context, x, y, width, height, WidgetChrome.FROST, HudSurface.nativeRenderer());
 
         int textY = y + 5;
-        context.drawString(mc.font, data.title(), x + 6, textY, WidgetTheme.TITLE);
+        context.text(mc.font, data.title(), x + 6, textY, WidgetTheme.TITLE);
         textY += lineHeight + 2;
         for (int i = 0; i < data.lines().size(); i++) {
             int color = switch (i) {
@@ -70,7 +65,7 @@ public final class PetExperienceOverlay {
                 case 3 -> WidgetTheme.TEXT_SOFT;
                 default -> WidgetTheme.TITLE;
             };
-            context.drawString(mc.font, data.lines().get(i), x + 6, textY, color);
+            context.text(mc.font, data.lines().get(i), x + 6, textY, color);
             textY += lineHeight;
         }
     }
@@ -118,33 +113,17 @@ public final class PetExperienceOverlay {
         if (customData == null) {
             return "overworld";
         }
-        CompoundTag root = customData.getUnsafe();
-        CompoundTag values = root.contains(PUBLIC_BUKKIT_VALUES) ? root.getCompound(PUBLIC_BUKKIT_VALUES) : root;
+        CompoundTag root = customData.copyTag();
+        CompoundTag values = root.contains(PUBLIC_BUKKIT_VALUES) ? root.getCompoundOrEmpty(PUBLIC_BUKKIT_VALUES) : root;
         if (!values.contains(DIMENSION_KEY)) {
             return "overworld";
         }
-        String dimension = values.getString(DIMENSION_KEY).trim().toLowerCase(Locale.ROOT);
+        String dimension = values.getStringOr(DIMENSION_KEY, "").trim().toLowerCase(Locale.ROOT);
         return dimension.isBlank() ? "overworld" : dimension;
     }
 
     private static List<String> getLoreLines(ItemStack stack) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null) {
-            return List.of();
-        }
-        List<Component> tooltip = stack.getTooltipLines(
-                Item.TooltipContext.of(mc.level),
-                mc.player,
-                mc.options.advancedItemTooltips ? TooltipFlag.ADVANCED : TooltipFlag.NORMAL
-        );
-        List<String> lines = new ArrayList<>();
-        for (int i = 1; i < tooltip.size(); i++) {
-            String text = Formatting.stripMinecraftFormatting(tooltip.get(i).getString()).trim();
-            if (!text.isEmpty()) {
-                lines.add(text);
-            }
-        }
-        return lines;
+        return ItemLoreReader.read(stack);
     }
 
     private static final class ExperienceByDimension {

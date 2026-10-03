@@ -14,7 +14,7 @@ public final class DwStaffTimersDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int count = DwProtocolCodec.readVarInt(buf);
+            int count = DwProtocolCodec.readCollectionSize(buf);
             Map<Integer, Long> timers = new LinkedHashMap<>();
 
             for (int i = 0; i < count; i++) {

@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
@@ -18,7 +18,7 @@ public class SlotHeaderSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
         boolean hovered = isHovered(mouseX, mouseY);
         boolean expanded = expandedGetter.getAsBoolean();
@@ -27,8 +27,8 @@ public class SlotHeaderSettingsComponent extends SettingsComponent {
 
         String arrow = expanded ? "v" : ">";
         int textY = y + (height - mc.font.lineHeight) / 2;
-        context.drawString(mc.font, arrow, x + 8, textY, hovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_SOFT);
-        context.drawString(mc.font, label, x + 20, textY, hovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_PRIMARY);
+        context.text(mc.font, arrow, x + 8, textY, hovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_SOFT);
+        context.text(mc.font, label, x + 20, textY, hovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_PRIMARY);
     }
 
     @Override

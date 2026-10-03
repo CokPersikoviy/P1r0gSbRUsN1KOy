@@ -1,6 +1,6 @@
 package ru.wilyfox.client.chat;
 
-import net.minecraft.client.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.ChatComponent;
 import ru.wilyfox.bridge.ChatComponentAccessor;

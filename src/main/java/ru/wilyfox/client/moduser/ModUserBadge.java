@@ -5,17 +5,17 @@ import net.minecraft.network.chat.ComponentContents;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.contents.PlainTextContents;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
- * The frog badge shown on a FrogHelper user's nametag. It's a single glyph (U+E000) rendered through our
+ * The frog badge shown on a FrogHelper user's nametag. It's a single glyph (U+F8FF) rendered through our
  * own {@code froghelper:mod_badge} bitmap font (mapped to {@code textures/font/mod_badge.png}), so it
  * scales and aligns with the nametag text instead of needing world-space quad math.
  */
 public final class ModUserBadge {
     private static final String GLYPH = ""; // U+F8FF: PUA slot DW does NOT use (U+E000 = DW trade.png)
-    private static final ResourceLocation FONT = ResourceLocation.fromNamespaceAndPath("froghelper", "mod_badge");
-    private static final Style BADGE_STYLE = Style.EMPTY.withFont(FONT);
+    private static final Identifier FONT = Identifier.fromNamespaceAndPath("froghelper", "mod_badge");
+    private static final Style BADGE_STYLE = Style.EMPTY.withFont(new net.minecraft.network.chat.FontDescription.Resource(FONT));
 
     private ModUserBadge() {
     }
@@ -35,19 +35,20 @@ public final class ModUserBadge {
 
         InsertState state = new InsertState(Math.max(0, characterIndex));
         MutableComponent result = Component.empty();
-        appendWithBadge(result, component, state);
+        appendWithBadge(result, component, Style.EMPTY, state);
         if (!state.inserted) {
             appendBadge(result);
         }
         return result;
     }
 
-    private static void appendWithBadge(MutableComponent output, Component node, InsertState state) {
+    private static void appendWithBadge(MutableComponent output, Component node, Style parentStyle, InsertState state) {
+        Style effectiveStyle = node.getStyle().applyTo(parentStyle);
         ComponentContents contents = node.getContents();
         if (contents instanceof PlainTextContents.LiteralContents literal) {
-            appendLiteralWithBadge(output, literal.text(), node.getStyle(), state);
+            appendLiteralWithBadge(output, literal.text(), effectiveStyle, state);
         } else {
-            MutableComponent own = MutableComponent.create(contents).setStyle(node.getStyle());
+            MutableComponent own = MutableComponent.create(contents).setStyle(effectiveStyle);
             String ownText = own.getString();
             if (!state.inserted && state.remaining <= ownText.length()) {
                 appendBadge(output);
@@ -60,7 +61,7 @@ public final class ModUserBadge {
         }
 
         for (Component sibling : node.getSiblings()) {
-            appendWithBadge(output, sibling, state);
+            appendWithBadge(output, sibling, effectiveStyle, state);
         }
     }
 
@@ -113,19 +114,27 @@ public final class ModUserBadge {
         MutableComponent out;
         if (contents instanceof PlainTextContents.LiteralContents literal) {
             String text = literal.text();
-            if (state.removeSeparator && text.startsWith(" ")) {
-                text = text.substring(1);
-                state.removeSeparator = false;
+            StringBuilder cleaned = new StringBuilder(text.length());
+            for (int index = 0; index < text.length(); index++) {
+                char character = text.charAt(index);
+                if (state.removeSeparator) {
+                    state.removeSeparator = false;
+                    if (character == ' ') {
+                        continue;
+                    }
+                }
+                if (character == GLYPH.charAt(0)) {
+                    state.removeSeparator = true;
+                } else {
+                    cleaned.append(character);
+                }
             }
-            if (text.equals(GLYPH)) {
-                text = "";
-                state.removeSeparator = true;
-            } else {
-                text = text.replace(GLYPH, "");
-            }
-            out = Component.literal(text);
+            out = Component.literal(cleaned.toString());
         } else {
             out = MutableComponent.create(contents);
+            if (!out.getString().isEmpty()) {
+                state.removeSeparator = false;
+            }
         }
         out.setStyle(node.getStyle());
         for (Component sibling : node.getSiblings()) {

@@ -1,7 +1,7 @@
 package ru.wilyfox.client.moduser;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
@@ -37,7 +37,7 @@ public class SocialScreen extends Screen {
     }
 
     @Override
-    protected void renderBlurredBackground() {
+    protected void extractBlurredBackground(GuiGraphicsExtractor graphics) {
     }
 
     @Override
@@ -59,7 +59,7 @@ public class SocialScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("ui/SocialScreen/render")) {
             layout();
             Minecraft minecraft = Minecraft.getInstance();
@@ -68,13 +68,13 @@ public class SocialScreen extends Screen {
             graphics.fill(0, 0, width, height, WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0x66));
             HudBlur.beginFrame(graphics);
             HudSurface.drawPanel(graphics, panelX, panelY, PANEL_WIDTH, panelHeight, WidgetChrome.FROST, HudSurface.nativeRenderer());
-            graphics.drawString(minecraft.font, ModUserBadge.prefix(Component.literal("FrogHelper users")),
+            graphics.text(minecraft.font, ModUserBadge.prefix(Component.literal("FrogHelper users")),
                     panelX + PANEL_PADDING, panelY + 10, WidgetTheme.TITLE);
             graphics.fill(panelX + PANEL_PADDING, panelY + HEADER_HEIGHT - 6,
                     panelX + PANEL_WIDTH - PANEL_PADDING, panelY + HEADER_HEIGHT - 5, WidgetTheme.ACCENT_LINE);
 
             if (names.isEmpty()) {
-                graphics.drawString(minecraft.font, "No users discovered",
+                graphics.text(minecraft.font, "No users discovered",
                         panelX + PANEL_PADDING, panelY + HEADER_HEIGHT + 4, WidgetTheme.TEXT_MUTED);
                 return;
             }
@@ -87,7 +87,7 @@ public class SocialScreen extends Screen {
                     break;
                 }
                 int rowY = listTop + i * ROW_HEIGHT;
-                graphics.drawString(minecraft.font, ModUserBadge.prefix(Component.literal(names.get(index))),
+                graphics.text(minecraft.font, ModUserBadge.prefix(Component.literal(names.get(index))),
                         rowX, rowY + 2, WidgetTheme.TEXT_PRIMARY);
             }
 
@@ -97,7 +97,7 @@ public class SocialScreen extends Screen {
         }
     }
 
-    private void drawScrollbar(GuiGraphics graphics, int count, int listTop) {
+    private void drawScrollbar(GuiGraphicsExtractor graphics, int count, int listTop) {
         int trackX = panelX + PANEL_WIDTH - 5;
         int trackHeight = visibleRows * ROW_HEIGHT;
         graphics.fill(trackX, listTop, trackX + 2, listTop + trackHeight, WidgetTheme.BAR_BG);
@@ -116,11 +116,12 @@ public class SocialScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        int keyCode = event.key(), scanCode = event.scancode(), modifiers = event.modifiers();
         if (keyCode == GLFW.GLFW_KEY_C || keyCode == GLFW.GLFW_KEY_ESCAPE) {
             onClose();
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 }

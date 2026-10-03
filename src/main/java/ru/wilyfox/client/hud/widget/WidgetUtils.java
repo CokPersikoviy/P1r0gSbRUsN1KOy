@@ -1,6 +1,6 @@
 package ru.wilyfox.client.hud.widget;
 
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.config.ConfigManager;
 
 public final class WidgetUtils {
@@ -16,7 +16,7 @@ public final class WidgetUtils {
         return !ConfigManager.get().render.unclutterWidgets;
     }
 
-    public static void drawCorners(GuiGraphics context, int x, int y, int width, int height, int color) {
+    public static void drawCorners(GuiGraphicsExtractor context, int x, int y, int width, int height, int color) {
         int cornerLength = 4;
         int thickness = 1;
 
@@ -26,7 +26,7 @@ public final class WidgetUtils {
         drawBottomRightCorner(context, x, y, width, height, color);
     }
 
-    public static void drawTopLeftCorner(GuiGraphics context, int x, int y, int width, int height, int color) {
+    public static void drawTopLeftCorner(GuiGraphicsExtractor context, int x, int y, int width, int height, int color) {
         int cornerLength = 4;
         int thickness = 1;
 
@@ -34,7 +34,7 @@ public final class WidgetUtils {
         context.fill(x, y, x + thickness, y + cornerLength, color);
     }
 
-    public static void drawTopRightCorner(GuiGraphics context, int x, int y, int width, int height, int color) {
+    public static void drawTopRightCorner(GuiGraphicsExtractor context, int x, int y, int width, int height, int color) {
         int cornerLength = 4;
         int thickness = 1;
 
@@ -42,7 +42,7 @@ public final class WidgetUtils {
         context.fill(x + width - thickness, y, x + width, y + cornerLength, color);
     }
 
-    public static void drawBottomLeftCorner(GuiGraphics context, int x, int y, int width, int height, int color) {
+    public static void drawBottomLeftCorner(GuiGraphicsExtractor context, int x, int y, int width, int height, int color) {
         int cornerLength = 4;
         int thickness = 1;
 
@@ -50,7 +50,7 @@ public final class WidgetUtils {
         context.fill(x, y + height - cornerLength, x + thickness, y + height, color);
     }
 
-    public static void drawBottomRightCorner(GuiGraphics context, int x, int y, int width, int height, int color) {
+    public static void drawBottomRightCorner(GuiGraphicsExtractor context, int x, int y, int width, int height, int color) {
         int cornerLength = 4;
         int thickness = 1;
 
@@ -58,21 +58,21 @@ public final class WidgetUtils {
         context.fill(x + width - thickness, y + height - cornerLength, x + width, y + height, color);
     }
 
-    public static void drawAnchorPoint(GuiGraphics context, int centerX, int centerY, int color) {
+    public static void drawAnchorPoint(GuiGraphicsExtractor context, int centerX, int centerY, int color) {
         drawAnchorPoint(context, centerX, centerY, color, 10);
     }
 
-    public static void drawAnchorPoint(GuiGraphics context, int centerX, int centerY, int color, int size) {
+    public static void drawAnchorPoint(GuiGraphicsExtractor context, int centerX, int centerY, int color, int size) {
         int half = size / 2;
         drawCorners(context, centerX - half, centerY - half, size, size, color);
     }
 
-    public static void drawCornerMarker(GuiGraphics context, int x, int y, int color) {
+    public static void drawCornerMarker(GuiGraphicsExtractor context, int x, int y, int color) {
         int size = 4;
         drawCorners(context, x, y, size, size, color);
     }
 
-    public static void drawSnapLine(GuiGraphics context, int x1, int y1, int x2, int y2, int color) {
+    public static void drawSnapLine(GuiGraphicsExtractor context, int x1, int y1, int x2, int y2, int color) {
         if (x1 == x2) {
             int minY = Math.min(y1, y2);
             int maxY = Math.max(y1, y2);

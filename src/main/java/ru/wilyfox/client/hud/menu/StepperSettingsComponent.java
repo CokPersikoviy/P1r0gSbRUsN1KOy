@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
@@ -36,7 +36,7 @@ public class StepperSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
 
         boolean hovered = isHovered(mouseX, mouseY);
@@ -48,7 +48,7 @@ public class StepperSettingsComponent extends SettingsComponent {
         HudSurface.fillRounded(context, x, y, width, height, 4, rowBg);
 
         int textY = y + (height - mc.font.lineHeight) / 2;
-        context.drawString(mc.font, label, x + 8, textY, textColor);
+        context.text(mc.font, label, x + 8, textY, textColor);
 
         int buttonWidth = 16;
         int buttonHeight = height - 6;
@@ -70,11 +70,11 @@ public class StepperSettingsComponent extends SettingsComponent {
         HudSurface.fillRounded(context, minusX, buttonY, buttonWidth, buttonHeight, 3, hoverMinus ? buttonHoverBg : buttonBg);
         HudSurface.fillRounded(context, plusX, buttonY, buttonWidth, buttonHeight, 3, hoverPlus ? buttonHoverBg : buttonBg);
 
-        context.drawCenteredString(mc.font, "-", minusX + buttonWidth / 2, textY, WidgetTheme.TITLE);
-        context.drawCenteredString(mc.font, "+", plusX + buttonWidth / 2, textY, WidgetTheme.TITLE);
+        context.centeredText(mc.font, "-", minusX + buttonWidth / 2, textY, WidgetTheme.TITLE);
+        context.centeredText(mc.font, "+", plusX + buttonWidth / 2, textY, WidgetTheme.TITLE);
 
         String valueText = String.valueOf(getter.getAsInt());
-        context.drawCenteredString(mc.font, valueText, valueX + valueWidth / 2, textY, valueColor);
+        context.centeredText(mc.font, valueText, valueX + valueWidth / 2, textY, valueColor);
     }
 
     @Override

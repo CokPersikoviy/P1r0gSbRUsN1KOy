@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.layer.HudLayer;
 
 public class PlainTextWidget extends AbstractWidget {
@@ -14,18 +14,18 @@ public class PlainTextWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
-        context.drawString(Minecraft.getInstance().font, text, 0, 0, WidgetTheme.TEXT_SOFT);
+        context.text(Minecraft.getInstance().font, text, 0, 0, WidgetTheme.TEXT_SOFT);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override

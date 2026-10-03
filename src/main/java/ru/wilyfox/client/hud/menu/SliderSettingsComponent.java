@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
@@ -30,7 +30,7 @@ public class SliderSettingsComponent extends SettingsComponent{
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
 
         boolean hovered = isHovered(mouseX, mouseY);
@@ -50,13 +50,13 @@ public class SliderSettingsComponent extends SettingsComponent{
         String displayLabel = labelTruncated
                 ? mc.font.plainSubstrByWidth(label, Math.max(0, labelMaxWidth - mc.font.width("…"))) + "…"
                 : label;
-        context.drawString(mc.font, displayLabel, x + 8, textY, textColor);
+        context.text(mc.font, displayLabel, x + 8, textY, textColor);
 
         int valueWidth = 24;
         int valueX = x + width - 8 - valueWidth;
 
         String valueText = String.valueOf(getter.getAsInt());
-        context.drawCenteredString(mc.font, valueText, valueX + valueWidth / 2, textY, valueColor);
+        context.centeredText(mc.font, valueText, valueX + valueWidth / 2, textY, valueColor);
 
         int sliderWidth = valueX - sliderX - 10;
         int sliderY = y + height / 2 - 1;

@@ -56,6 +56,9 @@ final class DwProtocolCodec {
 
         for (int position = 0; position < 10; position++) {
             int currentByte = buf.readByte() ^ BYTE_XOR_KEY;
+            if (position == 9 && (currentByte & 0xFE) != 0) {
+                throw new IllegalArgumentException("DW packed long is too large");
+            }
             value |= (long) (currentByte & SEGMENT_MASK) << (position * 7);
 
             if ((currentByte & CONTINUATION_MASK) == 0) {
@@ -63,7 +66,7 @@ final class DwProtocolCodec {
             }
         }
 
-        return value;
+        throw new IllegalArgumentException("DW packed long is too large");
     }
 
     static double readDouble(ByteBuf buf) {
@@ -93,6 +96,9 @@ final class DwProtocolCodec {
             }
 
             int currentByte = buf.readByte() ^ BYTE_XOR_KEY;
+            if (position == 28 && (currentByte & 0xF0) != 0) {
+                throw new IllegalArgumentException("DW varint is too large");
+            }
             value |= (currentByte & SEGMENT_MASK) << position;
 
             if ((currentByte & CONTINUATION_MASK) == 0) {
@@ -101,5 +107,15 @@ final class DwProtocolCodec {
 
             position += 7;
         }
+    }
+
+    static int readCollectionSize(ByteBuf buf) {
+        int count = readVarInt(buf);
+        // Every protocol collection entry consumes at least one byte. Validate before
+        // allocating a collection from an untrusted count, including nested collections.
+        if (count < 0 || count > buf.readableBytes()) {
+            throw new IllegalArgumentException("DW collection size exceeds payload: " + count);
+        }
+        return count;
     }
 }

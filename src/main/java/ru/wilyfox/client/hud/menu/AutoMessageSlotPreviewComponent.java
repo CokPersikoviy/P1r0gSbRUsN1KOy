@@ -1,7 +1,7 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
@@ -26,7 +26,7 @@ public class AutoMessageSlotPreviewComponent extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         Minecraft mc = Minecraft.getInstance();
         boolean hovered = isHovered(mouseX, mouseY);
         HudSurface.fillRounded(context, x, y, width, height, 4, hovered ? WidgetTheme.PANEL_BG : WidgetTheme.PANEL_BG_SOFT);
@@ -43,8 +43,8 @@ public class AutoMessageSlotPreviewComponent extends SettingsComponent {
         String preview = trimToWidth(mc, message, availableWidth);
         int textY = y + (height - mc.font.lineHeight) / 2;
 
-        context.drawString(mc.font, preview, x + 8, textY, messageGetter.get() == null || messageGetter.get().isBlank() ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SOFT);
-        context.drawString(mc.font, meta, x + width - 8 - metaWidth, textY, WidgetTheme.TEXT_SECONDARY);
+        context.text(mc.font, preview, x + 8, textY, messageGetter.get() == null || messageGetter.get().isBlank() ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SOFT);
+        context.text(mc.font, meta, x + width - 8 - metaWidth, textY, WidgetTheme.TEXT_SECONDARY);
     }
 
     @Override

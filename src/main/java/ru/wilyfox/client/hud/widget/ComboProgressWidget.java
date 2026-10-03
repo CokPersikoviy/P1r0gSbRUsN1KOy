@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.combo.ComboProgressStore;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
@@ -30,7 +30,7 @@ public final class ComboProgressWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -52,14 +52,14 @@ public final class ComboProgressWidget extends AbstractWidget {
         int width = getUnscaledWidth(mc, lines);
         int height = getUnscaledHeight(mc, lines.size(), showBar);
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
         int lineY = PADDING_Y;
         for (RenderLine line : lines) {
-            context.drawString(mc.font, line.text(), PADDING_X, lineY, line.color());
+            context.text(mc.font, line.text(), PADDING_X, lineY, line.color());
             lineY += mc.font.lineHeight + 2;
         }
 
@@ -69,7 +69,7 @@ public final class ComboProgressWidget extends AbstractWidget {
                     (float) snapshot.progress(), WidgetTheme.BAR_FILL);
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -122,19 +122,19 @@ public final class ComboProgressWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Combo x1.0 -> x1.1", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "0/1,000", PADDING_X, 16, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Combo x1.0 -> x1.1", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "0/1,000", PADDING_X, 16, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     private String formatMultiplier(double value) {

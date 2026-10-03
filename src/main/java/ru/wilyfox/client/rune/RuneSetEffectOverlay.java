@@ -1,15 +1,13 @@
 package ru.wilyfox.client.rune;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.TooltipFlag;
 import ru.wilyfox.client.hud.config.WidgetChrome;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
@@ -19,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -139,7 +138,7 @@ public final class RuneSetEffectOverlay {
         return screen instanceof InventoryScreen;
     }
 
-    public static void render(GuiGraphics context, int x, int y, OverlayData data) {
+    public static void render(GuiGraphicsExtractor context, int x, int y, OverlayData data) {
         Minecraft mc = Minecraft.getInstance();
         int lineHeight = mc.font.lineHeight + 1;
 
@@ -154,11 +153,11 @@ public final class RuneSetEffectOverlay {
         HudSurface.drawPanel(context, x, y, width, height, WidgetChrome.FROST, HudSurface.nativeRenderer());
 
         int textY = y + 5;
-        context.drawString(mc.font, data.title(), x + 6, textY, WidgetTheme.TITLE);
+        context.text(mc.font, data.title(), x + 6, textY, WidgetTheme.TITLE);
         textY += lineHeight + 2;
 
         for (String line : data.lines()) {
-            context.drawString(mc.font, line, x + 6, textY, WidgetTheme.TEXT_SOFT);
+            context.text(mc.font, line, x + 6, textY, WidgetTheme.TEXT_SOFT);
             textY += lineHeight;
         }
     }
@@ -192,7 +191,7 @@ public final class RuneSetEffectOverlay {
             }
 
             List<String> lore = getLoreLines(slot.getItem());
-            if (!lore.isEmpty() && lore.get(0).toLowerCase().contains(BAG_MARKER)) {
+            if (!lore.isEmpty() && lore.get(0).toLowerCase(Locale.ROOT).contains(BAG_MARKER)) {
                 return extractSetBuffLines(lore);
             }
         }
@@ -209,7 +208,7 @@ public final class RuneSetEffectOverlay {
                 continue;
             }
 
-            String lower = clean.toLowerCase();
+            String lower = clean.toLowerCase(Locale.ROOT);
             if (lower.contains(BAG_MARKER) || lower.contains("нельзя передать")) {
                 continue;
             }
@@ -295,23 +294,7 @@ public final class RuneSetEffectOverlay {
     }
 
     private static List<String> getLoreLines(ItemStack stack) {
-        // Always NORMAL: ADVANCED appends the registry-id line ("minecraft:paper"), durability, etc.,
-        // which the buff parser would otherwise pick up as a fake property line.
-        List<Component> tooltip = stack.getTooltipLines(
-                Item.TooltipContext.of(Minecraft.getInstance().player.level()),
-                Minecraft.getInstance().player,
-                TooltipFlag.NORMAL
-        );
-        List<String> lines = new ArrayList<>();
-
-        for (int i = 1; i < tooltip.size(); i++) {
-            String text = Formatting.stripMinecraftFormatting(tooltip.get(i).getString()).trim();
-            if (!text.isEmpty()) {
-                lines.add(text);
-            }
-        }
-
-        return lines;
+        return ItemLoreReader.read(stack);
     }
 
     public record OverlayData(String title, List<String> lines) {

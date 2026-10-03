@@ -13,7 +13,7 @@ public final class DwHourlyQuestTypesDecoder {
     public static DwHourlyQuestTypesPacket decode(byte[] data) {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
         try {
-            int count = DwProtocolCodec.readVarInt(buf);
+            int count = DwProtocolCodec.readCollectionSize(buf);
             Map<Integer, DwHourlyQuestType> types = new LinkedHashMap<>(Math.max(4, count));
             for (int i = 0; i < count; i++) {
                 int id = DwProtocolCodec.readInt(buf);

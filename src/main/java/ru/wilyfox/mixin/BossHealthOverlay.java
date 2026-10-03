@@ -1,7 +1,7 @@
 package ru.wilyfox.mixin;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.LerpingBossEvent;
 import net.minecraft.world.BossEvent;
 import org.spongepowered.asm.mixin.Final;
@@ -26,17 +26,17 @@ public abstract class BossHealthOverlay implements BossHealthOverlayAccessor {
     private Map<UUID, LerpingBossEvent> events;
 
     @Shadow
-    protected abstract void drawBar(GuiGraphics guiGraphics, int i, int j, BossEvent bossEvent);
+    protected abstract void extractBar(GuiGraphicsExtractor guiGraphics, int i, int j, BossEvent bossEvent);
 
-    @Inject(method = "render", at = @At("HEAD"), cancellable = true)
-    private void froghelper$cancelVanillaRender(GuiGraphics guiGraphics, CallbackInfo ci) {
+    @Inject(method = "extractRenderState", at = @At("HEAD"), cancellable = true)
+    private void froghelper$cancelVanillaRender(GuiGraphicsExtractor guiGraphics, CallbackInfo ci) {
         if (ConfigManager.get().bossBar.active) {
             ci.cancel();
         }
     }
 
     @Override
-    public void froghelper$renderAt(GuiGraphics context, int startX, int startY) {
+    public void froghelper$renderAt(GuiGraphicsExtractor context, int startX, int startY) {
         if (events.isEmpty()) {
             return;
         }
@@ -56,8 +56,8 @@ public abstract class BossHealthOverlay implements BossHealthOverlayAccessor {
             int textY = rowTop;
             int barY = rowTop + 8;
 
-            drawBar(context, barX, barY, event);
-            context.drawString(minecraft.font, event.getName(), textX, textY, 0xFFFFFFFF);
+            extractBar(context, barX, barY, event);
+            context.text(minecraft.font, event.getName(), textX, textY, 0xFFFFFFFF);
 
             rowTop += 19;
             rendered++;

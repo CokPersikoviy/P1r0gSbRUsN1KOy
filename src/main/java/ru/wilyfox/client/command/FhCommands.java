@@ -7,8 +7,8 @@ import ru.wilyfox.client.chat.BossShareService;
 import ru.wilyfox.client.profiler.ProfilerDebugCommand;
 import ru.wilyfox.client.protocol.ProtocolDebugCommand;
 
-import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.argument;
-import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.literal;
+import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.argument;
+import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 
 /**
  * Registers FrogHelper's client-side pseudo-commands with Brigadier so they get proper tab

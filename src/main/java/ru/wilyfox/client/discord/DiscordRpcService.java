@@ -25,8 +25,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
 import static ru.wilyfox.client.debug.DebugLogger.debug;
@@ -50,17 +48,18 @@ public final class DiscordRpcService {
     });
 
     private static final Object LOCK = new Object();
-    private static final AtomicBoolean AUTO_UPDATE_SCHEDULED = new AtomicBoolean(false);
-    private static final AtomicReference<PresenceData> PENDING_AUTO_PRESENCE = new AtomicReference<>();
+    private static final DiscordPresenceUpdateQueue<PresenceData> AUTO_UPDATES =
+            new DiscordPresenceUpdateQueue<>(EXECUTOR, DiscordRpcService::processAutoPresenceRequest);
 
     private static DiscordIpcClient client;
     private static String activeClientId = "";
     private static long startedAtMillis;
-    private static long lastAutoUpdateAt;
+    private static volatile long lastAutoUpdateAt;
     private static long lastConnectAttemptAt;
     private static boolean connectFailureLogged;
     private static String lastPresenceSignature = "";
     private static boolean registered;
+    private static boolean autoRequested;
     private static volatile String status = "Stopped";
     private static volatile Mode mode = Mode.NONE;
 
@@ -90,30 +89,21 @@ public final class DiscordRpcService {
 
         registered = true;
 
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            if (mode == Mode.AUTO) {
-                EXECUTOR.execute(DiscordRpcService::stopAutoInternal);
-            }
-        });
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> stopAuto());
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("tick/DiscordRpcService")) {
                 DiscordRpcConfig config = ConfigManager.get().discordRpc;
                 if (!config.active) {
-                    PENDING_AUTO_PRESENCE.set(null);
-                    if (mode == Mode.AUTO) {
-                        EXECUTOR.execute(DiscordRpcService::stopAutoInternal);
-                    } else if (!"Disabled".equals(status)) {
+                    stopAuto();
+                    if (!"Disabled".equals(status)) {
                         status = "Disabled";
                     }
                     return;
                 }
 
                 if (!shouldRunAuto(client)) {
-                    PENDING_AUTO_PRESENCE.set(null);
-                    if (mode == Mode.AUTO) {
-                        EXECUTOR.execute(DiscordRpcService::stopAutoInternal);
-                    }
+                    stopAuto();
                     return;
                 }
 
@@ -125,14 +115,12 @@ public final class DiscordRpcService {
 
                 PresenceData presence = buildAutoPresence(client, config);
                 if (presence == null) {
-                    PENDING_AUTO_PRESENCE.set(null);
-                    if (mode == Mode.AUTO) {
-                        EXECUTOR.execute(DiscordRpcService::stopAutoInternal);
-                    }
+                    stopAuto();
                     return;
                 }
 
-                enqueueAutoPresenceUpdate(presence);
+                autoRequested = true;
+                AUTO_UPDATES.update(presence);
             }
         });
     }
@@ -141,32 +129,23 @@ public final class DiscordRpcService {
         return status;
     }
 
-    private static void enqueueAutoPresenceUpdate(PresenceData presence) {
-        PENDING_AUTO_PRESENCE.set(presence);
-        if (AUTO_UPDATE_SCHEDULED.compareAndSet(false, true)) {
-            EXECUTOR.execute(DiscordRpcService::drainAutoPresenceUpdates);
+    private static void stopAuto() {
+        if (autoRequested) {
+            autoRequested = false;
+            AUTO_UPDATES.stop();
         }
     }
 
-    private static void drainAutoPresenceUpdates() {
-        try {
-            while (true) {
-                PresenceData presence = PENDING_AUTO_PRESENCE.getAndSet(null);
-                if (presence == null) {
-                    break;
-                }
-
-                updateAutoPresence(presence);
-            }
-        } finally {
-            AUTO_UPDATE_SCHEDULED.set(false);
-            if (PENDING_AUTO_PRESENCE.get() != null && AUTO_UPDATE_SCHEDULED.compareAndSet(false, true)) {
-                EXECUTOR.execute(DiscordRpcService::drainAutoPresenceUpdates);
-            }
+    private static void processAutoPresenceRequest(DiscordPresenceUpdateQueue.Request<PresenceData> request) {
+        if (request.presence() == null) {
+            stopAutoInternal();
+        } else {
+            updateAutoPresence(request);
         }
     }
 
-    private static void updateAutoPresence(PresenceData presence) {
+    private static void updateAutoPresence(DiscordPresenceUpdateQueue.Request<PresenceData> request) {
+        PresenceData presence = request.presence();
         long now = System.currentTimeMillis();
 
         try {
@@ -183,10 +162,16 @@ public final class DiscordRpcService {
                     try {
                         connected = connectWithRetry(APPLICATION_ID);
                     } catch (IOException connectFailure) {
-                        noteConnectFailureLocked(connectFailure);
+                        if (AUTO_UPDATES.isCurrent(request)) {
+                            noteConnectFailureLocked(connectFailure);
+                        }
                         return;
                     }
 
+                    if (!AUTO_UPDATES.isCurrent(request)) {
+                        connected.close();
+                        return;
+                    }
                     client = connected;
                     activeClientId = APPLICATION_ID;
                     startedAtMillis = now;
@@ -199,6 +184,9 @@ public final class DiscordRpcService {
                 mode = Mode.AUTO;
             }
 
+            if (!AUTO_UPDATES.isCurrent(request)) {
+                return;
+            }
             PresenceData resolvedPresence = presence.withStartedAtSeconds(
                     presence.includeElapsedTime() ? startedAtMillis / 1000L : 0L
             );
@@ -575,13 +563,8 @@ public final class DiscordRpcService {
     }
 
     private static void stopAutoInternal() {
-        PENDING_AUTO_PRESENCE.set(null);
         lastConnectAttemptAt = 0L;
         connectFailureLogged = false;
-        if (mode != Mode.AUTO) {
-            return;
-        }
-
         synchronized (LOCK) {
             stopSessionLocked();
         }
@@ -630,11 +613,14 @@ public final class DiscordRpcService {
         return formatted;
     }
 
-    private static String limit(String value, int maxLength) {
+    static String limit(String value, int maxLength) {
         if (value == null || value.length() <= maxLength) {
             return value == null ? "" : value;
         }
-        return value.substring(0, Math.max(0, maxLength - 1)).trim() + "...";
+        if (maxLength <= 3) {
+            return value.substring(0, Math.max(0, maxLength));
+        }
+        return value.substring(0, maxLength - 3).trim() + "...";
     }
 
     private static void failAndShutdown(String logMessage, Throwable throwable) {

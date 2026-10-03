@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.ability.AbilityCooldownStore;
 import ru.wilyfox.client.ability.AbilityCooldownStore.Entry;
 import ru.wilyfox.client.hud.HudEditingScreen;
@@ -42,7 +42,7 @@ public class AbilityCooldownWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -63,15 +63,15 @@ public class AbilityCooldownWidget extends AbstractWidget {
         int height = getUnscaledHeight(entries.size());
         int rowHeight = mc.font.lineHeight;
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
 
         int y = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, "Ability Cooldowns", PADDING_X, y, WidgetTheme.TITLE);
+            context.text(mc.font, "Ability Cooldowns", PADDING_X, y, WidgetTheme.TITLE);
             y += mc.font.lineHeight + 3;
         }
 
@@ -80,13 +80,13 @@ public class AbilityCooldownWidget extends AbstractWidget {
             int timeWidth = mc.font.width(remaining);
             int rightX = width - PADDING_X;
 
-            context.drawString(mc.font, entry.name(), PADDING_X, y, WidgetTheme.TEXT_SOFT);
-            context.drawString(mc.font, remaining, rightX - timeWidth, y, WidgetTheme.TEXT_SECONDARY);
+            context.text(mc.font, entry.name(), PADDING_X, y, WidgetTheme.TEXT_SOFT);
+            context.text(mc.font, remaining, rightX - timeWidth, y, WidgetTheme.TEXT_SECONDARY);
 
             y += rowHeight + ROW_GAP;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -140,18 +140,18 @@ public class AbilityCooldownWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Ability Cooldowns", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No active abilities", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Ability Cooldowns", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No active abilities", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 }

@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
@@ -24,7 +24,7 @@ public class VisibilityStatusWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -33,9 +33,9 @@ public class VisibilityStatusWidget extends AbstractWidget {
         int width = getUnscaledWidth(mc);
         int height = getUnscaledHeight(mc);
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
 
@@ -45,7 +45,7 @@ public class VisibilityStatusWidget extends AbstractWidget {
             renderDetailed(context, mc);
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -96,7 +96,7 @@ public class VisibilityStatusWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
     private String statusText(boolean visible) {
@@ -119,16 +119,16 @@ public class VisibilityStatusWidget extends AbstractWidget {
         };
     }
 
-    private void renderDetailed(GuiGraphics context, Minecraft mc) {
+    private void renderDetailed(GuiGraphicsExtractor context, Minecraft mc) {
         int y = PADDING_Y;
-        context.drawString(mc.font, "Clan [" + statusText(store.isClanVisible()) + "]", PADDING_X, y, statusColor(store.isClanVisible()));
+        context.text(mc.font, "Clan [" + statusText(store.isClanVisible()) + "]", PADDING_X, y, statusColor(store.isClanVisible()));
         y += mc.font.lineHeight + ROW_GAP;
-        context.drawString(mc.font, "Players [" + statusText(store.isPlayersVisible()) + "]", PADDING_X, y, statusColor(store.isPlayersVisible()));
+        context.text(mc.font, "Players [" + statusText(store.isPlayersVisible()) + "]", PADDING_X, y, statusColor(store.isPlayersVisible()));
         y += mc.font.lineHeight + ROW_GAP;
-        context.drawString(mc.font, "Pets [" + store.getPetsVisibility().displayName() + "]", PADDING_X, y, petsStatusColor(store.getPetsVisibility()));
+        context.text(mc.font, "Pets [" + store.getPetsVisibility().displayName() + "]", PADDING_X, y, petsStatusColor(store.getPetsVisibility()));
     }
 
-    private void renderCompact(GuiGraphics context, Minecraft mc) {
+    private void renderCompact(GuiGraphicsExtractor context, Minecraft mc) {
         int x = PADDING_X;
         x = drawCompactSegment(context, mc, x, "Cl [" + compactStatus(store.isClanVisible()) + "]", statusColor(store.isClanVisible()));
         x += SEGMENT_GAP;
@@ -137,8 +137,8 @@ public class VisibilityStatusWidget extends AbstractWidget {
         drawCompactSegment(context, mc, x, "Pt [" + store.getPetsVisibility().compactName() + "]", petsStatusColor(store.getPetsVisibility()));
     }
 
-    private int drawCompactSegment(GuiGraphics context, Minecraft mc, int x, String text, int color) {
-        context.drawString(mc.font, text, x, PADDING_Y, color);
+    private int drawCompactSegment(GuiGraphicsExtractor context, Minecraft mc, int x, String text, int color) {
+        context.text(mc.font, text, x, PADDING_Y, color);
         return x + mc.font.width(text);
     }
 

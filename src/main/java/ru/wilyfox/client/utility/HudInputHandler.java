@@ -29,23 +29,27 @@ public final class HudInputHandler {
     }
 
     private void toggleEditor(Minecraft client) {
-        if (client.screen instanceof HudEditingScreen) {
-            client.setScreen(null);
+        if (client.gui.screen() instanceof HudEditingScreen) {
+            client.gui.setScreen(null);
             hudRenderer.setEditing(false);
             return;
         }
 
         hudRenderer.setEditing(true);
-        client.setScreen(new HudEditingScreen(hudRenderer));
+        client.gui.setScreen(new HudEditingScreen(hudRenderer));
     }
 
     private void toggleSettings(Minecraft client) {
         hudRenderer.toggleSettings();
 
         if (hudRenderer.isSettingsOpen()) {
-            client.setScreen(new HudEditingScreen(hudRenderer));
+            hudRenderer.setEditing(false);
+            // Replacing the editor invokes removed(), which would clear the settings flag.
+            if (!(client.gui.screen() instanceof HudEditingScreen)) {
+                client.gui.setScreen(new HudEditingScreen(hudRenderer));
+            }
         } else {
-            client.setScreen(null);
+            client.gui.setScreen(null);
         }
     }
 }

@@ -14,7 +14,7 @@ public final class DwPotionTypesDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int count = DwProtocolCodec.readVarInt(buf);
+            int count = DwProtocolCodec.readCollectionSize(buf);
             List<DwPotionTypeEntry> entries = new ArrayList<>(Math.max(4, count));
 
             for (int i = 0; i < count; i++) {

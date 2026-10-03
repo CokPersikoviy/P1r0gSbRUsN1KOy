@@ -14,7 +14,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -33,9 +32,20 @@ public final class BossShareService {
     private static final int FORMAT_VERSION = 1;
     private static final int MAX_CHAT_LENGTH = 240;
     private static final long SEND_INTERVAL_MS = 1_000L;
+    private static final int MAX_INCOMING_PARTS = 32;
+    private static final int MAX_ENCODED_PAYLOAD_LENGTH = 8_192;
+    private static final int MAX_DECOMPRESSED_PAYLOAD_LENGTH = 65_536;
+    private static final int MAX_SHARED_BOSSES = 512;
+    private static final long INCOMING_TTL_MS = 30_000L;
 
     private static BossRepository repository;
-    private static final Map<String, IncomingShareBuffer> incomingShares = new HashMap<>();
+    private static final MultipartChatMessageAssembler incomingShares = new MultipartChatMessageAssembler(
+            64,
+            MAX_INCOMING_PARTS,
+            MAX_CHAT_LENGTH,
+            MAX_ENCODED_PAYLOAD_LENGTH,
+            INCOMING_TTL_MS
+    );
     private static boolean initialized = false;
 
     private BossShareService() {
@@ -78,7 +88,7 @@ public final class BossShareService {
         }
 
         if (addToHistory && minecraft.gui != null) {
-            minecraft.gui.getChat().addRecentChat(normalized);
+            minecraft.gui.hud.getChat().addRecentChat(normalized);
         }
 
         String targetName = normalized.length() > COMMAND.length()
@@ -126,23 +136,28 @@ public final class BossShareService {
             return false;
         }
 
-        String sender = extractSender(text);
+        String sender = ChatProtocolRoute.extractIncomingSender(text, TOKEN_PREFIX);
         String shareId = matcher.group(1);
-        int partIndex = Integer.parseInt(matcher.group(2));
-        int totalParts = Integer.parseInt(matcher.group(3));
+        int partIndex = parsePositiveInt(matcher.group(2));
+        int totalParts = parsePositiveInt(matcher.group(3));
         String payloadPart = matcher.group(4);
-
-        String bufferKey = (sender == null ? "unknown" : sender.toLowerCase(Locale.ROOT)) + ":" + shareId;
-        IncomingShareBuffer buffer = incomingShares.computeIfAbsent(bufferKey, ignored -> new IncomingShareBuffer(totalParts, sender));
-        buffer.put(partIndex, payloadPart);
-
-        if (!buffer.isComplete()) {
+        if (partIndex < 1 || totalParts < 1) {
             return true;
         }
 
-        incomingShares.remove(bufferKey);
+        MultipartChatMessageAssembler.Result assembled = incomingShares.accept(
+                sender,
+                shareId,
+                partIndex,
+                totalParts,
+                payloadPart,
+                System.currentTimeMillis()
+        );
+        if (assembled.status() != MultipartChatMessageAssembler.Status.COMPLETE) {
+            return true;
+        }
 
-        Map<Integer, Long> sharedTimers = decodeBosses(buffer.joinedPayload());
+        Map<Integer, Long> sharedTimers = decodeBosses(assembled.payload());
         if (sharedTimers.isEmpty()) {
             showLocalMessage("Не удалось импортировать таймеры боссов.");
             return true;
@@ -156,10 +171,10 @@ public final class BossShareService {
             repository.upsert(bossName, now + remainingMillis);
         }
 
-        if (buffer.sender == null || buffer.sender.isBlank()) {
+        if (sender == null || sender.isBlank()) {
             showLocalMessage("Импортировано таймеров боссов: " + sharedTimers.size() + ".");
         } else {
-            showLocalMessage("Импортировано таймеров боссов от " + buffer.sender + ": " + sharedTimers.size() + ".");
+            showLocalMessage("Импортировано таймеров боссов от " + sender + ": " + sharedTimers.size() + ".");
         }
 
         return true;
@@ -224,7 +239,7 @@ public final class BossShareService {
         }
     }
 
-    private static Map<Integer, Long> decodeBosses(String payload) {
+    static Map<Integer, Long> decodeBosses(String payload) {
         try {
             byte[] compressed = Base64.getUrlDecoder().decode(payload);
             byte[] raw = inflate(compressed);
@@ -237,9 +252,12 @@ public final class BossShareService {
                 }
 
                 int count = buf.readVarInt();
+                if (count < 0 || count > MAX_SHARED_BOSSES) {
+                    return Map.of();
+                }
                 Map<Integer, Long> decoded = new LinkedHashMap<>();
 
-                for (int i = 0; i < count && buf.isReadable(); i++) {
+                for (int i = 0; i < count; i++) {
                     int level = buf.readVarInt();
                     long remainingMillis = buf.readVarInt() * 1000L;
                     if (level > 0 && remainingMillis > 0L) {
@@ -273,19 +291,37 @@ public final class BossShareService {
 
     private static byte[] inflate(byte[] compressed) throws Exception {
         Inflater inflater = new Inflater();
-        inflater.setInput(compressed);
+        try {
+            inflater.setInput(compressed);
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream(compressed.length * 2);
-        byte[] buffer = new byte[256];
-        while (!inflater.finished()) {
-            int read = inflater.inflate(buffer);
-            if (read == 0 && inflater.needsInput()) {
-                break;
+            ByteArrayOutputStream output = new ByteArrayOutputStream(Math.min(compressed.length * 2, 4_096));
+            byte[] buffer = new byte[256];
+            while (!inflater.finished()) {
+                int read = inflater.inflate(buffer);
+                if (read == 0) {
+                    if (inflater.needsInput()) {
+                        throw new IllegalArgumentException("Boss share compressed stream is truncated");
+                    }
+                    throw new IllegalArgumentException("Boss share inflater made no progress");
+                }
+                if (output.size() + read > MAX_DECOMPRESSED_PAYLOAD_LENGTH) {
+                    throw new IllegalArgumentException("Boss share payload exceeds decompressed size limit");
+                }
+                output.write(buffer, 0, read);
             }
-            output.write(buffer, 0, read);
+            return output.toByteArray();
+        } finally {
+            inflater.end();
         }
-        inflater.end();
-        return output.toByteArray();
+    }
+
+    private static int parsePositiveInt(String value) {
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed > 0 ? parsed : -1;
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
     }
 
     private static String resolveBossName(int level) {
@@ -302,76 +338,11 @@ public final class BossShareService {
         return "Boss [" + level + "]";
     }
 
-    private static String extractSender(String text) {
-        int tokenIndex = text.indexOf(TOKEN_PREFIX);
-        if (tokenIndex <= 0) {
-            return null;
-        }
-
-        String prefix = text.substring(0, tokenIndex).trim();
-        int pipeIndex = prefix.indexOf('|');
-        if (pipeIndex >= 0) {
-            prefix = prefix.substring(pipeIndex + 1).trim();
-        }
-
-        prefix = prefix.replace("» Я", "")
-                .replace("Я:", "")
-                .replace(":", "")
-                .trim();
-
-        String[] parts = prefix.split("\\s+");
-        for (int i = parts.length - 1; i >= 0; i--) {
-            String candidate = parts[i].replaceAll("[^A-Za-z0-9_]", "");
-            if (!candidate.isBlank()) {
-                return candidate;
-            }
-        }
-
-        return null;
-    }
-
     private static void showLocalMessage(String message) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.gui != null) {
-            minecraft.gui.getChat().addMessage(Component.literal(message));
+            minecraft.gui.hud.getChat().addClientSystemMessage(Component.literal(message));
         }
     }
 
-    private static final class IncomingShareBuffer {
-        private final int totalParts;
-        private final String sender;
-        private final String[] parts;
-
-        private IncomingShareBuffer(int totalParts, String sender) {
-            this.totalParts = Math.max(1, totalParts);
-            this.sender = sender;
-            this.parts = new String[this.totalParts];
-        }
-
-        private void put(int partIndex, String payloadPart) {
-            if (partIndex <= 0 || partIndex > totalParts) {
-                return;
-            }
-
-            parts[partIndex - 1] = payloadPart;
-        }
-
-        private boolean isComplete() {
-            for (String part : parts) {
-                if (part == null) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private String joinedPayload() {
-            StringBuilder builder = new StringBuilder();
-            for (String part : parts) {
-                builder.append(part);
-            }
-            return builder.toString();
-        }
-    }
 }

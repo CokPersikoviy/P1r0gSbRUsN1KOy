@@ -1,10 +1,8 @@
 package ru.wilyfox.client.clan;
 
-import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
@@ -23,7 +21,7 @@ public final class ClanSiegeMapRenderer {
                 && DiamondWorldProtocolClient.getClanSiegePosition().isAvailable();
     }
 
-    public static int render(GuiGraphics graphics, Minecraft minecraft, int left, int top, int size,
+    public static int render(GuiGraphicsExtractor graphics, Minecraft minecraft, int left, int top, int size,
                              float zoom, boolean rotate) {
         if (!canRender(minecraft)) {
             return 0;
@@ -32,13 +30,13 @@ public final class ClanSiegeMapRenderer {
         DwClanSiegePosition position = DiamondWorldProtocolClient.getClanSiegePosition();
         int renderedTiles = 0;
         graphics.enableScissor(left, top, left + size, top + size);
-        graphics.pose().pushPose();
-        graphics.pose().translate(left + size / 2.0F, top + size / 2.0F, 0.0F);
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(left + size / 2.0F, top + size / 2.0F);
         if (rotate && minecraft.player != null) {
-            graphics.pose().mulPose(Axis.ZP.rotationDegrees(180.0F - minecraft.player.getYRot()));
+            graphics.pose().rotate((float) Math.toRadians(180.0F - minecraft.player.getYRot()));
         }
-        graphics.pose().scale(zoom, zoom, 1.0F);
-        graphics.pose().translate(COMPOSITE_CENTER - position.x(), COMPOSITE_CENTER - position.y(), 0.0F);
+        graphics.pose().scale(zoom, zoom);
+        graphics.pose().translate(COMPOSITE_CENTER - position.x(), COMPOSITE_CENTER - position.y());
 
         for (int index = 0; index < ClanSiegeMap.TILE_COUNT; index++) {
             MapId mapId = new MapId(ClanSiegeMap.FIRST_MAP_ID + index);
@@ -47,11 +45,11 @@ public final class ClanSiegeMapRenderer {
                 continue;
             }
 
-            ResourceLocation texture = minecraft.getMapTextureManager().prepareMapTexture(mapId, mapData);
+            Identifier texture = minecraft.getMapTextureManager().prepareMapTexture(mapId, mapData);
             int tileX = index % ClanSiegeMap.GRID_SIZE;
             int tileY = index / ClanSiegeMap.GRID_SIZE;
             graphics.blit(
-                    RenderType::guiTextured,
+                    net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
                     texture,
                     tileX * TILE_SIZE - COMPOSITE_CENTER,
                     tileY * TILE_SIZE - COMPOSITE_CENTER,
@@ -65,7 +63,7 @@ public final class ClanSiegeMapRenderer {
             renderedTiles++;
         }
 
-        graphics.pose().popPose();
+        graphics.pose().popMatrix();
         graphics.disableScissor();
         return renderedTiles;
     }

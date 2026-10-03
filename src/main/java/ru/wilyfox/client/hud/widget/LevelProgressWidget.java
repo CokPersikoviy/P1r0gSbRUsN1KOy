@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
@@ -28,7 +28,7 @@ public class LevelProgressWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -59,15 +59,15 @@ public class LevelProgressWidget extends AbstractWidget {
         int blocksColor = snapshot.blocks() >= snapshot.requiredBlocks() ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_SECONDARY;
         int moneyColor = snapshot.money() >= snapshot.requiredMoney() ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_SECONDARY;
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
-        context.drawString(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
+        context.text(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
         if (!snapshot.maxLevel()) {
-            context.drawString(mc.font, blocksLine, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, blocksColor);
-            context.drawString(mc.font, moneyLine, PADDING_X, PADDING_Y + (mc.font.lineHeight + 2) * 2, moneyColor);
+            context.text(mc.font, blocksLine, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, blocksColor);
+            context.text(mc.font, moneyLine, PADDING_X, PADDING_Y + (mc.font.lineHeight + 2) * 2, moneyColor);
         }
 
         if (showBar) {
@@ -76,7 +76,7 @@ public class LevelProgressWidget extends AbstractWidget {
                     (float) snapshot.progress(), WidgetTheme.BAR_FILL);
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -132,19 +132,19 @@ public class LevelProgressWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Level Progress", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "Waiting for levelinfo", PADDING_X, 16, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Level Progress", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "Waiting for levelinfo", PADDING_X, 16, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     private String formatInt(int value) {

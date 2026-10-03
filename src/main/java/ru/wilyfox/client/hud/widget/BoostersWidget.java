@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.booster.BoosterStore;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
@@ -29,7 +29,7 @@ public final class BoostersWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -66,45 +66,45 @@ public final class BoostersWidget extends AbstractWidget {
         return "Boosters";
     }
 
-    private void renderCompact(GuiGraphics context, Minecraft mc) {
+    private void renderCompact(GuiGraphicsExtractor context, Minecraft mc) {
         List<BoosterView> views = getViews();
         int width = getCompactWidth(mc);
         int height = getCompactHeight(mc);
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
 
         int y = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, "Boosters", PADDING_X, y, WidgetTheme.TITLE);
+            context.text(mc.font, "Boosters", PADDING_X, y, WidgetTheme.TITLE);
             y += mc.font.lineHeight + 4;
         }
 
         for (BoosterView view : views) {
-            context.drawString(mc.font, formatCompactLine(view), PADDING_X, y, WidgetTheme.TEXT_SOFT);
+            context.text(mc.font, formatCompactLine(view), PADDING_X, y, WidgetTheme.TEXT_SOFT);
             y += mc.font.lineHeight + ROW_GAP;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
-    private void renderDetailed(GuiGraphics context, Minecraft mc) {
+    private void renderDetailed(GuiGraphicsExtractor context, Minecraft mc) {
         List<BoosterView> views = getViews();
         int width = getDetailedWidth(mc);
         int height = getDetailedHeight(mc);
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
 
         int contentY = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, "Boosters", PADDING_X, contentY, WidgetTheme.TITLE);
+            context.text(mc.font, "Boosters", PADDING_X, contentY, WidgetTheme.TITLE);
             contentY += mc.font.lineHeight + 4;
         }
 
@@ -115,24 +115,24 @@ public final class BoostersWidget extends AbstractWidget {
             x += columnWidth + COLUMN_GAP;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
-    private void renderDetailedColumn(GuiGraphics context, Minecraft mc, BoosterView view, int x, int y, int width) {
+    private void renderDetailedColumn(GuiGraphicsExtractor context, Minecraft mc, BoosterView view, int x, int y, int width) {
         BoosterStore.Snapshot snapshot = view.snapshot();
-        context.drawString(mc.font, view.label() + " x" + formatMultiplier(snapshot.totalMultiplier()), x, y, WidgetTheme.TEXT_PRIMARY);
+        context.text(mc.font, view.label() + " x" + formatMultiplier(snapshot.totalMultiplier()), x, y, WidgetTheme.TEXT_PRIMARY);
         y += mc.font.lineHeight + 2;
 
         if (snapshot.entries().isEmpty()) {
-            context.drawString(mc.font, "No active boosts", x, y, WidgetTheme.TEXT_MUTED);
+            context.text(mc.font, "No active boosts", x, y, WidgetTheme.TEXT_MUTED);
             return;
         }
 
         for (BoosterStore.Entry entry : snapshot.entries()) {
             String left = "Active x" + formatMultiplier(entry.multiplier());
             String right = formatRemaining(entry.remainingMillis());
-            context.drawString(mc.font, left, x, y, WidgetTheme.TEXT_SOFT);
-            context.drawString(mc.font, right, x + width - mc.font.width(right), y, WidgetTheme.TEXT_SECONDARY);
+            context.text(mc.font, left, x, y, WidgetTheme.TEXT_SOFT);
+            context.text(mc.font, right, x + width - mc.font.width(right), y, WidgetTheme.TEXT_SECONDARY);
             y += mc.font.lineHeight + 1;
         }
     }
@@ -199,7 +199,7 @@ public final class BoostersWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
     private static String kindLabel(BoosterStore.Kind kind) {

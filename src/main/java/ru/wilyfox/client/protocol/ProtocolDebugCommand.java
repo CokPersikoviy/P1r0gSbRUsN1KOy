@@ -24,7 +24,7 @@ public final class ProtocolDebugCommand {
 
         Minecraft minecraft = Minecraft.getInstance();
         if (addToHistory && minecraft.gui != null) {
-            minecraft.gui.getChat().addRecentChat(normalized);
+            minecraft.gui.hud.getChat().addRecentChat(normalized);
         }
 
         String args = normalized.length() > COMMAND.length()
@@ -53,7 +53,7 @@ public final class ProtocolDebugCommand {
     private static void showLocalMessage(String message) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.gui != null) {
-            minecraft.gui.getChat().addMessage(Component.literal("[FH Protocol] " + message));
+            minecraft.gui.hud.getChat().addClientSystemMessage(Component.literal("[FH Protocol] " + message));
         }
     }
 }

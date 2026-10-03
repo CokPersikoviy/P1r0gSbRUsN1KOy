@@ -14,11 +14,7 @@ import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.fishing.FishingSpotTracker;
 import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.profiler.ProfilerScopeStack;
-import net.minecraft.client.Camera;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.state.BlockState;
+
 
 import java.util.HashSet;
 import java.util.Set;
@@ -44,23 +40,13 @@ public class ParticleEngineMixin {
         froghelper$particleTickScopes.closeLatest();
     }
 
-    @Inject(method = "render", at = @At("HEAD"))
-    private void froghelper$beginParticleRender(
-            Camera camera,
-            float partialTick,
-            MultiBufferSource.BufferSource bufferSource,
-            CallbackInfo ci
-    ) {
+    @Inject(method = "extract", at = @At("HEAD"))
+    private void froghelper$beginParticleRender(CallbackInfo ci) {
         froghelper$particleRenderScopes.push(ModProfiler.getInstance().scope("render/particles/frame"));
     }
 
-    @Inject(method = "render", at = @At("RETURN"))
-    private void froghelper$endParticleRender(
-            Camera camera,
-            float partialTick,
-            MultiBufferSource.BufferSource bufferSource,
-            CallbackInfo ci
-    ) {
+    @Inject(method = "extract", at = @At("RETURN"))
+    private void froghelper$endParticleRender(CallbackInfo ci) {
         froghelper$particleRenderScopes.closeLatest();
     }
 
@@ -74,20 +60,6 @@ public class ParticleEngineMixin {
 
         if (tracker.shouldDebugParticles()) {
             logUnknownFishingParticle(tracker.getCurrentFishingLocationId(), particleOptions, x, y, z);
-        }
-    }
-
-    @Inject(method = "destroy", at = @At("HEAD"), cancellable = true)
-    private void froghelper$hideDestroyParticles(BlockPos blockPos, BlockState blockState, CallbackInfo ci) {
-        if (ConfigManager.get().render.hideBlockBreakParticles) {
-            ci.cancel();
-        }
-    }
-
-    @Inject(method = "crack", at = @At("HEAD"), cancellable = true)
-    private void froghelper$hideCrackParticles(BlockPos blockPos, Direction direction, CallbackInfo ci) {
-        if (ConfigManager.get().render.hideBlockBreakParticles) {
-            ci.cancel();
         }
     }
 

@@ -25,8 +25,8 @@ public final class WorldToScreen {
             return null;
         }
 
-        Camera camera = mc.gameRenderer.getMainCamera();
-        Vec3 cameraPos = camera.getPosition();
+        Camera camera = mc.gameRenderer.mainCamera();
+        Vec3 cameraPos = camera.position();
         Vec3 relative = worldPos.subtract(cameraPos);
 
         Vector3f cameraSpace = new Vector3f(

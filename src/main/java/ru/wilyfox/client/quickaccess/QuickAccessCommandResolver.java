@@ -39,7 +39,7 @@ public final class QuickAccessCommandResolver {
                 && entityHitResult.getEntity() instanceof Player player
                 && minecraft.player != null
                 && player != minecraft.player) {
-            return player.getGameProfile().getName();
+            return player.getGameProfile().name();
         }
 
         return null;
@@ -64,7 +64,7 @@ public final class QuickAccessCommandResolver {
     public static void showMissingTargetFeedback() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.gui != null) {
-            minecraft.gui.getChat().addMessage(Component.literal("No target player under crosshair."));
+            minecraft.gui.hud.getChat().addClientSystemMessage(Component.literal("No target player under crosshair."));
         }
     }
 }

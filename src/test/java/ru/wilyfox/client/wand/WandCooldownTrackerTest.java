@@ -18,8 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WandCooldownTrackerTest {
     @BeforeAll
     static void bootstrapMinecraft() {
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
+        ru.wilyfox.MinecraftTestBootstrap.initialize();
     }
 
     @Test

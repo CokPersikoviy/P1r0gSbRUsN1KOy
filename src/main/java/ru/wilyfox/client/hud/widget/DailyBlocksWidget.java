@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
@@ -17,7 +17,7 @@ public final class DailyBlocksWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -25,13 +25,13 @@ public final class DailyBlocksWidget extends AbstractWidget {
         Minecraft minecraft = Minecraft.getInstance();
         String text = getText();
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0.0F);
-        context.pose().scale(scale, scale, 1.0F);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
-        context.drawString(minecraft.font, text, 0, 0, WidgetTheme.TEXT_SOFT, true);
+        context.text(minecraft.font, text, 0, 0, WidgetTheme.TEXT_SOFT, true);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -47,7 +47,7 @@ public final class DailyBlocksWidget extends AbstractWidget {
     @Override
     public boolean isVisible() {
         return ConfigManager.get().dailyBlocks.active
-                && (store.getSnapshot().available() || Minecraft.getInstance().screen instanceof HudEditingScreen);
+                && (store.getSnapshot().available() || Minecraft.getInstance().gui.screen() instanceof HudEditingScreen);
     }
 
     @Override

@@ -12,19 +12,19 @@ import ru.wilyfox.client.profiler.ModProfiler;
 
 @Mixin(Connection.class)
 public class ConnectionMixin {
-    @Inject(method = "channelRead0", at = @At("HEAD"))
+    @Inject(method = "channelRead0(Lio/netty/channel/ChannelHandlerContext;Lnet/minecraft/network/protocol/Packet;)V", at = @At("HEAD"))
     private void froghelper$trackEstimatedTps(ChannelHandlerContext context, Packet<?> packet, CallbackInfo ci) {
         EstimatedTpsMonitor.onClientboundPacket(packet);
         ModProfiler.getInstance().recordNetworkPacket("clientbound", packet);
     }
 
     @Inject(
-            method = "send(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketSendListener;Z)V",
+            method = "send(Lnet/minecraft/network/protocol/Packet;Lio/netty/channel/ChannelFutureListener;Z)V",
             at = @At("HEAD")
     )
     private void froghelper$trackServerboundPacket(
             Packet<?> packet,
-            net.minecraft.network.PacketSendListener listener,
+            io.netty.channel.ChannelFutureListener listener,
             boolean flush,
             CallbackInfo ci
     ) {

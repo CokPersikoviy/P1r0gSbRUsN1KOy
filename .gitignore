@@ -4,7 +4,6 @@
 build/
 out/
 classes/
-build.gradle
 
 # eclipse
 
@@ -28,13 +27,39 @@ bin/
 # macos
 
 *.DS_Store
+Thumbs.db
+Desktop.ini
 
 # fabric
 
 run/
 
+# local service documentation
+
+/docs/
+
+# logs and temporary files
+
+/logs/
+*.log
+*.log.gz
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*~
+
+# local environment settings
+
+.env
+.env.*
+!.env.example
+!.env.sample
+
 # java
 
+*.class
 hs_err_*.log
 replay_*.log
 *.hprof

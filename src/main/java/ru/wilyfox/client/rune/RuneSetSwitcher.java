@@ -5,18 +5,14 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
 import org.lwjgl.glfw.GLFW;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.RunesBagConfig;
 import ru.wilyfox.client.profiler.ModProfiler;
-import ru.wilyfox.utils.Formatting;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public final class RuneSetSwitcher {
@@ -72,7 +68,7 @@ public final class RuneSetSwitcher {
     }
 
     private static boolean matches(KeyMapping mapping, int keyCode, int scanCode) {
-        return mapping.matches(keyCode, scanCode);
+        return mapping.matches(new net.minecraft.client.input.KeyEvent(keyCode, scanCode, 0));
     }
 
     private static int matchDirectSelection(int keyCode, int scanCode) {
@@ -144,7 +140,7 @@ public final class RuneSetSwitcher {
             return false;
         }
 
-        gameMode.handleInventoryMouseClick(menu.containerId, slotIndex, 0, ClickType.PICKUP, client.player);
+        gameMode.handleContainerInput(menu.containerId, slotIndex, 0, ContainerInput.PICKUP, client.player);
         return true;
     }
 
@@ -175,26 +171,6 @@ public final class RuneSetSwitcher {
     }
 
     private static List<String> getLoreLines(ItemStack stack) {
-        Minecraft client = Minecraft.getInstance();
-        if (client.player == null) {
-            return List.of();
-        }
-
-        // NORMAL only — ADVANCED adds the registry-id/durability lines that pollute lore-marker matching.
-        List<Component> tooltip = stack.getTooltipLines(
-                Item.TooltipContext.of(client.player.level()),
-                client.player,
-                TooltipFlag.NORMAL
-        );
-
-        List<String> lines = new ArrayList<>();
-        for (int i = 1; i < tooltip.size(); i++) {
-            String line = Formatting.stripMinecraftFormatting(tooltip.get(i).getString()).trim();
-            if (!line.isEmpty()) {
-                lines.add(line);
-            }
-        }
-
-        return lines;
+        return ItemLoreReader.read(stack);
     }
 }

@@ -2,8 +2,8 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.Hud;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.bridge.ScoreboardSidebarAccessor;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
@@ -19,12 +19,12 @@ public class ScoreboardWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
 
-        Gui gui = Minecraft.getInstance().gui;
+        Hud gui = Minecraft.getInstance().gui.hud;
         if (gui instanceof ScoreboardSidebarAccessor accessor) {
             if (!inited) {
                 initialize(accessor);
@@ -39,19 +39,25 @@ public class ScoreboardWidget extends AbstractWidget {
                 return;
             }
 
-            context.pose().pushPose();
-            context.pose().translate(startX, startY, 0);
-            context.pose().scale(getScale(), getScale(), 1.0f);
+            context.pose().pushMatrix();
+            context.pose().translate(startX, startY);
+            context.pose().scale(getScale(), getScale());
 
             accessor.froghelper$renderAt(context, 0, 0);
 
-            context.pose().popPose();
+            context.pose().popMatrix();
         }
     }
 
     private void initialize(ScoreboardSidebarAccessor accessor) {
         if (getConfigKey() != null && ConfigManager.getWidgetLayout(getConfigKey()) != null) {
             inited = true;
+            return;
+        }
+
+        // Opening the editor before the first sidebar packet should not pin the
+        // widget to the accessor's still-uninitialized (0, 0) fallback.
+        if (accessor.froghelper$getRenderedWidth() <= 0 || accessor.froghelper$getRenderedHeight() <= 0) {
             return;
         }
 
@@ -67,7 +73,7 @@ public class ScoreboardWidget extends AbstractWidget {
 
     @Override
     public int getWidth() {
-        Gui gui = Minecraft.getInstance().gui;
+        Hud gui = Minecraft.getInstance().gui.hud;
         if (gui instanceof ScoreboardSidebarAccessor accessor) {
             int width = accessor.froghelper$getRenderedWidth();
             if (width > 0) {
@@ -80,7 +86,7 @@ public class ScoreboardWidget extends AbstractWidget {
 
     @Override
     public int getHeight() {
-        Gui gui = Minecraft.getInstance().gui;
+        Hud gui = Minecraft.getInstance().gui.hud;
         if (gui instanceof ScoreboardSidebarAccessor accessor) {
             int height = accessor.froghelper$getRenderedHeight();
             if (height > 0) {
@@ -97,11 +103,11 @@ public class ScoreboardWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
     private boolean hasRenderedScoreboard() {
-        Gui gui = Minecraft.getInstance().gui;
+        Hud gui = Minecraft.getInstance().gui.hud;
         if (gui instanceof ScoreboardSidebarAccessor accessor) {
             return accessor.froghelper$getRenderedWidth() > 0 && accessor.froghelper$getRenderedHeight() > 0;
         }
@@ -109,16 +115,16 @@ public class ScoreboardWidget extends AbstractWidget {
         return false;
     }
 
-    private void renderPlaceholder(GuiGraphics context) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(getScale(), getScale(), 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(getScale(), getScale());
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(Minecraft.getInstance().font, "Scoreboard", 6, 6, WidgetTheme.TITLE);
-        context.drawString(Minecraft.getInstance().font, "Sidebar hidden", 6, 16, WidgetTheme.TEXT_MUTED);
+        context.text(Minecraft.getInstance().font, "Scoreboard", 6, 6, WidgetTheme.TITLE);
+        context.text(Minecraft.getInstance().font, "Sidebar hidden", 6, 16, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 }
 

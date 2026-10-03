@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.item.ItemStack;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
@@ -33,7 +33,7 @@ public class ActivePetsWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -52,24 +52,24 @@ public class ActivePetsWidget extends AbstractWidget {
 
         int lineStep = Math.max(ICON_SIZE, mc.font.lineHeight) + LINE_GAP;
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, getUnscaledWidth(), getUnscaledHeight());
 
         int y = PADDING_Y;
         if (WidgetUtils.showWidgetTitles()) {
-            context.drawString(mc.font, "Active Pets", PADDING_X, y, WidgetTheme.TITLE);
+            context.text(mc.font, "Active Pets", PADDING_X, y, WidgetTheme.TITLE);
             y += lineStep + 2;
         }
 
         for (ActivePetInfo pet : pets) {
             ItemStack icon = pet.icon();
             if (!icon.isEmpty()) {
-                context.renderItem(icon, PADDING_X, y);
+                context.item(icon, PADDING_X, y);
             }
-            context.drawString(
+            context.text(
                     mc.font,
                     formatPetLine(pet),
                     PADDING_X + ICON_SIZE + ICON_TEXT_GAP,
@@ -79,7 +79,7 @@ public class ActivePetsWidget extends AbstractWidget {
             y += lineStep;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -130,19 +130,19 @@ public class ActivePetsWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Active Pets", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No active pets", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Active Pets", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No active pets", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     private String formatPetLine(ActivePetInfo pet) {

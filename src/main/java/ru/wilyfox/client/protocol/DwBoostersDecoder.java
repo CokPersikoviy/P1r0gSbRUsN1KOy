@@ -23,12 +23,12 @@ public final class DwBoostersDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int groupCount = DwProtocolCodec.readVarInt(buf);
+            int groupCount = DwProtocolCodec.readCollectionSize(buf);
             Map<BoosterStore.Kind, List<BoosterStore.ProtocolEntry>> boosters = new EnumMap<>(BoosterStore.Kind.class);
 
             for (int i = 0; i < groupCount; i++) {
                 RemoteKind remoteKind = RemoteKind.values()[DwProtocolCodec.readVarInt(buf)];
-                int entryCount = DwProtocolCodec.readVarInt(buf);
+                int entryCount = DwProtocolCodec.readCollectionSize(buf);
                 List<BoosterStore.ProtocolEntry> entries = new ArrayList<>(Math.max(0, entryCount));
 
                 for (int j = 0; j < entryCount; j++) {

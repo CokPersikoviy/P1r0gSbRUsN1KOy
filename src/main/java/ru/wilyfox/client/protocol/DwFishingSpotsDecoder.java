@@ -14,7 +14,7 @@ public final class DwFishingSpotsDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int count = DwProtocolCodec.readVarInt(buf);
+            int count = DwProtocolCodec.readCollectionSize(buf);
             Map<String, String> locations = new LinkedHashMap<>(Math.max(4, count));
 
             for (int i = 0; i < count; i++) {

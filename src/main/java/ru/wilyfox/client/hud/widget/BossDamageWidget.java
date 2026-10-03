@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.boss.BossDamageInfo;
 import ru.wilyfox.client.boss.BossDamageStore;
 import ru.wilyfox.client.hud.HudEditingScreen;
@@ -28,7 +28,7 @@ public class BossDamageWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!isVisible()) {
             return;
         }
@@ -50,15 +50,15 @@ public class BossDamageWidget extends AbstractWidget {
         int width = getUnscaledWidth(bossText, damageText);
         int height = getUnscaledHeight();
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPanel(context, width, height);
-        context.drawString(mc.font, bossText, PADDING_X, PADDING_Y, WidgetTheme.TEXT_PRIMARY);
-        context.drawString(mc.font, damageText, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, WidgetTheme.TEXT_ACCENT);
+        context.text(mc.font, bossText, PADDING_X, PADDING_Y, WidgetTheme.TEXT_PRIMARY);
+        context.text(mc.font, damageText, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, WidgetTheme.TEXT_ACCENT);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -109,19 +109,19 @@ public class BossDamageWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
-    private void renderPlaceholder(GuiGraphics context, Minecraft mc) {
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0);
-        context.pose().scale(scale, scale, 1.0f);
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.drawString(mc.font, "Boss Damage", PADDING_X, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No recent hit", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Boss Damage", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No recent hit", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 }
 

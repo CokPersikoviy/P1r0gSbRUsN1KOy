@@ -269,7 +269,11 @@ public final class HudSnapLayoutEngine {
         }
 
         String key = widget.getConfigKey();
-        if (key == null || !visiting.add(key)) {
+        if (key == null) {
+            return;
+        }
+        if (!visiting.add(key)) {
+            widget.clearWidgetSnap();
             return;
         }
 
@@ -281,7 +285,9 @@ public final class HudSnapLayoutEngine {
         }
 
         applyStoredWidgetSnap(host, target, widgetByKey, visiting);
-        applyWidgetSnapPosition(widget, target, widget.getSnapOwnCorner(), widget.getSnapTargetCorner());
+        if (widget.hasWidgetSnap()) {
+            applyWidgetSnapPosition(widget, target, widget.getSnapOwnCorner(), widget.getSnapTargetCorner());
+        }
         visiting.remove(key);
     }
 
@@ -348,10 +354,11 @@ public final class HudSnapLayoutEngine {
         String childKey = child.getConfigKey();
         AbstractWidget current = parent;
         Set<String> visited = new HashSet<>();
-        while (current != null && current.hasWidgetSnap() && visited.add(current.getConfigKey())) {
-            if (current.getConfigKey().equals(childKey)) {
+        while (current != null) {
+            if (java.util.Objects.equals(current.getConfigKey(), childKey) || !visited.add(current.getConfigKey())) {
                 return true;
             }
+            if (!current.hasWidgetSnap()) return false;
             current = findAbstractWidget(current.getSnapTargetKey());
         }
         return false;

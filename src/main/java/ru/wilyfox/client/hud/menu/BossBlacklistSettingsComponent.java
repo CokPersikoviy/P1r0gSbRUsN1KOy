@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.boss.BossBlacklist;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
@@ -34,7 +34,7 @@ public final class BossBlacklistSettingsComponent extends SettingsComponent {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY) {
+    public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
         Minecraft minecraft = Minecraft.getInstance();
         Font font = minecraft.font;
         List<DwBossType> types = bossTypes();
@@ -55,13 +55,13 @@ public final class BossBlacklistSettingsComponent extends SettingsComponent {
         }
 
         int textY = y + (HEADER_HEIGHT - font.lineHeight) / 2;
-        graphics.drawString(font, label, x + 8, textY, headerHovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_PRIMARY);
+        graphics.text(font, label, x + 8, textY, headerHovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_PRIMARY);
 
         String summary = hiddenCount + " hidden";
         int expandX = x + width - 14;
         int summaryX = expandX - 8 - font.width(summary);
-        graphics.drawString(font, summary, summaryX, textY, hiddenCount > 0 ? WidgetTheme.STATUS_ERROR : WidgetTheme.TEXT_MUTED);
-        graphics.drawCenteredString(font, expanded ? "-" : "+", expandX, textY, headerHovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_SECONDARY);
+        graphics.text(font, summary, summaryX, textY, hiddenCount > 0 ? WidgetTheme.STATUS_ERROR : WidgetTheme.TEXT_MUTED);
+        graphics.centeredText(font, expanded ? "-" : "+", expandX, textY, headerHovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_SECONDARY);
 
         if (!expanded) {
             return;
@@ -78,7 +78,7 @@ public final class BossBlacklistSettingsComponent extends SettingsComponent {
                 3,
                 clearHovered ? WidgetTheme.PANEL_BG : WidgetTheme.BAR_BG
         );
-        graphics.drawCenteredString(
+        graphics.centeredText(
                 font,
                 "Show all bosses",
                 x + width / 2,
@@ -141,7 +141,7 @@ public final class BossBlacklistSettingsComponent extends SettingsComponent {
     }
 
     private void renderBossRow(
-            GuiGraphics graphics,
+            GuiGraphicsExtractor graphics,
             Font font,
             DwBossType type,
             int rowY,
@@ -162,7 +162,7 @@ public final class BossBlacklistSettingsComponent extends SettingsComponent {
         graphics.fill(checkX, checkY, checkX + 1, checkY + checkSize, checkColor);
         graphics.fill(checkX + checkSize - 1, checkY, checkX + checkSize, checkY + checkSize, checkColor);
         if (hidden) {
-            graphics.drawCenteredString(font, "x", checkX + checkSize / 2, checkY + 1, WidgetTheme.HARD_ACCENT);
+            graphics.centeredText(font, "x", checkX + checkSize / 2, checkY + 1, WidgetTheme.HARD_ACCENT);
         }
 
         String level = type.level() > 0 ? "[" + type.level() + "]" : "[?]";
@@ -177,8 +177,8 @@ public final class BossBlacklistSettingsComponent extends SettingsComponent {
 
         int baseline = rowY + (ROW_HEIGHT - font.lineHeight) / 2;
         int textColor = hidden ? WidgetTheme.STATUS_ERROR : (hovered ? WidgetTheme.TITLE : WidgetTheme.TEXT_PRIMARY);
-        graphics.drawString(font, name, nameX, baseline, textColor);
-        graphics.drawString(font, level, levelX, baseline, hidden ? WidgetTheme.HARD_ACCENT : WidgetTheme.TEXT_SECONDARY);
+        graphics.text(font, name, nameX, baseline, textColor);
+        graphics.text(font, level, levelX, baseline, hidden ? WidgetTheme.HARD_ACCENT : WidgetTheme.TEXT_SECONDARY);
     }
 
     private static List<DwBossType> bossTypes() {

@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.internal.HudFrameClock;
@@ -50,7 +50,7 @@ public class WandCooldownWidget extends AbstractWidget {
     }
 
     @Override
-    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
         if (!ConfigManager.get().wandCooldown.active) {
             return;
         }
@@ -66,9 +66,9 @@ public class WandCooldownWidget extends AbstractWidget {
             return;
         }
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0.0f);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         int width = getUnscaledWidth(entries.size(), numericMode);
         int height = getUnscaledHeight(entries.size(), numericMode);
@@ -81,7 +81,7 @@ public class WandCooldownWidget extends AbstractWidget {
         int x = 0;
         for (WandCooldownEntry entry : entries) {
             if (numericMode) {
-                context.renderItem(entry.stack(), x + (slotWidth - 16) / 2, ITEM_OFFSET);
+                context.item(entry.stack(), x + (slotWidth - 16) / 2, ITEM_OFFSET);
 
                 long remainingMillis = Math.max(0L, entry.endsAt() - now);
                 String remaining = formatNumericCooldown(remainingMillis);
@@ -89,11 +89,11 @@ public class WandCooldownWidget extends AbstractWidget {
                 int textColor = remainingMillis <= 1_000L
                         ? WidgetTheme.HARD_ACCENT
                         : WidgetTheme.TEXT_SECONDARY;
-                context.drawString(minecraft.font, remaining, textX,
+                context.text(minecraft.font, remaining, textX,
                         SLOT_SIZE + NUMERIC_TEXT_GAP, textColor, false);
             } else {
                 context.fill(x, SLOT_SIZE - BAR_HEIGHT, x + SLOT_SIZE, SLOT_SIZE, WidgetTheme.BAR_BG);
-                context.renderItem(entry.stack(), x + ITEM_OFFSET, ITEM_OFFSET);
+                context.item(entry.stack(), x + ITEM_OFFSET, ITEM_OFFSET);
 
                 int fillWidth = Math.max(0, Math.min(SLOT_SIZE, Math.round(SLOT_SIZE * entry.progress())));
                 if (fillWidth > 0) {
@@ -104,7 +104,7 @@ public class WandCooldownWidget extends AbstractWidget {
             x += slotWidth + GAP;
         }
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 
     @Override
@@ -174,24 +174,24 @@ public class WandCooldownWidget extends AbstractWidget {
     }
 
     private boolean isEditorPreview() {
-        return Minecraft.getInstance().screen instanceof HudEditingScreen;
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
     }
 
-    private void renderPlaceholder(GuiGraphics context) {
+    private void renderPlaceholder(GuiGraphicsExtractor context) {
         Minecraft mc = Minecraft.getInstance();
 
-        context.pose().pushPose();
-        context.pose().translate(startX, startY, 0.0f);
-        context.pose().scale(scale, scale, 1.0f);
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
         if (!ConfigManager.get().wandCooldown.numericCooldown) {
             context.fill(0, SLOT_SIZE - BAR_HEIGHT, EMPTY_WIDTH, SLOT_SIZE, WidgetTheme.BAR_BG);
         }
 
-        context.drawString(mc.font, "Wand Cooldowns", 6, 6, WidgetTheme.TITLE);
-        context.drawString(mc.font, "No active wands", 6, 14, WidgetTheme.TEXT_MUTED);
+        context.text(mc.font, "Wand Cooldowns", 6, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No active wands", 6, 14, WidgetTheme.TEXT_MUTED);
 
-        context.pose().popPose();
+        context.pose().popMatrix();
     }
 }

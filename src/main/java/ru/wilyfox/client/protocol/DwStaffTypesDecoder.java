@@ -14,7 +14,7 @@ public final class DwStaffTypesDecoder {
         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.wrappedBuffer(data));
 
         try {
-            int count = DwProtocolCodec.readVarInt(buf);
+            int count = DwProtocolCodec.readCollectionSize(buf);
             Map<Integer, DwStaffType> types = new LinkedHashMap<>();
 
             for (int index = 0; index < count; index++) {
