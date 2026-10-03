@@ -1,1 +1,13 @@
-{"key.categories.froghelper.main": "FrogHelper"}
+{
+  "key.categories.froghelper.main": "FrogHelper",
+  "Social": "Players online with FrogHelper",
+  "screen.froghelper.online": "FrogHelper online",
+  "screen.froghelper.online_count": "FrogHelper online: %s",
+  "social.froghelper.waiting": "Waiting for DW login",
+  "social.froghelper.disabled": "Socials disabled",
+  "social.froghelper.empty": "No players online",
+  "social.froghelper.online": "Online",
+  "social.froghelper.renewing": "Waiting for renewed DW login",
+  "social.froghelper.unavailable": "Backend unavailable",
+  "social.froghelper.connecting": "Connecting"
+}

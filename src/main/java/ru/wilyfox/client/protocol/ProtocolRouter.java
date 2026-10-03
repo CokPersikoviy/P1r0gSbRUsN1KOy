@@ -55,7 +55,7 @@ final class ProtocolRouter {
             case "marketcd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleNamedCooldown(state, "marketcd", "Market", body), state);
             case "gourmetcd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleGourmetCooldown(state, body), state);
             case "potioncd" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handlePotionCooldowns(state, body), state);
-            case "token" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleToken(body), state);
+            case "token" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleToken(state, body), state);
             case "boosters" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleBoosters(state, body), state);
             case "gameevent" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleGameEvent(state, body), state);
             case "claninfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleClanInfo(state, body), state);

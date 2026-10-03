@@ -4,16 +4,15 @@ import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.Test;
 import ru.wilyfox.client.clan.PlayerClanChatParser;
 import ru.wilyfox.client.moduser.ModUserBadge;
-import ru.wilyfox.client.moduser.ModUserStorage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ChatMessageSanitizerTest {
     @Test
-    void removesDisplayBadgeAndTransportMarker() {
-        Component decorated = ModUserBadge.prefix(Component.literal("C Fox: hello" + ModUserStorage.MARKER));
+    void removesDisplayBadgeButPreservesOrdinaryUserText() {
+        Component decorated = ModUserBadge.prefix(Component.literal("C Fox: helloⒻ"));
 
-        assertEquals("C Fox: hello", ChatMessageSanitizer.forLogic(decorated).getString());
+        assertEquals("C Fox: helloⒻ", ChatMessageSanitizer.forLogic(decorated).getString());
     }
 
     @Test

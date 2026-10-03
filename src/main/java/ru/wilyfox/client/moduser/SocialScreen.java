@@ -5,6 +5,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
+import ru.wilyfox.client.keybinds.KeyBinds;
 import ru.wilyfox.client.hud.config.WidgetChrome;
 import ru.wilyfox.client.hud.widget.HudBlur;
 import ru.wilyfox.client.hud.widget.HudSurface;
@@ -13,7 +14,7 @@ import ru.wilyfox.client.profiler.ModProfiler;
 
 import java.util.List;
 
-/** Displays players discovered to be using FrogHelper. */
+/** Displays players currently online with FrogHelper in this game region. */
 public class SocialScreen extends Screen {
     private static final int PANEL_WIDTH = 264;
     private static final int PANEL_PADDING = 14;
@@ -28,7 +29,7 @@ public class SocialScreen extends Screen {
     private int scroll;
 
     public SocialScreen() {
-        super(Component.literal("Social"));
+        super(Component.translatable("screen.froghelper.online"));
     }
 
     @Override
@@ -46,8 +47,9 @@ public class SocialScreen extends Screen {
     }
 
     private void layout() {
-        int count = ModUserStorage.knownCount();
-        visibleRows = Math.max(1, Math.min(count, MAX_VISIBLE_ROWS));
+        int count = PresenceStore.knownCount();
+        int availableRows = Math.max(1, (height - HEADER_HEIGHT - PANEL_PADDING - 24) / ROW_HEIGHT);
+        visibleRows = Math.max(1, Math.min(count, Math.min(MAX_VISIBLE_ROWS, availableRows)));
         panelHeight = HEADER_HEIGHT + visibleRows * ROW_HEIGHT + PANEL_PADDING;
         panelX = (width - PANEL_WIDTH) / 2;
         panelY = (height - panelHeight) / 2;
@@ -63,18 +65,18 @@ public class SocialScreen extends Screen {
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("ui/SocialScreen/render")) {
             layout();
             Minecraft minecraft = Minecraft.getInstance();
-            List<String> names = ModUserStorage.knownDisplayNames();
+            List<String> names = PresenceStore.knownDisplayNames();
 
             graphics.fill(0, 0, width, height, WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0x66));
             HudBlur.beginFrame(graphics);
             HudSurface.drawPanel(graphics, panelX, panelY, PANEL_WIDTH, panelHeight, WidgetChrome.FROST, HudSurface.nativeRenderer());
-            graphics.text(minecraft.font, ModUserBadge.prefix(Component.literal("FrogHelper users")),
+            graphics.text(minecraft.font, ModUserBadge.prefix(Component.translatable("screen.froghelper.online_count", names.size())),
                     panelX + PANEL_PADDING, panelY + 10, WidgetTheme.TITLE);
             graphics.fill(panelX + PANEL_PADDING, panelY + HEADER_HEIGHT - 6,
                     panelX + PANEL_WIDTH - PANEL_PADDING, panelY + HEADER_HEIGHT - 5, WidgetTheme.ACCENT_LINE);
 
             if (names.isEmpty()) {
-                graphics.text(minecraft.font, "No users discovered",
+                graphics.text(minecraft.font, Component.translatable(BackendSocialClient.statusText()),
                         panelX + PANEL_PADDING, panelY + HEADER_HEIGHT + 4, WidgetTheme.TEXT_MUTED);
                 return;
             }
@@ -111,14 +113,13 @@ public class SocialScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         scroll -= (int) Math.signum(scrollY);
-        clampScroll(ModUserStorage.knownCount());
+        clampScroll(PresenceStore.knownCount());
         return true;
     }
 
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
-        int keyCode = event.key(), scanCode = event.scancode(), modifiers = event.modifiers();
-        if (keyCode == GLFW.GLFW_KEY_C || keyCode == GLFW.GLFW_KEY_ESCAPE) {
+        if (KeyBinds.SOCIAL.matches(event) || event.key() == GLFW.GLFW_KEY_ESCAPE) {
             onClose();
             return true;
         }

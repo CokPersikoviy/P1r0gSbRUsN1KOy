@@ -442,6 +442,15 @@ final class HudSettingsFeatureSections {
         componentsByCategory.get(SettingsCategory.FISHING).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
+                        "Pet experience in inventory",
+                        () -> ConfigManager.get().fishing.showPetExperienceOverlay,
+                        value -> ConfigManager.get().fishing.showPetExperienceOverlay = value
+                )
+        );
+
+        componentsByCategory.get(SettingsCategory.FISHING).add(
+                new ToggleSettingsComponent(
+                        0, 0, 0, 0,
                         "Show markers",
                         () -> ConfigManager.get().fishing.showFishingMarkers,
                         value -> ConfigManager.get().fishing.showFishingMarkers = value

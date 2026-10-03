@@ -3,7 +3,6 @@ package ru.wilyfox.client.chat;
 import net.minecraft.network.chat.Component;
 import ru.wilyfox.client.clan.PlayerClanStorage;
 import ru.wilyfox.client.combo.ComboTimerChatTracker;
-import ru.wilyfox.client.moduser.ModUserProtocol;
 import ru.wilyfox.client.profiler.ModProfiler;
 
 import java.util.function.BooleanSupplier;
@@ -37,9 +36,6 @@ public final class IncomingChatHandler {
         // Service messages must be consumed before ordinary chat consumers publish popups
         // or interpret their encoded text as a player message.
         if (test("bossShare", () -> BossShareService.handleIncomingShare(logicalComponent))) {
-            return true;
-        }
-        if (test("modUserProtocol", () -> ModUserProtocol.handleIncoming(logicalComponent))) {
             return true;
         }
 

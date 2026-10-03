@@ -22,8 +22,8 @@ import ru.wilyfox.client.chat.ChatDispatchQueue;
 import ru.wilyfox.client.clan.PlayerClanStorage;
 import ru.wilyfox.client.highlight.UsefulWorldHighlightRenderHook;
 import ru.wilyfox.client.hud.fishing.FishingSpotTracker;
-import ru.wilyfox.client.moduser.ModUserProtocol;
-import ru.wilyfox.client.moduser.ModUserStorage;
+import ru.wilyfox.client.moduser.BackendSocialClient;
+import ru.wilyfox.client.moduser.PresenceStore;
 import ru.wilyfox.client.popup.PopUpManager;
 import ru.wilyfox.mixin.LevelRendererAccessorMixin;
 import ru.wilyfox.mixin.MapTextureManagerAccessorMixin;
@@ -380,7 +380,7 @@ final class ProfilerDiagnostics {
     private static FrogHelperSnapshot captureFrogHelper() {
         try {
             ChatDispatchQueue.DebugSnapshot chatQueue = ChatDispatchQueue.getDebugSnapshot();
-            ModUserProtocol.DebugSnapshot social = ModUserProtocol.diagnosticSnapshot();
+            BackendSocialClient.DebugSnapshot social = BackendSocialClient.diagnosticSnapshot();
             UsefulWorldHighlightRenderHook.DiagnosticSnapshot highlight =
                     UsefulWorldHighlightRenderHook.diagnosticSnapshot();
             return new FrogHelperSnapshot(
@@ -390,10 +390,10 @@ final class ProfilerDiagnostics {
                     chatQueue.size(),
                     BoosterChatDebug.diagnosticMessageCount(),
                     BossShareService.diagnosticPendingShareCount(),
-                    ModUserStorage.knownCount(),
-                    social.incomingBuffers(),
-                    social.pairedPlayers(),
-                    social.acknowledgedPlayers(),
+                    PresenceStore.knownCount(),
+                    social.bufferedCharacters(),
+                    social.connected(),
+                    social.requestPending(),
                     PlayerClanStorage.diagnosticEntryCount(),
                     highlight.cachedBoxes(),
                     highlight.blockBoxes(),
@@ -629,9 +629,9 @@ final class ProfilerDiagnostics {
             int boosterDebugMessages,
             int pendingBossShares,
             int knownModUsers,
-            int socialIncomingBuffers,
-            int socialPairedPlayers,
-            int socialAcknowledgedPlayers,
+            int socialBufferedCharacters,
+            int socialConnected,
+            int socialRequestPending,
             int clanEntries,
             int highlightCachedBoxes,
             int highlightBlockBoxes,

@@ -883,9 +883,10 @@ final class ProtocolPayloadHandlers {
         }
     }
 
-    static boolean handleToken(byte[] data) {
+    static boolean handleToken(ProtocolState state, byte[] data) {
         try {
             DwTokenPacket packet = DwTokenDecoder.decode(data);
+            state.gameToken = packet.value();
             info(
                     LOGGER,
                     "DW protocol: token parsed successfully, present={}, length={}",

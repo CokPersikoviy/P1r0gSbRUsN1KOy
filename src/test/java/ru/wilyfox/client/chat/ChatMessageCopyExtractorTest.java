@@ -10,7 +10,6 @@ import net.minecraft.util.FormattedCharSequence;
 import org.joml.Matrix3x2f;
 import org.junit.jupiter.api.Test;
 import ru.wilyfox.client.moduser.ModUserBadge;
-import ru.wilyfox.client.moduser.ModUserStorage;
 
 import java.util.List;
 
@@ -59,7 +58,7 @@ class ChatMessageCopyExtractorTest {
     @Test
     void fullMessageCopyPreservesDisplayedTextExceptFrogMarkers() {
         String message = "[12:34:56] [Clan] [VIP] Fox: hello\u00A0world";
-        String displayed = ModUserBadge.prefix(Component.literal(message + ModUserStorage.MARKER)).getString();
+        String displayed = ModUserBadge.prefix(Component.literal(message)).getString();
 
         assertEquals(message, ChatMessageCopyExtractor.selectCopiedText(
                 ChatMessageSanitizer.forLogic(displayed),

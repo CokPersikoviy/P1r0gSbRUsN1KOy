@@ -87,7 +87,9 @@ public abstract class AbstractContainerScreenMixin {
         }
     }
 
-    @Inject(method = "extractRenderState", at = @At("TAIL"))
+    // Recipe-book screens (including survival inventory) call extractContents
+    // directly in 26.2, bypassing AbstractContainerScreen.extractRenderState.
+    @Inject(method = "extractContents", at = @At("TAIL"))
     private void froghelper$renderRuneSetEffect(GuiGraphicsExtractor context, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("ui/containerOverlay/render")) {
             froghelper$renderContainerOverlays(context);
@@ -134,7 +136,8 @@ public abstract class AbstractContainerScreenMixin {
         }
 
         // Player inventory: only the pet-experience plate (rune buffs moved to the rune bag).
-        if (!RuneSetEffectOverlay.isPlayerInventoryScreen(screen)) {
+        if (!ru.wilyfox.client.hud.config.ConfigManager.get().fishing.showPetExperienceOverlay
+                || !RuneSetEffectOverlay.isPlayerInventoryScreen(screen)) {
             return;
         }
 

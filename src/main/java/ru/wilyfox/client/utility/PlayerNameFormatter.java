@@ -6,7 +6,7 @@ import ru.wilyfox.client.clan.PlayerClanNameFormatter;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.RenderConfig;
 import ru.wilyfox.client.moduser.ModUserBadge;
-import ru.wilyfox.client.moduser.ModUserStorage;
+import ru.wilyfox.client.moduser.PresenceStore;
 
 /** Keeps TAB and world nametags consistent without changing player identity. */
 public final class PlayerNameFormatter {
@@ -15,12 +15,10 @@ public final class PlayerNameFormatter {
     public static Component apply(Component serverName, String playerName) {
         RenderConfig config = ConfigManager.get().render;
         Component result = baseName(serverName, playerName, config.cleanPlayerNames);
-        if (config.cleanPlayerNames) {
-            return result;
+        if (!config.cleanPlayerNames) {
+            result = PlayerClanNameFormatter.apply(result, playerName);
         }
-
-        result = PlayerClanNameFormatter.apply(result, playerName);
-        if (config.modUserBadge && ModUserStorage.isKnown(playerName)) {
+        if (config.modUserBadge && PresenceStore.isKnown(playerName)) {
             result = ModUserBadge.prefix(result);
         }
         return result;

@@ -30,6 +30,10 @@ public final class DiamondWorldProtocolClient {
     private DiamondWorldProtocolClient() {
     }
 
+    public static String getGameToken() {
+        return STATE.gameToken;
+    }
+
     public static void init() {
         ProtocolTransport.init(STATE, ROUTER);
     }

@@ -23,7 +23,6 @@ import ru.wilyfox.client.combo.ComboTimerChatTracker;
 import ru.wilyfox.client.dungeon.DungeonDecorationHighlightRenderHook;
 import ru.wilyfox.client.dungeon.DungeonMapTracker;
 import ru.wilyfox.client.discord.DiscordRpcService;
-import ru.wilyfox.client.discord.JoinWebhookNotifier;
 import ru.wilyfox.client.effect.ActiveEffectStore;
 import ru.wilyfox.client.event.ClientEntityEventHandler;
 import ru.wilyfox.client.highlight.UsefulWorldHighlightRenderHook;
@@ -152,8 +151,7 @@ public class Client {
         AutoBossAnnouncer.bindRepository(repository);
         AutoBossAnnouncer.register();
         PlayerClanStorage.init();
-        ru.wilyfox.client.moduser.ModUserStorage.init();
-        ru.wilyfox.client.moduser.ModUserProtocol.init();
+        ru.wilyfox.client.moduser.BackendSocialClient.init();
         PopUpEventNotifier.getInstance().bindBossRepository(repository);
         PopUpEventNotifier.getInstance().bindAbilityCooldownStore(abilityCooldownStore);
         PopUpEventNotifier.getInstance().bindActiveMinersStore(activeMinersStore);
@@ -185,7 +183,6 @@ public class Client {
         DiscordRpcService.bindComboProgressStore(comboProgressStore);
         DiscordRpcService.bindBossDamageStore(bossDamageStore);
         DiscordRpcService.register();
-        JoinWebhookNotifier.register();
         final Identifier FrogHelperLayer = Identifier.fromNamespaceAndPath(MOD_ID, "hud-froghelper-layer");
         final Identifier FrogHelperSettingsLayer = Identifier.fromNamespaceAndPath(MOD_ID, "hud-froghelper-settings-layer");
 

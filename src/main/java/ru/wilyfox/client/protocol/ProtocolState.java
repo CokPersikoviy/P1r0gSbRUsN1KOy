@@ -22,6 +22,7 @@ import java.util.Set;
 final class ProtocolState {
     static final int PAYLOAD_SAMPLE_LIMIT_PER_SUBCHANNEL = 3;
 
+    String gameToken; // Memory only; never included in diagnostics or persisted.
     boolean initialized;
     boolean loggedFirstMinerPayload;
     boolean receivedEvoPlusPayload;
@@ -68,6 +69,7 @@ final class ProtocolState {
     Map<Integer, DwHourlyQuestProgress> hourlyQuestProgress = new LinkedHashMap<>();
 
     void resetRuntimeState() {
+        gameToken = null;
         worldContextRevision++;
         gameLocationRevision++;
         receivedEvoPlusPayload = false;

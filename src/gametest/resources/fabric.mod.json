@@ -4,6 +4,18 @@
   "version": "1.0.0",
   "name": "FrogHelper migration smoke tests",
   "environment": "client",
-  "entrypoints": {"fabric-client-gametest": ["ru.wilyfox.MigrationClientTest", "ru.wilyfox.HudDragClientTest", "ru.wilyfox.HudBlurClientTest", "ru.wilyfox.DungeonMapClientTest"]},
-  "depends": {"froghelper": "*", "fabric-client-gametest-api-v1": "*"}
+  "entrypoints": {
+    "fabric-client-gametest": [
+      "ru.wilyfox.MigrationClientTest",
+      "ru.wilyfox.HudDragClientTest",
+      "ru.wilyfox.HudBlurClientTest",
+      "ru.wilyfox.DungeonMapClientTest",
+      "ru.wilyfox.client.moduser.SocialClientTest",
+      "ru.wilyfox.client.moduser.SocialBackendClientTest"
+    ]
+  },
+  "depends": {
+    "froghelper": "*",
+    "fabric-client-gametest-api-v1": "*"
+  }
 }

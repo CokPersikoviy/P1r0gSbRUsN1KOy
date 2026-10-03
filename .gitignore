@@ -38,6 +38,15 @@ run/
 
 /docs/
 
+# local backend and Go sources
+
+/backend/
+*.go
+go.mod
+go.sum
+go.work
+go.work.sum
+
 # logs and temporary files
 
 /logs/

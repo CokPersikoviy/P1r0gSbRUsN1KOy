@@ -1111,7 +1111,7 @@ public final class ModProfiler {
         appendLongTrend(markdown, "FH booster debug messages", samples, sample -> sample.frogHelper().boosterDebugMessages());
         appendLongTrend(markdown, "FH pending boss shares", samples, sample -> sample.frogHelper().pendingBossShares());
         appendLongTrend(markdown, "FH known mod users", samples, sample -> sample.frogHelper().knownModUsers());
-        appendLongTrend(markdown, "FH social incoming buffers", samples, sample -> sample.frogHelper().socialIncomingBuffers());
+        appendLongTrend(markdown, "FH social buffered characters", samples, sample -> sample.frogHelper().socialBufferedCharacters());
         appendLongTrend(markdown, "FH clan entries", samples, sample -> sample.frogHelper().clanEntries());
         appendLongTrend(markdown, "FH highlight cached boxes", samples, sample -> sample.frogHelper().highlightCachedBoxes());
         appendLongTrend(markdown, "FH highlight cached chunks", samples, sample -> sample.frogHelper().highlightCachedChunks());
@@ -1239,7 +1239,7 @@ public final class ModProfiler {
         appendContextRow(markdown, "Booster debug messages", Integer.toString(state.boosterDebugMessages()));
         appendContextRow(markdown, "Pending boss shares", Integer.toString(state.pendingBossShares()));
         appendContextRow(markdown, "Known mod users", Integer.toString(state.knownModUsers()));
-        appendContextRow(markdown, "Social incoming / paired / acked", state.socialIncomingBuffers() + " / " + state.socialPairedPlayers() + " / " + state.socialAcknowledgedPlayers());
+        appendContextRow(markdown, "Social buffered chars / connected / request pending", state.socialBufferedCharacters() + " / " + state.socialConnected() + " / " + state.socialRequestPending());
         appendContextRow(markdown, "Player clan entries", Integer.toString(state.clanEntries()));
         appendContextRow(markdown, "Highlight boxes block / entity / merged", state.highlightBlockBoxes() + " / " + state.highlightEntityBoxes() + " / " + state.highlightCachedBoxes());
         appendContextRow(markdown, "Highlight chunks cached / dirty / pending", state.highlightCachedChunks() + " / " + state.highlightDirtyChunks() + " / " + state.highlightPendingChunkScans());
@@ -1410,7 +1410,7 @@ public final class ModProfiler {
                 + ", chatQ=" + state.chatQueue()
                 + ", boosterDebug=" + state.boosterDebugMessages()
                 + ", shares=" + state.pendingBossShares()
-                + ", socialIn=" + state.socialIncomingBuffers()
+                + ", socialIn=" + state.socialBufferedCharacters()
                 + ", highlightBoxes=" + state.highlightCachedBoxes()
                 + ", highlightChunks=" + state.highlightCachedChunks()
                 + ", highlightDirty=" + state.highlightDirtyBlockPositions();

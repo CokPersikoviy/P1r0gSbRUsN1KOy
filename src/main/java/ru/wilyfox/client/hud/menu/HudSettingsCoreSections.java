@@ -4,7 +4,7 @@ import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.PotionRecipeVisibility;
 import ru.wilyfox.client.hud.config.SellerCooldownFilter;
 import ru.wilyfox.client.hud.config.WidgetChrome;
-import ru.wilyfox.client.moduser.ModUserProtocol;
+import ru.wilyfox.client.moduser.BackendSocialClient;
 
 import java.util.List;
 import java.util.Map;
@@ -32,7 +32,7 @@ final class HudSettingsCoreSections {
                 value -> ConfigManager.get().render.cleanPlayerNames = value);
         toggle(items, "FrogHelper Badge On Nametags", () -> ConfigManager.get().render.modUserBadge,
                 value -> ConfigManager.get().render.modUserBadge = value);
-        toggle(items, "Socials", () -> ConfigManager.get().render.modUserMesh, ModUserProtocol::setSocialsEnabled);
+        toggle(items, "Socials", () -> ConfigManager.get().render.socialsEnabled, BackendSocialClient::setSocialsEnabled);
         toggle(items, "Hide block particles", () -> ConfigManager.get().render.hideBlockBreakParticles,
                 value -> ConfigManager.get().render.hideBlockBreakParticles = value);
         toggle(items, "Hide lightning", () -> ConfigManager.get().render.hideLightningEffect,
