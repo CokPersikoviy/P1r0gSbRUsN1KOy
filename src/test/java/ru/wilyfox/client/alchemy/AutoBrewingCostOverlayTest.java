@@ -20,6 +20,8 @@ class AutoBrewingCostOverlayTest {
     @Test
     void parsesPriceOnlyAfterEvoPlusPriceMarker() {
         assertEquals(125, AutoBrewingCostOverlay.parsePrice("\u041a\u0443\u043f\u0438\u0442\u044c \u0437\u0430 125 \u043c\u043e\u043d\u0435\u0442"));
+        assertEquals(125, AutoBrewingCostOverlay.parsePrice("Buy for 125 coins"));
+        assertEquals(125, AutoBrewingCostOverlay.parsePrice("Buy for\u00a0125 coins"));
         assertNull(AutoBrewingCostOverlay.parsePrice("\u0426\u0435\u043d\u0430: 125"));
     }
 }

@@ -2,6 +2,10 @@ package ru.wilyfox.boss;
 
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
+import ru.wilyfox.client.protocol.BossTypeCatalog;
+import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
+import ru.wilyfox.client.protocol.DwBossType;
+import ru.wilyfox.utils.BossLevel;
 import ru.wilyfox.utils.BossName;
 import ru.wilyfox.utils.Formatting;
 
@@ -62,9 +66,10 @@ public class BossTracker {
             }
 
             String raw = entity.getCustomName().getString();
-            String clean = Formatting.sanitize(raw);
-
-            String bossName = BossName.getBossName(clean);
+            String bossName = BossName.getBossName(raw);
+            if (bossName == null) {
+                bossName = BossName.resolveRegistryName(raw, BossTypeCatalog.snapshot());
+            }
             if (bossName != null) {
                 pendingBossName = bossName;
                 it.remove();
@@ -86,8 +91,11 @@ public class BossTracker {
         if (pendingBossName != null && pendingBossTimeMillis != null) {
             info(LOGGER, "COMMIT boss={}, time={}", pendingBossName, pendingBossTimeMillis);
 
-            long respawnAt = Instant.now().toEpochMilli() + pendingBossTimeMillis;
-            respawnAt = ((respawnAt + 999) / 1000) * 1000;
+            int level = java.util.Objects.requireNonNullElse(BossLevel.getBossLevel(pendingBossName), 0);
+            DwBossType type = BossTypeCatalog.resolve(new BossInfo(pendingBossName, 0L, level));
+            long duration = BossTimerMath.adjustDurationMillis(pendingBossTimeMillis,
+                    DiamondWorldProtocolClient.isMythicalEventActive(), type != null && type.raid());
+            long respawnAt = Instant.now().toEpochMilli() + duration;
             repository.upsert(pendingBossName, respawnAt);
 
             info(LOGGER, "Bosses size={}", repository.getAll().size());

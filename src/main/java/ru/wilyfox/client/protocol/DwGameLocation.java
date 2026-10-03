@@ -177,7 +177,7 @@ public record DwGameLocation(String id) {
     }
 
     public boolean isAlchemy() {
-        return normalizedId().equals("alchemy");
+        return normalizedId().startsWith("alchemy");
     }
 
     public boolean isSiege() {

@@ -51,6 +51,7 @@ public final class ProtocolGraphTelemetry {
         registerRoute("gourmetcd", "DwCooldownValueDecoder", "handleGourmetCooldown", outputs(store("abilityCooldownStore"), widget("AbilityCooldownWidget")));
         registerRoute("potioncd", "DwPotionCooldownsDecoder", "handlePotionCooldowns", outputs(store("potionStore"), widget("PotionTimersWidget")));
         registerRoute("token", "DwTokenDecoder", "handleToken", outputs(state("token")));
+        registerRoute("dungeonpos", "DwDungeonPositionDecoder", "handleDungeonPosition", outputs(state("dungeonPosition"), widget("DungeonMapWidget")));
         registerRoute("boosters", "DwBoostersDecoder", "handleBoosters", outputs(store("boosterStore"), widget("BoostersWidget")));
         registerRoute("gameevent", "DwGameEventDecoder", "handleGameEvent", outputs(state("currentGameEvent")));
         registerRoute("claninfo", "DwClanInfoDecoder", "handleClanInfo", outputs(state("clanInfo")));

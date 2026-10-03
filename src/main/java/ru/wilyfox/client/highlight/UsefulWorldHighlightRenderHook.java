@@ -804,7 +804,7 @@ public final class UsefulWorldHighlightRenderHook {
         }
     }
 
-    private enum HighlightBlockType {
+    enum HighlightBlockType {
         GOLDEN_SHARD(1.0F, 0.79F, 0.16F),
         DIAMOND_SHARD(0.20F, 0.85F, 1.0F),
         BASE_LUCKY_BLOCK(1.0F, 0.92F, 0.15F),
@@ -843,7 +843,7 @@ public final class UsefulWorldHighlightRenderHook {
             };
         }
 
-        private static HighlightBlockType from(BlockState blockState, BlockEntity blockEntity) {
+        static HighlightBlockType from(BlockState blockState, BlockEntity blockEntity) {
             // All block scans are already gated on the mine location by refreshBlockCacheIfNeeded.
             if (blockState.getBlock() instanceof PlayerHeadBlock || blockState.getBlock() instanceof PlayerWallHeadBlock) {
                 String texture = readSkullTextureValue(blockEntity);
@@ -874,15 +874,15 @@ public final class UsefulWorldHighlightRenderHook {
 
             NoteBlockInstrument instrument = blockState.getValue(NoteBlock.INSTRUMENT);
             int note = blockState.getValue(NoteBlock.NOTE);
-            boolean powered = blockState.getValue(NoteBlock.POWERED);
-            if (instrument != NoteBlockInstrument.FLUTE || powered) {
+            if (instrument != NoteBlockInstrument.FLUTE) {
                 return null;
             }
 
+            // Both powered states are the same barrel; powering only starts its detonation.
             return switch (note) {
-                case 21, 22 -> NORMAL_BARREL;
-                case 18, 19 -> NETHER_BARREL;
-                case 16, 17 -> END_BARREL;
+                case 19 -> NORMAL_BARREL;
+                case 18 -> NETHER_BARREL;
+                case 17 -> END_BARREL;
                 default -> null;
             };
         }

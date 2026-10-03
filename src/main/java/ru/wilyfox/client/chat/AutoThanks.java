@@ -6,9 +6,12 @@ import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.utils.Formatting;
 
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 public final class AutoThanks {
     private static final long COMMAND_COOLDOWN_MS = 3_000L;
+    private static final Pattern ENGLISH_BOOSTER = Pattern.compile("activated the global .*booster");
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     private static long lastSentAt = 0L;
 
@@ -20,7 +23,7 @@ public final class AutoThanks {
             return;
         }
 
-        if (!isGlobalBoosterActivation(component)) {
+        if (!isGlobalBoosterActivation(component.getString())) {
             return;
         }
 
@@ -38,10 +41,12 @@ public final class AutoThanks {
         lastSentAt = now;
     }
 
-    private static boolean isGlobalBoosterActivation(Component component) {
-        String normalized = Formatting.stripMinecraftFormatting(component.getString())
-                .replace(' ', ' ')
-                .replaceAll("\\s+", " ")
+    static boolean isGlobalBoosterActivation(String text) {
+        if (text == null) {
+            return false;
+        }
+        String normalized = WHITESPACE.matcher(Formatting.stripMinecraftFormatting(text).replace('\u00A0', ' '))
+                .replaceAll(" ")
                 .trim()
                 .toLowerCase(Locale.ROOT);
 
@@ -57,7 +62,8 @@ public final class AutoThanks {
 
         // Match tolerantly instead of anchoring on a bare ASCII nickname: real broadcasts carry
         // rank/clan prefixes and Cyrillic that the previous "^[\\w\\s]+ ..." regex never accepted.
-        return normalized.contains("активирова") // активирова(л/ла)
+        return ENGLISH_BOOSTER.matcher(normalized).find()
+                || normalized.contains("активирова") // активирова(л/ла)
                 && normalized.contains("глобальн")            // глобальн(ый/ого)
                 && normalized.contains("буст");                                   // буст(ер)
     }

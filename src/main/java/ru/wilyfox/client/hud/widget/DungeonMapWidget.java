@@ -7,6 +7,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import ru.wilyfox.client.dungeon.DungeonMapTracker;
+import ru.wilyfox.client.dungeon.DungeonMapRenderer;
 import ru.wilyfox.client.clan.ClanSiegeMapRenderer;
 import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.config.ConfigManager;
@@ -17,8 +18,6 @@ public final class DungeonMapWidget extends AbstractWidget {
     private static final int OUTER_SIZE = 132;
     private static final int MAP_SIZE = 128;
     private static final int MAP_DRAW_OFFSET = 2;
-    private static final float MAP_UV_OFFSET = 1.0F;
-    private static final int MAP_UV_SIZE = 126;
 
     public DungeonMapWidget(int x, int y, HudLayer layer) {
         super(x, y, layer);
@@ -71,20 +70,10 @@ public final class DungeonMapWidget extends AbstractWidget {
 
         HudSurface.drawPanel(context, OUTER_SIZE, OUTER_SIZE);
 
-        context.blit(
-                net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                texture,
-                MAP_DRAW_OFFSET,
-                MAP_DRAW_OFFSET,
-                MAP_UV_OFFSET,
-                MAP_UV_OFFSET,
-                MAP_SIZE,
-                MAP_SIZE,
-                MAP_UV_SIZE,
-                MAP_UV_SIZE,
-                128,
-                128
-        );
+        var config = ConfigManager.get().dungeonMap;
+        DungeonMapRenderer.render(context, texture, MAP_DRAW_OFFSET, MAP_DRAW_OFFSET,
+                DiamondWorldProtocolClient.getDungeonPosition(), config.anchorDungeonMap, config.rotateDungeonMap,
+                config.dungeonZoomPercent, mc.player != null ? mc.player.getYRot() : 180f);
 
         context.pose().popMatrix();
     }

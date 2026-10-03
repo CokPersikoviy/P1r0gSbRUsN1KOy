@@ -190,81 +190,18 @@ final class ProtocolPayloadSupport {
         return Optional.of(result);
     }
 
-    // Abilities that DO NOT lock rune-set swapping when used (their runes read "не накладывает КД смены
-    // сета рун"). Matched by protocol id (confirmed from device logs) OR by a display-name fragment via
-    // abilityTypes, so abilities whose id we couldn't confirm still resolve by their in-game name.
-    private static final Set<String> SWAP_CD_EXEMPT_IDS =
-            Set.of("SERAPHIM", "ILLUSIONER", "TURTLE", "PHOENIX");
-    private static final Set<String> SWAP_CD_EXEMPT_NAME_FRAGMENTS =
-            Set.of("серафим", "иллюз", "черепах", "феникс", "титан", "божеств", "темпус");
+    // EvoPlus 3.3.2 RuneFeature uses these exact protocol IDs. POSEIDON was added in 3.3.2.
+    private static final Set<String> SWAP_CD_EXEMPT_IDS = Set.of("SERAPHIM", "PHOENIX", "GOD", "POSEIDON");
 
-    private static boolean isSwapCdExempt(ProtocolState state, String abilityId) {
-        if (abilityId != null && SWAP_CD_EXEMPT_IDS.contains(abilityId)) {
-            return true;
-        }
-        String name = resolveAbilityName(state, abilityId);
-        if (name == null) {
-            return false;
-        }
-        String lower = name.toLowerCase(Locale.ROOT);
-        for (String fragment : SWAP_CD_EXEMPT_NAME_FRAGMENTS) {
-            if (lower.contains(fragment)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static String resolveAbilityName(ProtocolState state, String abilityId) {
-        if (state == null || state.abilityTypes == null || abilityId == null) {
-            return null;
-        }
-        DwAbilityType type = state.abilityTypes.get(abilityId);
-        if (type != null) {
-            return type.name();
-        }
-        for (DwAbilityType candidate : state.abilityTypes.values()) {
-            if (abilityId.equals(candidate.id())) {
-                return candidate.name();
-            }
-        }
-        return null;
-    }
-
-    static boolean shouldTriggerRuneSetCooldown(ProtocolState state, Map<String, Long> timers, long now) {
+    static boolean shouldTriggerRuneSetCooldown(Map<String, Long> timers) {
         for (Map.Entry<String, Long> entry : timers.entrySet()) {
-            long current = Math.max(0L, entry.getValue());
-            if (current <= 0L) {
-                continue;
-            }
-
-            long previousRemaining = previousAbilityRemaining(state, entry.getKey(), now);
-
-            if (previousRemaining <= 0L || current - previousRemaining > 1_500L) {
-                if (isSwapCdExempt(state, entry.getKey())) {
-                    continue; // this ability's use does not lock rune-set swapping
-                }
+            // An exact whole-second value is the server's trigger, including zero.
+            if (!SWAP_CD_EXEMPT_IDS.contains(entry.getKey()) && entry.getValue() % 1_000L == 0L) {
                 return true;
             }
         }
 
         return false;
-    }
-
-    static long previousAbilityRemaining(ProtocolState state, String id, long now) {
-        ProtocolState.AbilityTimerSample previous = state.abilityTimerHistory.get(id);
-        return previous == null ? 0L : previous.remainingAt(now);
-    }
-
-    static void rememberAbilityTimers(ProtocolState state, Map<String, Long> timers, long now) {
-        state.abilityTimerHistory.values().removeIf(sample -> sample.remainingAt(now) <= 0L);
-        timers.forEach((id, remaining) -> {
-            if (remaining > 0L) {
-                state.abilityTimerHistory.put(id, new ProtocolState.AbilityTimerSample(remaining, now));
-            } else {
-                state.abilityTimerHistory.remove(id);
-            }
-        });
     }
 
     static String formatEnergy(double energy) {

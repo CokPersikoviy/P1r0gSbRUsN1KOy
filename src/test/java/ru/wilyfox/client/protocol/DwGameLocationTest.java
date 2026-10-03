@@ -11,6 +11,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DwGameLocationTest {
     @Test
+    void alchemySubLocationsUse332PrefixClassification() {
+        assertTrue(new DwGameLocation("alchemy").isAlchemy());
+        assertTrue(new DwGameLocation("alchemy_nether").isAlchemy());
+        assertFalse(new DwGameLocation("spawn_alchemy").isAlchemy());
+    }
+
+    @Test
     void classifiesDungeonFamiliesSeparately() {
         DwGameLocation regular = new DwGameLocation("dungeon_forest");
         DwGameLocation procedural = new DwGameLocation("procedural_dungeon_camp");

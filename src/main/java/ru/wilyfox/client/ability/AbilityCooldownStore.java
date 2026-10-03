@@ -9,6 +9,7 @@ import java.util.function.LongSupplier;
 
 public class AbilityCooldownStore {
     private static final long PROTOCOL_DISPLAY_THRESHOLD_MS = 1_000L;
+    private static final long PROTOCOL_TIMER_OFFSET_MS = 600L;
 
     private final Map<String, StoredCooldown> entries = new LinkedHashMap<>();
     private final Map<String, String> names = new LinkedHashMap<>();
@@ -34,7 +35,7 @@ public class AbilityCooldownStore {
             String id = entry.getKey();
             long remainingMillis = entry.getValue();
             if (id != null && !id.isBlank() && remainingMillis > PROTOCOL_DISPLAY_THRESHOLD_MS) {
-                entries.put(id, new StoredCooldown(clock.getAsLong() + remainingMillis, null));
+                entries.put(id, new StoredCooldown(clock.getAsLong() + remainingMillis + PROTOCOL_TIMER_OFFSET_MS, null));
             }
         }
     }

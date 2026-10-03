@@ -45,6 +45,7 @@ final class HudConfigSanitizer {
         if (sanitized.bossDamage == null) sanitized.bossDamage = new BossDamageConfig();
         if (sanitized.visibilityStatus == null) sanitized.visibilityStatus = new VisibilityStatusConfig();
         if (sanitized.dungeonMap == null) sanitized.dungeonMap = new DungeonMapConfig();
+        sanitized.dungeonMap.dungeonZoomPercent = Math.max(100, Math.min(310, sanitized.dungeonMap.dungeonZoomPercent));
         sanitized.dungeonMap.siegeZoomPercent = Math.max(100, Math.min(310, sanitized.dungeonMap.siegeZoomPercent));
         if (sanitized.entityInspect == null) sanitized.entityInspect = new EntityInspectConfig();
         if (sanitized.outgoingChatQueue == null) sanitized.outgoingChatQueue = new OutgoingChatQueueConfig();

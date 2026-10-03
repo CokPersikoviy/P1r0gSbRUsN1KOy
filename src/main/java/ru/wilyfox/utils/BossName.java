@@ -1,10 +1,21 @@
 package ru.wilyfox.utils;
 
+import ru.wilyfox.client.protocol.DwBossType;
+
+import java.text.Normalizer;
+import java.util.Collection;
+import java.util.Locale;
+import java.util.regex.Pattern;
+
 public final class BossName {
+    private static final Pattern MULTIPLICITY = Pattern.compile("[xXхХ×]\\d+");
 
     private BossName() {}
 
     public static String getBossName(String text) {
+        if (text == null) return null;
+        text = Normalizer.normalize(Formatting.sanitize(withoutMultiplicity(text)), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "").toUpperCase(Locale.ROOT);
         switch (text) {
             // Overworld
             case "КРИГЕР" -> {
@@ -55,7 +66,7 @@ public final class BossName {
             case "ГИГАНТ" -> {
                 return  "Гигант";
             }
-            case "БЕССМЕРТНЫИ ЛЕГИОН" -> {
+            case "БЕССМЕРТНЫИ ЛЕГИОН", "КОМАНДИР ЛЕГИОНА" -> {
                 return  "Бессмертный Легион";
             }
             case "БЕЗУМНЫИ АЛХИМИК" -> {
@@ -195,5 +206,31 @@ public final class BossName {
                 return null;
             }
         }
+    }
+
+    /** RU/EN holograms resolve against server IDs and names rather than translations guessed locally. */
+    public static String resolveRegistryName(String text, Collection<DwBossType> types) {
+        String candidate = lookupKey(text);
+        if (candidate.isEmpty() || types == null) return null;
+        if (candidate.equals("LEGIONCOMMANDER")) candidate = "IMMORTALLEGION";
+        if (candidate.equals("КОМАНДИРЛЕГИОНА")) candidate = "БЕССМЕРТНЫИЛЕГИОН";
+        for (DwBossType type : types) {
+            if (type == null) continue;
+            if (candidate.equals(lookupKey(type.id())) || candidate.equals(lookupKey(type.name()))) {
+                return type.name() == null || type.name().isBlank() ? type.id() : type.name();
+            }
+        }
+        return null;
+    }
+
+    private static String lookupKey(String value) {
+        if (value == null) return "";
+        return Normalizer.normalize(Formatting.stripMinecraftFormatting(withoutMultiplicity(value)), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "").replaceAll("[^a-zA-Zа-яА-Я]+", "")
+                .toUpperCase(Locale.ROOT);
+    }
+
+    private static String withoutMultiplicity(String text) {
+        return MULTIPLICITY.matcher(text).replaceAll("");
     }
 }

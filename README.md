@@ -1,6 +1,6 @@
 # FrogHelper Fabric
 
-Текущая версия: **FrogHelper 1.1.0 — Minecraft 26.2 / Fabric, Java 25**. Устанавливаемый файл: `build/libs/froghelper-1.1.0.jar`.
+Текущая версия: **FrogHelper 1.1.1 — Minecraft 26.2 / Fabric, Java 25**. Устанавливаемый файл: `build/libs/froghelper-1.1.1.jar`.
 
 ## Содержание
 

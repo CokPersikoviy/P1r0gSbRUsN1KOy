@@ -3,6 +3,7 @@ package ru.wilyfox.client.protocol;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import ru.wilyfox.boss.BossInfo;
+import ru.wilyfox.boss.BossTimerMath;
 import ru.wilyfox.client.boss.BossDamageInfo;
 import ru.wilyfox.client.miner.ActiveMinerInfo;
 import ru.wilyfox.client.pet.ActivePetInfo;
@@ -33,9 +34,18 @@ final class ProtocolPayloadHandlers {
     private static final int BOSSCOLLECT_GROUP_PREVIEW_LIMIT = 6;
     private static final int BOSSCOLLECT_VALUE_PREVIEW_LIMIT = 4;
     private static final long RUNE_SET_COOLDOWN_MILLIS = 10_000L;
-    private static final long RUNE_SET_COOLDOWN_REDUCTION_MILLIS = 500L;
 
     private ProtocolPayloadHandlers() {
+    }
+
+    static boolean handleDungeonPosition(ProtocolState state, byte[] data) {
+        try {
+            state.dungeonPosition = DwDungeonPositionDecoder.decode(data);
+            return true;
+        } catch (Exception exception) {
+            warn(LOGGER, "DW protocol: failed to parse dungeonpos payload", exception);
+            return false;
+        }
     }
 
     static boolean handleBossTimers(ProtocolState state, byte[] data) {
@@ -157,8 +167,7 @@ final class ProtocolPayloadHandlers {
     static boolean handleServerInfo(ProtocolState state, byte[] data) {
         try {
             CurrentServerInfo serverInfo = DwServerInfoDecoder.decode(data);
-            state.currentServerInfo = serverInfo;
-            state.worldContextRevision++;
+            applyServerInfo(state, serverInfo);
             info(
                     LOGGER,
                     "DW protocol: serverinfo parsed successfully, family={}, server={}, mirror={}, display={}",
@@ -174,15 +183,17 @@ final class ProtocolPayloadHandlers {
         }
     }
 
+    static void applyServerInfo(ProtocolState state, CurrentServerInfo serverInfo) {
+        if (!serverInfo.equals(state.currentServerInfo)) {
+            state.currentServerInfo = serverInfo;
+            state.worldContextRevision++;
+        }
+    }
+
     static boolean handlePetTypes(ProtocolState state, byte[] data) {
         try {
             DwPetTypesPacket packet = DwPetTypesDecoder.decode(data);
-            state.petTypes = new LinkedHashMap<>(packet.types());
-            if (state.activePetsStore != null && !state.activePetsStore.isEmpty()) {
-                state.activePetsStore.replace(state.activePetsStore.getAll().stream()
-                        .map(pet -> ProtocolPayloadSupport.enrichActivePet(state, pet))
-                        .toList());
-            }
+            applyPetTypes(state, packet);
 
             if (packet.types().isEmpty()) {
                 info(LOGGER, "DW protocol: pettypes parsed successfully, entries=0");
@@ -207,12 +218,21 @@ final class ProtocolPayloadHandlers {
         }
     }
 
+    static void applyPetTypes(ProtocolState state, DwPetTypesPacket packet) {
+        state.petTypes.putAll(packet.types());
+        if (state.activePetsStore != null && !state.activePetsStore.isEmpty()) {
+            state.activePetsStore.replace(state.activePetsStore.getAll().stream()
+                    .map(pet -> ProtocolPayloadSupport.enrichActivePet(state, pet))
+                    .toList());
+        }
+    }
+
     static boolean handlePotionTypes(ProtocolState state, byte[] data) {
         try {
             DwPotionTypesPacket packet = DwPotionTypesDecoder.decode(data);
 
             if (state.potionStore != null) {
-                state.potionStore.replaceTypes(packet.entries());
+                state.potionStore.updateTypes(packet.entries());
             }
 
             String preview = isEnabled() ? packet.entries().stream()
@@ -543,14 +563,7 @@ final class ProtocolPayloadHandlers {
     static boolean handleStaffTypes(ProtocolState state, byte[] data) {
         try {
             DwStaffTypesPacket packet = DwStaffTypesDecoder.decode(data);
-            state.staffTypes = new LinkedHashMap<>(packet.types());
-
-            if (state.wandCooldownTracker != null) {
-                state.wandCooldownTracker.replaceTypes(
-                        packet.types().values().stream().collect(Collectors.toMap(DwStaffType::id, DwStaffType::name)),
-                        packet.types().values().stream().collect(Collectors.toMap(DwStaffType::id, DwStaffType::modelId))
-                );
-            }
+            applyStaffTypes(state, packet);
 
             String preview = isEnabled() ? packet.types().values().stream()
                     .limit(STAFF_PREVIEW_LIMIT)
@@ -567,6 +580,16 @@ final class ProtocolPayloadHandlers {
         } catch (Exception exception) {
             warn(LOGGER, "DW protocol: failed to parse stafftypes payload", exception);
             return false;
+        }
+    }
+
+    static void applyStaffTypes(ProtocolState state, DwStaffTypesPacket packet) {
+        state.staffTypes.putAll(packet.types());
+        if (state.wandCooldownTracker != null) {
+            state.wandCooldownTracker.replaceTypes(
+                    state.staffTypes.values().stream().collect(Collectors.toMap(DwStaffType::id, DwStaffType::name)),
+                    state.staffTypes.values().stream().collect(Collectors.toMap(DwStaffType::id, DwStaffType::modelId))
+            );
         }
     }
 
@@ -599,13 +622,7 @@ final class ProtocolPayloadHandlers {
     static boolean handleAbilityTypes(ProtocolState state, byte[] data) {
         try {
             DwAbilityTypesPacket packet = DwAbilityTypesDecoder.decode(data);
-            state.abilityTypes = new LinkedHashMap<>(packet.types());
-
-            if (state.abilityCooldownStore != null) {
-                state.abilityCooldownStore.replaceTypes(
-                        packet.types().values().stream().collect(Collectors.toMap(DwAbilityType::id, DwAbilityType::name))
-                );
-            }
+            applyAbilityTypes(state, packet);
 
             String preview = isEnabled() ? packet.types().values().stream()
                     .limit(ABILITY_PREVIEW_LIMIT)
@@ -625,13 +642,21 @@ final class ProtocolPayloadHandlers {
         }
     }
 
+    static void applyAbilityTypes(ProtocolState state, DwAbilityTypesPacket packet) {
+        state.abilityTypes.putAll(packet.types());
+        if (state.abilityCooldownStore != null) {
+            state.abilityCooldownStore.replaceTypes(
+                    state.abilityTypes.values().stream().collect(Collectors.toMap(DwAbilityType::id, DwAbilityType::name))
+            );
+        }
+    }
+
     static boolean handleAbilityTimers(ProtocolState state, byte[] data) {
         try {
             DwAbilityTimersPacket packet = DwAbilityTimersDecoder.decode(data);
-            long now = System.currentTimeMillis();
-            boolean swapTriggered = ProtocolPayloadSupport.shouldTriggerRuneSetCooldown(state, packet.timers(), now);
+            boolean swapTriggered = ProtocolPayloadSupport.shouldTriggerRuneSetCooldown(packet.timers());
             if (swapTriggered) {
-                RuneSetCooldownStore.update(RUNE_SET_COOLDOWN_MILLIS - RUNE_SET_COOLDOWN_REDUCTION_MILLIS);
+                RuneSetCooldownStore.update(RUNE_SET_COOLDOWN_MILLIS);
             }
 
             if (isEnabled()) {
@@ -639,13 +664,10 @@ final class ProtocolPayloadHandlers {
                         .append(swapTriggered).append(") ===");
                 for (Map.Entry<String, Long> entry : packet.timers().entrySet()) {
                     dump.append("\n  ").append(entry.getKey())
-                            .append(": prevDecayed=").append(ProtocolPayloadSupport.previousAbilityRemaining(state, entry.getKey(), now))
-                            .append(" current=").append(Math.max(0L, entry.getValue()));
+                            .append(" current=").append(entry.getValue());
                 }
                 info(LOGGER, "{}", dump.toString());
             }
-
-            ProtocolPayloadSupport.rememberAbilityTimers(state, packet.timers(), now);
 
             if (state.abilityCooldownStore != null) {
                 state.abilityCooldownStore.replaceCooldowns(packet.timers());
@@ -973,15 +995,19 @@ final class ProtocolPayloadHandlers {
         }
     }
 
-    private static void applyBossTimers(ProtocolState state, DwBossTimersPacket packet) {
+    static void applyBossTimers(ProtocolState state, DwBossTimersPacket packet) {
         if (state.bossRepository == null) {
             return;
         }
 
         long now = System.currentTimeMillis();
-        Map<String, BossInfo> snapshot = new LinkedHashMap<>();
+        Map<String, BossInfo> updates = new LinkedHashMap<>();
 
         for (Map.Entry<String, Long> entry : packet.timers().entrySet()) {
+            long rawDuration = entry.getValue();
+            if (!state.bossRepository.acceptsProtocolDuration(rawDuration)) {
+                continue;
+            }
             String bossId = entry.getKey();
             DwBossType type = state.bossTypes.get(bossId);
 
@@ -993,10 +1019,12 @@ final class ProtocolPayloadHandlers {
             }
 
             BossTypeCatalog.observe(bossId, bossName, level);
-            snapshot.put(bossId, new BossInfo(bossId, bossName, now + entry.getValue(), level));
+            long duration = BossTimerMath.adjustDurationMillis(
+                    rawDuration, state.currentGameEvent == DwGameEvent.MYTHICAL_EVENT, type != null && type.raid());
+            updates.put(bossId, new BossInfo(bossId, bossName, now + duration, level));
         }
 
-        state.bossRepository.replaceProtocol(snapshot);
+        state.bossRepository.mergeProtocol(updates);
     }
 
 }

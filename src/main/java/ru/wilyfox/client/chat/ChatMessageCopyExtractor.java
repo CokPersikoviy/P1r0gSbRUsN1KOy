@@ -1,18 +1,23 @@
 package ru.wilyfox.client.chat;
 
-import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ActiveTextCollector;
+import net.minecraft.client.gui.TextAlignment;
 import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
+import org.joml.Matrix3x2f;
+import org.joml.Vector2f;
 import ru.wilyfox.bridge.ChatComponentAccessor;
 import ru.wilyfox.client.popup.PopUpManager;
+import ru.wilyfox.utils.Formatting;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
 public final class ChatMessageCopyExtractor {
-    private static final Pattern MESSAGE_BODY = Pattern.compile("^([^:]{1,32}:\\s+)(.+)$");
+    private static final Pattern MESSAGE_BODY = Pattern.compile("^([^:]{1,32}:\\s+)(.+)$", Pattern.DOTALL);
 
     private ChatMessageCopyExtractor() {
     }
@@ -31,55 +36,74 @@ public final class ChatMessageCopyExtractor {
             return false;
         }
 
-        double chatX = accessor.froghelper$screenToChatX(mouseX);
-        double chatY = accessor.froghelper$screenToChatY(mouseY);
-        int index = accessor.froghelper$getMessageLineIndexAt(chatX, chatY);
-
-        if (index < 0 || index >= visibleMessages.size()) {
+        Minecraft minecraft = Minecraft.getInstance();
+        double scale = minecraft.options.chatScale().get();
+        double chatX = mouseX / scale - 4.0;
+        int width = (int) Math.ceil(ChatComponent.getWidth(minecraft.options.chatWidth().get()) / scale);
+        if (!chat.isChatFocused() || chatX < -4 || chatX > width + 4) {
             return false;
         }
 
-        List<GuiMessage.Line> messageParts = collectMessageParts(visibleMessages, index);
+        HoveredLineFinder finder = new HoveredLineFinder(mouseY);
+        chat.captureClickableText(finder, minecraft.getWindow().getGuiScaledHeight(),
+                minecraft.gui.hud.getGuiTicks(), ChatComponent.DisplayMode.FOREGROUND);
 
-        String displayedText = ChatMessageSanitizer.forLogic(collectPlainText(messageParts));
+        String displayedText = ChatMessageSanitizer.forLogic(messageText(visibleMessages, finder.result));
         String copied = selectCopiedText(displayedText, fullMessage);
         if (copied.isBlank()) {
             return false;
         }
 
-        Minecraft.getInstance().keyboardHandler.setClipboard(copied);
+        minecraft.keyboardHandler.setClipboard(copied);
         PopUpManager.getInstance().notifyChatCopied();
         return true;
     }
 
-    private static List<GuiMessage.Line> collectMessageParts(List<GuiMessage.Line> visibleMessages, int index) {
-        int entryStart = index;
-        while (entryStart > 0 && !visibleMessages.get(entryStart).endOfEntry()) {
-            entryStart--;
-        }
-
-        List<GuiMessage.Line> messageParts = new ArrayList<>();
-        for (int i = entryStart; i < visibleMessages.size(); i++) {
-            GuiMessage.Line line = visibleMessages.get(i);
-            if (i > entryStart && line.endOfEntry()) {
-                break;
+    static String messageText(List<GuiMessage.Line> visibleMessages, FormattedCharSequence selectedLine) {
+        if (selectedLine != null) {
+            for (GuiMessage.Line line : visibleMessages) {
+                if (line.content() == selectedLine) {
+                    return Formatting.stripMinecraftFormatting(line.parent().content().getString());
+                }
             }
-            messageParts.add(line);
         }
-
-        Collections.reverse(messageParts);
-        return messageParts;
+        return "";
     }
 
-    private static String collectPlainText(List<GuiMessage.Line> lines) {
-        StringBuilder builder = new StringBuilder();
-        for (GuiMessage.Line line : lines) {
-            line.content().accept((index, style, codePoint) -> {
-                builder.appendCodePoint(codePoint);
-                return true;
-            });
+    static final class HoveredLineFinder implements ActiveTextCollector {
+        private final double mouseY;
+        private Parameters parameters = new Parameters(new Matrix3x2f());
+        FormattedCharSequence result;
+
+        HoveredLineFinder(double mouseY) {
+            this.mouseY = mouseY;
         }
-        return builder.toString();
+
+        @Override
+        public Parameters defaultParameters() {
+            return parameters;
+        }
+
+        @Override
+        public void defaultParameters(Parameters parameters) {
+            this.parameters = parameters;
+        }
+
+        @Override
+        public void accept(TextAlignment alignment, int x, int y, Parameters parameters, FormattedCharSequence text) {
+            if (result != null) {
+                return;
+            }
+            float top = parameters.pose().transformPosition(new Vector2f(x, y - 1.0f)).y;
+            float bottom = parameters.pose().transformPosition(new Vector2f(x, y + 8.0f)).y;
+            if (mouseY >= top && mouseY < bottom) {
+                result = text;
+            }
+        }
+
+        @Override
+        public void acceptScrolling(Component text, int centerX, int y, int left, int right, int color, Parameters parameters) {
+        }
     }
 
     static String selectCopiedText(String displayedText, boolean fullMessage) {

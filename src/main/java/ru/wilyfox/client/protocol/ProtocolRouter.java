@@ -60,6 +60,7 @@ final class ProtocolRouter {
             case "gameevent" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleGameEvent(state, body), state);
             case "claninfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleClanInfo(state, body), state);
             case "siegepos" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleClanSiegePosition(state, body), state);
+            case "dungeonpos" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleDungeonPosition(state, body), state);
             default -> {
                 state.diagnostics.onUnknownType(typeId, body.length);
                 ProtocolDebugLogger.logUnknownPayloadBody("unknown typeId=" + typeId, typeId, body);

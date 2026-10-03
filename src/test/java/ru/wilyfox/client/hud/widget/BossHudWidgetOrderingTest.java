@@ -17,7 +17,7 @@ class BossHudWidgetOrderingTest {
         var candidates = new ArrayList<>(List.of(first, second, raid));
 
         BossHudWidget.sortAndLimit(candidates,
-                boss -> boss == raid ? Math.round(boss.getRespawnAt() / 1.52D) : boss.getRespawnAt(), 2);
+                boss -> boss == raid ? (long) (boss.getRespawnAt() / 1.5D) : boss.getRespawnAt(), 2);
 
         assertEquals(List.of(raid, first), candidates);
     }

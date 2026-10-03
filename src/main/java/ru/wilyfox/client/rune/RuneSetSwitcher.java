@@ -17,8 +17,6 @@ import java.util.List;
 
 public final class RuneSetSwitcher {
     private static final List<Integer> RUNE_SET_SLOTS = List.of(0, 1, 3, 4, 5, 6, 8);
-    private static final String ACTIVE_SET_MARKER = "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0435\u0442\u0441\u044f";
-    private static final String CLICK_TO_USE_MARKER = "\u041d\u0430\u0436\u043c\u0438\u0442\u0435, \u0447\u0442\u043e\u0431\u044b \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c";
 
     private RuneSetSwitcher() {
     }
@@ -136,7 +134,7 @@ public final class RuneSetSwitcher {
         }
 
         String firstLoreLine = getFirstLoreLine(slot.getItem());
-        if (firstLoreLine == null || !firstLoreLine.contains(CLICK_TO_USE_MARKER)) {
+        if (!RuneLore.canUseSet(firstLoreLine)) {
             return false;
         }
 
@@ -157,7 +155,7 @@ public final class RuneSetSwitcher {
             }
 
             String firstLoreLine = getFirstLoreLine(slot.getItem());
-            if (firstLoreLine != null && firstLoreLine.contains(ACTIVE_SET_MARKER)) {
+            if (RuneLore.isActiveSet(firstLoreLine)) {
                 return i;
             }
         }

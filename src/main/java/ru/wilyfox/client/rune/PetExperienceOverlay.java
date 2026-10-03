@@ -18,8 +18,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class PetExperienceOverlay {
-    private static final Pattern LOOSE_EXP = Pattern.compile("^Опыт питомца: (\\d+)$");
-    private static final Pattern BUCKET_EXP = Pattern.compile("^Опыта питомца в ведре: (\\d+)/.*$");
+    private static final Pattern LOOSE_EXP = Pattern.compile("^(?:Опыт питомца|Pet experience): (\\d+)$");
+    private static final Pattern BUCKET_EXP = Pattern.compile("^(?:Опыта питомца в ведре|Bucket Pet experience): (\\d+)/.*$");
     private static final String PUBLIC_BUKKIT_VALUES = "PublicBukkitValues";
     private static final String DIMENSION_KEY = "prisonevo:dimension";
 
@@ -83,7 +83,7 @@ public final class PetExperienceOverlay {
         }
     }
 
-    private static long extractExperience(ItemStack stack) {
+    static long extractExperience(ItemStack stack) {
         for (String line : getLoreLines(stack)) {
             Long value = matchExperience(LOOSE_EXP, line);
             if (value == null) {

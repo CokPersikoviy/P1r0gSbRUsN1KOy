@@ -4,6 +4,7 @@ import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import ru.wilyfox.client.protocol.DwPotionTimerEntry;
 import ru.wilyfox.client.protocol.DwPotionTypeEntry;
 
 import java.util.List;
@@ -11,6 +12,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PotionStoreTest {
@@ -59,5 +62,43 @@ class PotionStoreTest {
         assertTrue(graceEntries.getFirst().remainingMillis() <= 0L);
 
         assertTrue(store.getCooldownEntries(0L).isEmpty());
+    }
+
+    @Test
+    void incrementalTypesKeepEarlierNamesAndInvalidateOnlyChangedModels() {
+        PotionStore store = new PotionStore();
+        store.updateTypes(List.of(new DwPotionTypeEntry(41, 410, "Strength")));
+        store.applyCooldownUpdate(Map.of(41, 60_000L));
+        var firstIcon = store.getCooldownEntries(0L).getFirst().icon();
+
+        store.updateTypes(List.of(new DwPotionTypeEntry(42, 420, "Speed")));
+        assertEquals("Strength", store.getCooldownEntries(0L).getFirst().name());
+        assertSame(firstIcon, store.getCooldownEntries(0L).getFirst().icon());
+
+        store.updateTypes(List.of(new DwPotionTypeEntry(41, 411, "Improved strength")));
+        assertEquals("Improved strength", store.getCooldownEntries(0L).getFirst().name());
+        assertNotSame(firstIcon, store.getCooldownEntries(0L).getFirst().icon());
+    }
+
+    @Test
+    void inactiveIncrementalEntriesPreserveEarlierPotionTimers() {
+        PotionStore store = new PotionStore();
+        store.applyUpdate(List.of(new DwPotionTimerEntry(41, 60_000L, 100)));
+        var first = store.getActiveEntries().getFirst();
+
+        store.applyUpdate(List.of(
+                new DwPotionTimerEntry(41, 30_000L, 0),
+                new DwPotionTimerEntry(42, 0L, 100),
+                new DwPotionTimerEntry(43, 60_000L, -1)
+        ));
+        assertEquals(1, store.getActiveEntries().size());
+        var preserved = store.getActiveEntries().getFirst();
+        assertEquals(first.id(), preserved.id());
+        assertEquals(first.quality(), preserved.quality());
+        assertTrue(preserved.remainingMillis() > 30_000L);
+
+        store.applyUpdate(List.of(new DwPotionTimerEntry(41, 30_000L, 150)));
+        assertEquals(150, store.getActiveEntries().getFirst().quality());
+        assertTrue(store.getActiveEntries().getFirst().remainingMillis() <= 30_000L);
     }
 }

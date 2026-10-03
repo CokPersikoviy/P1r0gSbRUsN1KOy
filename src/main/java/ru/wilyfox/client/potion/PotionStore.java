@@ -29,8 +29,16 @@ public final class PotionStore {
         types.clear();
         iconCache.clear();
 
+        updateTypes(entries);
+    }
+
+    public void updateTypes(List<DwPotionTypeEntry> entries) {
         for (DwPotionTypeEntry entry : entries) {
-            types.put(entry.id(), new PotionType(entry.id(), entry.modelId(), entry.name()));
+            PotionType updated = new PotionType(entry.id(), entry.modelId(), entry.name());
+            PotionType previous = types.put(entry.id(), updated);
+            if (previous == null || previous.modelId() != updated.modelId()) {
+                iconCache.remove(entry.id());
+            }
         }
     }
 
@@ -42,12 +50,8 @@ public final class PotionStore {
             long remaining = entry.remainedMillis();
             int quality = entry.quality();
 
-            if (quality <= 0) {
-                states.remove(entry.id());
-                continue;
-            }
-            if (remaining <= 0L) {
-                // Keep the previous deadline during the configured negative-countdown grace period.
+            if (quality <= 0 || remaining <= 0L) {
+                // Protocol entries are incremental; inactive entries do not cancel an earlier timer.
                 continue;
             }
 

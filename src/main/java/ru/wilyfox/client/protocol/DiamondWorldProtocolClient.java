@@ -117,6 +117,10 @@ public final class DiamondWorldProtocolClient {
         return STATE.currentGameEvent != null ? STATE.currentGameEvent : DwGameEvent.NONE;
     }
 
+    public static DwDungeonPosition getDungeonPosition() {
+        return STATE.dungeonPosition;
+    }
+
     /** The local player's current DiamondWorld level (0 if not known yet). */
     public static int getCurrentLevel() {
         return STATE.levelProgressStore != null ? STATE.levelProgressStore.getSnapshot().level() : 0;

@@ -8,6 +8,7 @@ public class RenderConfig {
     public boolean staticHand = false;
     public boolean hideFireOverlay = false;
     public boolean hideFirstPersonCosmetics = true;
+    public boolean cleanPlayerNames = false;
     public boolean modUserBadge = true;                       // frog badge on FrogHelper users' nametags
     public boolean modUserMesh = true;                        // Socials: outgoing beacon + PM mesh participation
     public boolean toneDownChat = false;

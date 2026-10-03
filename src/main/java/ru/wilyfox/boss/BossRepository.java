@@ -108,34 +108,21 @@ public class BossRepository {
                 .collect(Collectors.toList());
     }
 
-    public void replaceProtocol(Map<String, BossInfo> bosses) {
-        long now = clock.getAsLong();
-        long grace = spawnGraceMs();
-        // The server drops a boss from `bosstimers` the moment it spawns (remaining reaches 0). A
-        // plain clear+replace would evict it instantly, so it would vanish at 0 instead of briefly
-        // counting into the negative. Keep a just-spawned boss (respawn time only recently passed
-        // and no longer present in the new snapshot) for a short grace window that matches
-        // BossHudWidget's SPAWNED_VISIBLE_MS. World bosses already persist and behave this way.
-        Map<String, BossInfo> retained = new LinkedHashMap<>();
-        for (Map.Entry<String, BossInfo> entry : protocolBosses.entrySet()) {
-            if (bosses.containsKey(entry.getKey())) {
-                continue;
-            }
-
-            long sinceRespawn = now - entry.getValue().getRespawnAt();
-            if (sinceRespawn >= 0L && (grace < 0L || sinceRespawn < grace)) {
-                retained.put(entry.getKey(), entry.getValue());
-            }
-        }
-
-        protocolBosses.clear();
+    public void mergeProtocol(Map<String, BossInfo> bosses) {
+        // Both reference versions apply individual timer updates. Missing entries, including
+        // an empty packet, do not cancel live timers; expiration uses the HUD's grace policy.
         protocolBosses.putAll(bosses);
-        for (Map.Entry<String, BossInfo> entry : retained.entrySet()) {
-            protocolBosses.putIfAbsent(entry.getKey(), entry.getValue());
-        }
+        bosses.values().forEach(boss -> rememberProtocolLevel(boss.getName(), boss.getLevel()));
+        cleanupProtocol();
     }
 
-    // How long a just-spawned boss (dropped from the new snapshot) is retained, matching the boss
+    /** Filter the server duration before mythical scaling or overwriting an existing timer. */
+    public boolean acceptsProtocolDuration(long remainingMillis) {
+        long grace = spawnGraceMs();
+        return remainingMillis > 0L || grace < 0L || remainingMillis > -grace;
+    }
+
+    // How long a just-spawned boss is retained, matching the boss
     // widget's post-spawn settings. -1 = keep until it respawns (a new future timer arrives).
     private static long configuredSpawnGraceMs() {
         BossWidgetConfig config = ConfigManager.get().bossWidget;

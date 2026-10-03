@@ -28,6 +28,8 @@ final class HudSettingsCoreSections {
         toggle(items, "Debug", () -> ConfigManager.get().render.debug, value -> ConfigManager.get().render.debug = value);
         toggle(items, "Hide Cosmetics (First Person)", () -> ConfigManager.get().render.hideFirstPersonCosmetics,
                 value -> ConfigManager.get().render.hideFirstPersonCosmetics = value);
+        toggle(items, "Clean player names (TAB / nametags)", () -> ConfigManager.get().render.cleanPlayerNames,
+                value -> ConfigManager.get().render.cleanPlayerNames = value);
         toggle(items, "FrogHelper Badge On Nametags", () -> ConfigManager.get().render.modUserBadge,
                 value -> ConfigManager.get().render.modUserBadge = value);
         toggle(items, "Socials", () -> ConfigManager.get().render.modUserMesh, ModUserProtocol::setSocialsEnabled);
@@ -166,6 +168,12 @@ final class HudSettingsCoreSections {
         section(items, "Maps & Inspect");
         toggle(items, "Show Dungeon / Siege Map Widget", () -> ConfigManager.get().dungeonMap.active,
                 value -> ConfigManager.get().dungeonMap.active = value);
+        toggle(items, "Center Dungeon Map on Player", () -> ConfigManager.get().dungeonMap.anchorDungeonMap,
+                value -> ConfigManager.get().dungeonMap.anchorDungeonMap = value);
+        stepper(items, "Dungeon Map Zoom", () -> ConfigManager.get().dungeonMap.dungeonZoomPercent,
+                value -> ConfigManager.get().dungeonMap.dungeonZoomPercent = value, 100, 310, 25);
+        toggle(items, "Rotate Dungeon Map", () -> ConfigManager.get().dungeonMap.rotateDungeonMap,
+                value -> ConfigManager.get().dungeonMap.rotateDungeonMap = value);
         stepper(items, "Siege Map Zoom", () -> ConfigManager.get().dungeonMap.siegeZoomPercent,
                 value -> ConfigManager.get().dungeonMap.siegeZoomPercent = value, 100, 310, 25);
         toggle(items, "Rotate Siege Map", () -> ConfigManager.get().dungeonMap.rotateSiegeMap,

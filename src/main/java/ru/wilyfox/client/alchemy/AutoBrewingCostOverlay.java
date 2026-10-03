@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
 public final class AutoBrewingCostOverlay {
     public static final String AUTO_BREWING_TITLE = "\uB221";
 
-    private static final Pattern PRICE_PATTERN = Pattern.compile("\u0437\u0430\\s+(\\d+)");
+    private static final Pattern PRICE_PATTERN = Pattern.compile("(?:\u0437\u0430|for)\\s+(\\d+)");
 
     private AutoBrewingCostOverlay() {
     }

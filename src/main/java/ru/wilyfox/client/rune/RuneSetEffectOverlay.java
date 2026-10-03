@@ -175,7 +175,7 @@ public final class RuneSetEffectOverlay {
 
             ItemStack stack = slot.getItem();
             List<String> lore = getLoreLines(stack);
-            if (!lore.isEmpty() && lore.get(0).contains("Используется")) {
+            if (!lore.isEmpty() && RuneLore.isActiveSet(lore.getFirst())) {
                 return Formatting.stripMinecraftFormatting(stack.getHoverName().getString()).trim();
             }
         }
@@ -305,7 +305,7 @@ public final class RuneSetEffectOverlay {
         private static final Pattern FLAT = Pattern.compile("^([-+][\\d.,]+)(?: \\(([-+][\\d.,]+)\\))?(?: \\| ([-+][\\d.,]+))?$");
         private static final Pattern PERCENT = Pattern.compile("^([-+][\\d.,]+)%(?: \\(([-+][\\d.,]+)%\\))?(?: \\| ([-+][\\d.,]+)%)?$");
         private static final Pattern MULTIPLY = Pattern.compile("^x([\\d.,]+)(?: \\| x([\\d.,]+))?$");
-        private static final Pattern MINER = Pattern.compile("^1 к (\\d+)$");
+        private static final Pattern MINER = Pattern.compile("^1 (?:к|to) (\\d+)$");
 
         private final String name;
         private Kind kind = Kind.PRESENCE;

@@ -16,7 +16,7 @@ class AbilityCooldownStoreTest {
 
         store.replaceCooldowns(Map.of("ACTIVE", 10_000L, "ONE_SECOND", 1_000L, "READY", 0L));
         assertEquals(1, store.getActiveEntries().size());
-        assertEquals(20_000L, store.getActiveEntries().getFirst().endsAt());
+        assertEquals(20_600L, store.getActiveEntries().getFirst().endsAt());
 
         now.set(11_000L);
         store.replaceCooldowns(Map.of("OTHER", 5_000L));
@@ -25,12 +25,12 @@ class AbilityCooldownStoreTest {
         now.set(12_000L);
         store.replaceCooldowns(Map.of("ACTIVE", 0L));
 
-        assertEquals(20_000L, store.getActiveEntries().getFirst().endsAt());
-        assertEquals(8_000L, store.getActiveEntries().getFirst().remainingMillis());
+        assertEquals(20_600L, store.getActiveEntries().getFirst().endsAt());
+        assertEquals(8_600L, store.getActiveEntries().getFirst().remainingMillis());
     }
 
     @Test
-    void refreshesProtocolDeadlineFromExactRemainingTime() {
+    void refreshesProtocolDeadlineWithReferenceOffset() {
         AtomicLong now = new AtomicLong(10_000L);
         AbilityCooldownStore store = new AbilityCooldownStore(now::get);
         store.replaceCooldowns(Map.of("ABILITY", 10_000L));
@@ -38,8 +38,8 @@ class AbilityCooldownStoreTest {
         now.set(12_000L);
         store.replaceCooldowns(Map.of("ABILITY", 7_000L));
 
-        assertEquals(19_000L, store.getActiveEntries().getFirst().endsAt());
-        assertEquals(7_000L, store.getActiveEntries().getFirst().remainingMillis());
+        assertEquals(19_600L, store.getActiveEntries().getFirst().endsAt());
+        assertEquals(7_600L, store.getActiveEntries().getFirst().remainingMillis());
     }
 
     @Test
@@ -61,6 +61,7 @@ class AbilityCooldownStoreTest {
         store.replaceExternalCooldown("gourmetcd", "\u0413\u0443\u0440\u043c\u0430\u043d", 5_000L);
 
         assertEquals("\u0413\u0443\u0440\u043c\u0430\u043d", store.getActiveEntries().getFirst().name());
+        assertEquals(15_000L, store.getActiveEntries().getFirst().endsAt());
 
         store.replaceExternalCooldown("gourmetcd", "\u0413\u0443\u0440\u043c\u0430\u043d", 0L);
         assertTrue(store.getActiveEntries().isEmpty());

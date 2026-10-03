@@ -35,7 +35,6 @@ import static ru.wilyfox.utils.Formatting.formatMillisSigned;
 import static ru.wilyfox.utils.Formatting.stripMinecraftFormatting;
 
 public class BossHudWidget extends AbstractWidget {
-    private static final double MYTHICAL_RAID_SPEED_MULTIPLIER = 1.52D;
     /** Prefixed to raid-boss names in the timer during a mythical event. */
     private static final String RAID_MARKER = "✦ ";
     /** Prefixed to bosses the clan currently holds (captured / location busy). */
@@ -538,23 +537,9 @@ public class BossHudWidget extends AbstractWidget {
     }
 
     private long getDisplayRespawnAt(BossInfo boss) {
-        long respawnAt = boss.getRespawnAt();
-        if (!DiamondWorldProtocolClient.isMythicalEventActive()) {
-            return respawnAt;
-        }
-
-        if (!DiamondWorldProtocolClient.isRaidBossLevel(boss.getLevel())) {
-            return respawnAt;
-        }
-
-        long now = cachedFrameTime;
-        long remaining = respawnAt - now;
-        if (remaining <= 0L) {
-            return respawnAt;
-        }
-
-        long acceleratedRemaining = Math.max(0L, Math.round(remaining / MYTHICAL_RAID_SPEED_MULTIPLIER));
-        return now + acceleratedRemaining;
+        // The protocol/hologram handlers already adjust durations at receipt. Reapplying
+        // the factor here would move the deadline on every frame and accelerate twice.
+        return boss.getRespawnAt();
     }
 
     private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {

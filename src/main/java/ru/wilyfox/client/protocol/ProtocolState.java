@@ -34,7 +34,6 @@ final class ProtocolState {
     Map<String, DwPetType> petTypes = new LinkedHashMap<>();
     Map<String, DwAbilityType> abilityTypes = new LinkedHashMap<>();
     Map<Integer, DwStaffType> staffTypes = new LinkedHashMap<>();
-    Map<String, AbilityTimerSample> abilityTimerHistory = new LinkedHashMap<>();
     Map<String, Integer> payloadSampleCounts = new LinkedHashMap<>();
     ProtocolDiagnostics diagnostics = new ProtocolDiagnostics();
 
@@ -57,6 +56,7 @@ final class ProtocolState {
     DwClanState clanInfo = DwClanState.empty();
     Set<Integer> capturedBossLevels = Set.of();
     DwClanSiegePosition clanSiegePosition = DwClanSiegePosition.UNAVAILABLE;
+    DwDungeonPosition dungeonPosition;
     Map<String, Set<String>> bossCollectibles = new LinkedHashMap<>();
     Map<String, Long> externalCooldownEndsAt = new LinkedHashMap<>();
     Map<String, Long> externalCooldownRevisions = new LinkedHashMap<>();
@@ -79,7 +79,6 @@ final class ProtocolState {
         petTypes = new LinkedHashMap<>();
         abilityTypes = new LinkedHashMap<>();
         staffTypes = new LinkedHashMap<>();
-        abilityTimerHistory = new LinkedHashMap<>();
         payloadSampleCounts = new LinkedHashMap<>();
         diagnostics = new ProtocolDiagnostics();
 
@@ -88,6 +87,7 @@ final class ProtocolState {
         clanInfo = DwClanState.empty();
         capturedBossLevels = Set.of();
         clanSiegePosition = DwClanSiegePosition.UNAVAILABLE;
+        dungeonPosition = null;
         bossCollectibles = new LinkedHashMap<>();
         externalCooldownEndsAt = new LinkedHashMap<>();
         externalCooldownRevisions = new LinkedHashMap<>();
@@ -99,9 +99,4 @@ final class ProtocolState {
         hourlyQuestProgress = new LinkedHashMap<>();
     }
 
-    record AbilityTimerSample(long remainingMillis, long receivedAtMillis) {
-        long remainingAt(long now) {
-            return Math.max(0L, remainingMillis - Math.max(0L, now - receivedAtMillis));
-        }
-    }
 }

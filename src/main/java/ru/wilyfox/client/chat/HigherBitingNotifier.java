@@ -12,7 +12,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class HigherBitingNotifier {
-    private static final Pattern MESSAGE = Pattern.compile("^На локации \"([\\S\\s]+)\" повышенный клёв!$");
+    private static final Pattern MESSAGE = Pattern.compile(
+            "^(?:На локации \"([\\S\\s]+)\" повышенный клёв!|Nibble rate has increased in location: ([\\S\\s]+)!)$");
 
     private HigherBitingNotifier() {
     }
@@ -21,15 +22,23 @@ public final class HigherBitingNotifier {
         if (component == null || !ConfigManager.get().fishing.higherBitingNotification) {
             return;
         }
-        Matcher matcher = MESSAGE.matcher(Formatting.stripMinecraftFormatting(component.getString()).trim());
-        if (!matcher.matches()) {
+        String location = higherBitingLocation(component.getString());
+        if (location == null) {
             return;
         }
         PopUpManager.getInstance().publish(PopUpRequest.of(
                 PopUpSource.FISHING_HIGHER_BITING,
                 "Повышенный клёв",
-                "На локации " + matcher.group(1),
+                "На локации " + location,
                 PopUpSeverity.INFO
         ));
+    }
+
+    static String higherBitingLocation(String message) {
+        if (message == null) {
+            return null;
+        }
+        Matcher matcher = MESSAGE.matcher(Formatting.stripMinecraftFormatting(message).trim());
+        return matcher.matches() ? (matcher.group(1) != null ? matcher.group(1) : matcher.group(2)) : null;
     }
 }

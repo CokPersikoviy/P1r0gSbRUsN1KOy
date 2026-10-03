@@ -17,9 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.Client;
-import ru.wilyfox.client.clan.PlayerClanNameFormatter;
-import ru.wilyfox.client.moduser.ModUserBadge;
-import ru.wilyfox.client.moduser.ModUserStorage;
+import ru.wilyfox.client.utility.PlayerNameFormatter;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import ru.wilyfox.client.potion.PotionStore;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
@@ -55,18 +53,7 @@ public abstract class PlayerTabOverlayMixin {
         }
 
         String name = playerInfo.getProfile().name();
-        Component base = cir.getReturnValue();
-        if (base == null) {
-            base = Component.literal(name);
-        }
-
-        base = PlayerClanNameFormatter.apply(base, name);
-
-        if (ConfigManager.get().render.modUserBadge && ModUserStorage.isKnown(name)) {
-            base = ModUserBadge.prefix(base);
-        }
-
-        cir.setReturnValue(base);
+        cir.setReturnValue(PlayerNameFormatter.apply(cir.getReturnValue(), name));
     }
 
     @Inject(method = "extractRenderState", at = @At("TAIL"))
