@@ -10,8 +10,6 @@ public class RenderConfig {
     public boolean hideFirstPersonCosmetics = true;
     public boolean cleanPlayerNames = false;
     public boolean modUserBadge = true;                       // frog badge on FrogHelper users' nametags
-    @com.google.gson.annotations.SerializedName(value = "socialsEnabled", alternate = {"modUserMesh"})
-    public boolean socialsEnabled = true;                    // Backend presence; old opt-out stays respected
     public boolean toneDownChat = false;
     public boolean copyChatMessages = true;
     public boolean fullMessageCopy = false;

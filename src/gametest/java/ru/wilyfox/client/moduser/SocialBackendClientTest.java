@@ -1,6 +1,7 @@
 package ru.wilyfox.client.moduser;
 
 import com.google.gson.JsonObject;
+import com.google.gson.Gson;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -10,6 +11,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.input.KeyEvent;
 import org.lwjgl.glfw.GLFW;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.RenderConfig;
 import ru.wilyfox.client.keybinds.KeyBinds;
 import ru.wilyfox.client.protocol.SocialProtocolFixture;
 
@@ -80,10 +82,11 @@ public final class SocialBackendClientTest implements FabricClientGameTest {
         defaultClient.setAccessible(true);
         BackendSocialClient original = (BackendSocialClient) defaultClient.get(null);
         BackendSocialClient testClient = new BackendSocialClient(backend);
-        AtomicReference<Boolean> enabled = new AtomicReference<>();
+        AtomicReference<RenderConfig> originalRender = new AtomicReference<>();
         context.runOnClient(client -> {
-            enabled.set(ConfigManager.get().render.socialsEnabled);
-            ConfigManager.get().render.socialsEnabled = true;
+            originalRender.set(ConfigManager.get().render);
+            ConfigManager.get().render = new Gson().fromJson(
+                    "{\"socialsEnabled\":false,\"modUserMesh\":false}", RenderConfig.class);
             original.reset();
             try { defaultClient.set(null, testClient); }
             catch (IllegalAccessException exception) { throw new AssertionError(exception); }
@@ -134,7 +137,7 @@ public final class SocialBackendClientTest implements FabricClientGameTest {
             context.runOnClient(client -> {
                 testClient.reset();
                 SocialProtocolFixture.clear();
-                ConfigManager.get().render.socialsEnabled = enabled.get();
+                ConfigManager.get().render = originalRender.get();
                 try { defaultClient.set(null, original); }
                 catch (IllegalAccessException exception) { throw new AssertionError(exception); }
             });

@@ -11,7 +11,11 @@
       "ru.wilyfox.HudBlurClientTest",
       "ru.wilyfox.DungeonMapClientTest",
       "ru.wilyfox.client.moduser.SocialClientTest",
-      "ru.wilyfox.client.moduser.SocialBackendClientTest"
+      "ru.wilyfox.client.moduser.SocialBackendClientTest",
+      "ru.wilyfox.client.highlight.UsefulHighlightClientTest",
+      "ru.wilyfox.client.chat.LowHpMessageClientTest",
+      "ru.wilyfox.client.hud.widget.FishingQuestsClientTest",
+      "ru.wilyfox.client.profiler.TransitionDiagnosticsClientTest"
     ]
   },
   "depends": {

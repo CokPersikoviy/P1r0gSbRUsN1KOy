@@ -48,7 +48,7 @@ public abstract class AbstractContainerScreenMixin {
         }
 
         Screen screen = (Screen) (Object) this;
-        boolean isAlchemyPotionList = ru.wilyfox.client.hud.config.ConfigManager.get().potionRecipe.active
+        boolean isAlchemyPotionList = ru.wilyfox.client.hud.config.ConfigManager.get().alchemy.recipeActionAlerts
                 && screen instanceof ContainerScreen
                 && screen.getTitle().getString().contains(PotionRecipeTracker.ALCHEMY_POTION_LIST_TITLE);
         if (isAlchemyPotionList && hoveredSlot != null && hoveredSlot.hasItem()) {

@@ -210,6 +210,11 @@ public final class BossName {
 
     /** RU/EN holograms resolve against server IDs and names rather than translations guessed locally. */
     public static String resolveRegistryName(String text, Collection<DwBossType> types) {
+        DwBossType type = resolveRegistryType(text, types);
+        return type == null ? null : type.name() == null || type.name().isBlank() ? type.id() : type.name();
+    }
+
+    public static DwBossType resolveRegistryType(String text, Collection<DwBossType> types) {
         String candidate = lookupKey(text);
         if (candidate.isEmpty() || types == null) return null;
         if (candidate.equals("LEGIONCOMMANDER")) candidate = "IMMORTALLEGION";
@@ -217,7 +222,7 @@ public final class BossName {
         for (DwBossType type : types) {
             if (type == null) continue;
             if (candidate.equals(lookupKey(type.id())) || candidate.equals(lookupKey(type.name()))) {
-                return type.name() == null || type.name().isBlank() ? type.id() : type.name();
+                return type;
             }
         }
         return null;

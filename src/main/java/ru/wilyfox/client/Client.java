@@ -15,6 +15,7 @@ import ru.wilyfox.client.chat.AutoBossAnnouncer;
 import ru.wilyfox.client.chat.AutoMessageScheduler;
 import ru.wilyfox.client.chat.ActiveEffectChatTracker;
 import ru.wilyfox.client.chat.ChatDispatchQueue;
+import ru.wilyfox.client.chat.AutoThanks;
 import ru.wilyfox.client.chat.ChatTabManager;
 import ru.wilyfox.client.chat.VisibilityStatusTracker;
 import ru.wilyfox.client.clan.PlayerClanStorage;
@@ -53,7 +54,6 @@ import ru.wilyfox.client.hud.widget.DungeonMapWidget;
 import ru.wilyfox.client.hud.widget.LevelProgressWidget;
 import ru.wilyfox.client.hud.widget.OutgoingChatQueueWidget;
 import ru.wilyfox.client.hud.widget.PopUpsWidget;
-import ru.wilyfox.client.hud.widget.PotionRecipeWidget;
 import ru.wilyfox.client.hud.widget.PotionTimersWidget;
 import ru.wilyfox.client.hud.widget.ProtocolGraphWidget;
 import ru.wilyfox.client.hud.widget.ScoreboardWidget;
@@ -145,6 +145,7 @@ public class Client {
         AlchemyBrewingTracker.register();
         ru.wilyfox.client.alchemy.AlchemyIngredientTracker.getInstance().register();
         ChatDispatchQueue.init();
+        AutoThanks.init();
         ActiveEffectChatTracker.register(activeEffectStore);
         ChatTabManager.getInstance().register();
         AutoMessageScheduler.getInstance().register();
@@ -211,10 +212,6 @@ public class Client {
         hudRenderer.registerWidget(
                 new BoostersWidget(20, 20, HudLayer.CONTENT, boosterStore),
                 ScreenAnchor.TOP_RIGHT
-        );
-        hudRenderer.registerWidget(
-                new PotionRecipeWidget(20, 20, HudLayer.CONTENT),
-                ScreenAnchor.BOTTOM_RIGHT
         );
         hudRenderer.registerWidget(
                 new CraftRecipeWidget(20, 52, HudLayer.CONTENT),

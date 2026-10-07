@@ -1,7 +1,6 @@
 package ru.wilyfox.client.quickaccess;
 
 import net.minecraft.client.Minecraft;
-import ru.wilyfox.client.chat.ChatDispatchQueue;
 
 public final class QuickAccessManager {
     private static final QuickAccessManager INSTANCE = new QuickAccessManager();
@@ -54,7 +53,11 @@ public final class QuickAccessManager {
             return;
         }
 
-        ChatDispatchQueue.enqueueCommand(resolved, 0L);
+        if (client.player != null && client.player.connection != null) {
+            // Explicit player actions follow the same path as typing a command; automated chat
+            // and its server-reported message cooldown must not delay a teleport/menu action.
+            client.player.connection.sendCommand(resolved);
+        }
     }
 
     public void forceClose(Minecraft client) {

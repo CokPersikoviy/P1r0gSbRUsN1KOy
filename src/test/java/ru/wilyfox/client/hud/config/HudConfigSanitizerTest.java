@@ -9,6 +9,30 @@ class HudConfigSanitizerTest {
     private final Gson gson = new Gson();
 
     @Test
+    void removesDeletedPotionWidgetSettingsAndUnhooksOnlyItsDependents() {
+        HudConfig config = gson.fromJson("""
+                {"potionRecipe":{"active":true,"visibility":"ALCHEMY"},
+                 "alchemy":{"recipeActionAlerts":true},"widgetLayouts":{
+                   "PotionRecipeWidget":{"x":20,"y":20},
+                   "CraftRecipeWidget":{"x":40,"y":60,"snapTarget":"PotionRecipeWidget",
+                     "snapOwnCorner":"TOP_LEFT","snapTargetCorner":"BOTTOM_LEFT"},
+                   "PotionTimersWidget":{"x":12,"snapTarget":"BossHudWidget"}}}
+                """, HudConfig.class);
+        config = HudConfigSanitizer.sanitize(config);
+
+        assertFalse(config.widgetLayouts.containsKey("PotionRecipeWidget"));
+        var craft = config.widgetLayouts.get("CraftRecipeWidget");
+        assertEquals(40, craft.x);
+        assertEquals(60, craft.y);
+        assertNull(craft.snapTarget);
+        assertNull(craft.snapOwnCorner);
+        assertNull(craft.snapTargetCorner);
+        assertEquals("BossHudWidget", config.widgetLayouts.get("PotionTimersWidget").snapTarget);
+        assertTrue(config.alchemy.recipeActionAlerts);
+        assertFalse(gson.toJson(config).contains("potionRecipe"));
+    }
+
+    @Test
     void repairsNullQuickAccessSectionsAndItemsWithoutAddingExecutableCommands() {
         HudConfig config = gson.fromJson("""
                 {"quickAccess":{"sections":[null,{"title":null,"items":null},

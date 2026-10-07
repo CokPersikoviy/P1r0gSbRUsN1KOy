@@ -7,18 +7,27 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.function.LongSupplier;
 import java.util.regex.Pattern;
 
 public final class PopUpManager {
     private static final int MAX_BUFFER_SIZE = 32;
+    private static final long MAX_PENDING_AGE_MS = 60_000L;
     private static final Pattern LEGACY_AMPERSAND_FORMATTING = Pattern.compile(
             "(?i)&x(?:&[0-9a-f]){6}|&[0-9a-fk-or]"
     );
     private static final PopUpManager INSTANCE = new PopUpManager();
 
     private final Deque<PopUpNotification> notifications = new ArrayDeque<>();
+    private final Deque<PopUpNotification> pending = new ArrayDeque<>();
+    private final LongSupplier clock;
 
     private PopUpManager() {
+        this(System::currentTimeMillis);
+    }
+
+    PopUpManager(LongSupplier clock) {
+        this.clock = clock;
     }
 
     public static PopUpManager getInstance() {
@@ -39,19 +48,21 @@ public final class PopUpManager {
         int hold = request.holdMs() != null ? request.holdMs() : ConfigManager.get().popUps.holdMillis;
         int fadeOut = request.fadeOutMs() != null ? request.fadeOutMs() : ConfigManager.get().popUps.fadeOutMillis;
 
-        notifications.addFirst(new PopUpNotification(
+        pending.addLast(new PopUpNotification(
                 source,
                 sanitizeText(request.title(), "Notification"),
                 sanitizeText(request.message(), ""),
                 request.severity() != null ? request.severity() : PopUpSeverity.INFO,
-                System.currentTimeMillis(),
+                clock.getAsLong(),
                 Math.max(0, fadeIn),
                 Math.max(0, hold),
                 Math.max(0, fadeOut)
         ));
 
-        while (notifications.size() > MAX_BUFFER_SIZE) {
-            notifications.removeLast();
+        pruneExpired();
+        while (notifications.size() + pending.size() > MAX_BUFFER_SIZE) {
+            if (!pending.isEmpty()) pending.removeFirst();
+            else notifications.removeLast();
         }
     }
 
@@ -59,6 +70,13 @@ public final class PopUpManager {
         pruneExpired();
 
         int max = Math.max(0, limit);
+        // Start the animation when a slot is available, so a burst cannot expire unseen.
+        long now = clock.getAsLong();
+        while (notifications.size() < max && !pending.isEmpty()) {
+            PopUpNotification next = pending.removeFirst();
+            notifications.addLast(new PopUpNotification(next.source(), next.title(), next.message(),
+                    next.severity(), now, next.fadeInMs(), next.holdMs(), next.fadeOutMs()));
+        }
         List<PopUpNotification> visible = new ArrayList<>(Math.min(max, notifications.size()));
         int index = 0;
         for (PopUpNotification notification : notifications) {
@@ -81,7 +99,13 @@ public final class PopUpManager {
 
     public synchronized int diagnosticNotificationCount() {
         pruneExpired();
-        return notifications.size();
+        return notifications.size() + pending.size();
+    }
+
+    public synchronized void removeSources(String... sources) {
+        var removed = java.util.Set.of(sources);
+        notifications.removeIf(notification -> removed.contains(notification.source()));
+        pending.removeIf(notification -> removed.contains(notification.source()));
     }
 
     private boolean isSourceEnabled(String source) {
@@ -106,8 +130,9 @@ public final class PopUpManager {
     }
 
     private void pruneExpired() {
-        long now = System.currentTimeMillis();
+        long now = clock.getAsLong();
         notifications.removeIf(notification -> notification.expiresAtMs() <= now);
+        pending.removeIf(notification -> now - notification.createdAtMs() > MAX_PENDING_AGE_MS);
     }
 
     static String sanitizeText(String value, String fallback) {

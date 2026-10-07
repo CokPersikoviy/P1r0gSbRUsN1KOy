@@ -29,8 +29,6 @@ final class HudConfigSanitizer {
         if (sanitized.playerHealthBars == null) sanitized.playerHealthBars = new PlayerHealthBarsConfig();
         if (sanitized.alchemy == null) sanitized.alchemy = new AlchemyConfig();
         sanitized.alchemy.recipeActionLeadMillis = Math.max(100, Math.min(2_000, sanitized.alchemy.recipeActionLeadMillis));
-        if (sanitized.potionRecipe == null) sanitized.potionRecipe = new PotionRecipeConfig();
-        if (sanitized.potionRecipe.visibility == null) sanitized.potionRecipe.visibility = PotionRecipeVisibility.ALWAYS;
         if (sanitized.craftRecipe == null) sanitized.craftRecipe = new CraftRecipeConfig();
         if (sanitized.potionTimers == null) sanitized.potionTimers = new PotionTimersConfig();
         if (sanitized.sellerCooldown == null) sanitized.sellerCooldown = new SellerCooldownConfig();
@@ -59,6 +57,7 @@ final class HudConfigSanitizer {
         if (sanitized.theme == null) sanitized.theme = new ThemeConfig();
         if (sanitized.theme.preset == null) sanitized.theme.preset = ThemePreset.LINGONBERRY_PIE;
         if (sanitized.widgetLayouts == null) sanitized.widgetLayouts = new java.util.LinkedHashMap<>();
+        sanitized.widgetLayouts.remove("PotionRecipeWidget");
         if (sanitized.quickAccess.sections == null) sanitized.quickAccess.sections = QuickAccessConfig.createDefaultSections();
         if (sanitized.quickAccess.sections.isEmpty()) sanitized.quickAccess.sections = QuickAccessConfig.createDefaultSections();
         QuickAccessConfig.sanitizeSections(sanitized.quickAccess.sections);
@@ -102,6 +101,11 @@ final class HudConfigSanitizer {
         }
         for (WidgetLayoutConfig layout : sanitized.widgetLayouts.values()) {
             if (layout == null) continue;
+            if ("PotionRecipeWidget".equals(layout.snapTarget)) {
+                layout.snapTarget = null;
+                layout.snapOwnCorner = null;
+                layout.snapTargetCorner = null;
+            }
             if (layout.scale != null) {
                 layout.scale = Float.isFinite(layout.scale) ? Math.max(0.5f, Math.min(3f, layout.scale)) : 1f;
             }

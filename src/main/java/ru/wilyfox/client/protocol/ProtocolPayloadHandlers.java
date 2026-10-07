@@ -184,6 +184,7 @@ final class ProtocolPayloadHandlers {
     }
 
     static void applyServerInfo(ProtocolState state, CurrentServerInfo serverInfo) {
+        state.serverDisplay.protocolUpdated(serverInfo);
         if (!serverInfo.equals(state.currentServerInfo)) {
             state.currentServerInfo = serverInfo;
             state.worldContextRevision++;
@@ -556,6 +557,30 @@ final class ProtocolPayloadHandlers {
             return true;
         } catch (Exception exception) {
             warn(LOGGER, "DW protocol: failed to parse hourlyquestinfo payload", exception);
+            return false;
+        }
+    }
+
+    static boolean handleQuestsSetup(ProtocolState state, byte[] data) {
+        try {
+            state.quests = new LinkedHashMap<>(DwQuestsSetupDecoder.decode(data));
+            info(LOGGER, "DW protocol: questssetup parsed successfully, entries={}, fishing={}", state.quests.size(),
+                    state.quests.values().stream().filter(quest -> quest.category() == DwQuest.Category.FISHING).count());
+            return true;
+        } catch (Exception exception) {
+            warn(LOGGER, "DW protocol: failed to parse questssetup payload", exception);
+            return false;
+        }
+    }
+
+    static boolean handleQuestUpdate(ProtocolState state, byte[] data) {
+        try {
+            DwQuestUpdateDecoder.Update update = DwQuestUpdateDecoder.decode(data);
+            state.quests.computeIfPresent(update.id(), (id, quest) -> quest.withProgress(update.progress()));
+            info(LOGGER, "DW protocol: questupdate parsed successfully, id={}, known={}", update.id(), state.quests.containsKey(update.id()));
+            return true;
+        } catch (Exception exception) {
+            warn(LOGGER, "DW protocol: failed to parse questupdate payload", exception);
             return false;
         }
     }

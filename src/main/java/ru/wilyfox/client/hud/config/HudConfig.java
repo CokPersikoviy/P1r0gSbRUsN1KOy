@@ -20,7 +20,6 @@ public class HudConfig {
     public ScoreboardConfig scoreboard = new ScoreboardConfig();
     public PlayerHealthBarsConfig playerHealthBars = new PlayerHealthBarsConfig();
     public AlchemyConfig alchemy = new AlchemyConfig();
-    public PotionRecipeConfig potionRecipe = new PotionRecipeConfig();
     public CraftRecipeConfig craftRecipe = new CraftRecipeConfig();
     public PotionTimersConfig potionTimers = new PotionTimersConfig();
     public SellerCooldownConfig sellerCooldown = new SellerCooldownConfig();

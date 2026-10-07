@@ -9,7 +9,9 @@ final class BossMessageParser {
     private static final Pattern CURSE = Pattern.compile("Босс проклят! Особенность: ([А-Яа-яЁё ]+)");
     private static final Pattern CAPTURE = Pattern.compile("^Босс (.*) захвачен кланом (.*)!$");
     private static final Pattern CLAN_WAVE = Pattern.compile("Испытание вызова (?:(|\\d+):|)(\\d+)");
-    private static final Pattern HEALTH = Pattern.compile("^(.+?)\\s+(\\d+(?:[.,]\\d+)?)\\D*$");
+    // EvoPlus searches for name + HP inside the title; trailing clan text is independent.
+    // Keep our decimal HP support while ignoring resource-pack icons around the match.
+    private static final Pattern HEALTH = Pattern.compile("([\\p{L} ]+)\\s+(\\d+(?:[.,]\\d+)?)(?=\\D|$)");
 
     private BossMessageParser() {
     }
@@ -34,12 +36,15 @@ final class BossMessageParser {
         }
 
         Matcher matcher = HEALTH.matcher(clean);
-        if (!matcher.matches()) {
+        if (!matcher.find()) {
             return null;
         }
 
         String bossName = matcher.group(1).trim();
         if (bossName.startsWith("Босс ")) {
+            bossName = bossName.substring(5).trim();
+        }
+        if (bossName.regionMatches(true, 0, "Boss ", 0, 5)) {
             bossName = bossName.substring(5).trim();
         }
         if (bossName.isEmpty()) {

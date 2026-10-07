@@ -8,6 +8,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientboundLoginPacket;
+import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
+import net.minecraft.network.protocol.game.ClientboundTabListPacket;
 import ru.wilyfox.client.chat.ChatTabManager;
 
 import java.io.IOException;
@@ -62,6 +66,8 @@ public final class ModProfiler {
     private final Deque<ProfilerDiagnostics.DiagnosticSample> persistentSamples = new ArrayDeque<>();
     private final ThreadLocal<Deque<ActiveScope>> activeScopes = ThreadLocal.withInitial(ArrayDeque::new);
     private final AtomicBoolean diagnosticsRegistered = new AtomicBoolean();
+    private final TransitionPacketTracker transitionPackets = new TransitionPacketTracker();
+    private long lastSlowTransitionLogNanos;
     private volatile boolean enabled;
     private long sessionStartedAt;
     private long sessionStoppedAt;
@@ -100,6 +106,7 @@ public final class ModProfiler {
             observeDimension(client, true);
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            transitionPackets.clear();
             synchronized (this) {
                 lifetimeDisconnectCount++;
             }
@@ -167,12 +174,36 @@ public final class ModProfiler {
     }
 
     public void recordNetworkPacket(String direction, Packet<?> packet) {
+        if ("clientbound".equals(direction) && (packet instanceof ClientboundLoginPacket
+                || packet instanceof ClientboundRespawnPacket || packet instanceof ClientboundPlayerPositionPacket
+                || packet instanceof ClientboundTabListPacket)) {
+            transitionPackets.received(packet, System.nanoTime());
+            recordClientEvent("transition-received", packet.getClass().getSimpleName());
+        }
         if (!isEnabled() || packet == null) {
             return;
         }
         String type = packet.getClass().getSimpleName();
         incrementCounter("network/" + safeSectionComponent(direction) + "/packets");
         incrementCounter("network/" + safeSectionComponent(direction) + "/type/" + safeSectionComponent(type));
+    }
+
+    /** Called only on the client thread, after Netty receipt and before the vanilla handler. */
+    public Scope transitionPacketScope(Packet<?> packet) {
+        long started = System.nanoTime();
+        long queued = transitionPackets.begin(packet, started);
+        return () -> {
+            long ended = System.nanoTime();
+            long handling = Math.max(0, ended - started);
+            String detail = packet.getClass().getSimpleName() + ": queueMs="
+                    + (queued < 0 ? "unknown" : queued / 1_000_000.0) + ", handleMs=" + handling / 1_000_000.0;
+            recordClientEvent("transition-packet", detail);
+            if ((queued >= 250_000_000L || handling >= 100_000_000L)
+                    && (lastSlowTransitionLogNanos == 0 || ended - lastSlowTransitionLogNanos >= 10_000_000_000L)) {
+                lastSlowTransitionLogNanos = ended;
+                ru.wilyfox.FrogHelper.LOGGER.warn("Slow client transition packet: {}", detail);
+            }
+        };
     }
 
     public Scope typedScope(String prefix, Object typeKey) {

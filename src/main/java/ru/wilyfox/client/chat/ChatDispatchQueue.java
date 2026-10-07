@@ -77,6 +77,12 @@ public final class ChatDispatchQueue {
         enqueue(MessageType.COMMAND, command, delayMs);
     }
 
+    public static void enqueuePriorityCommand(String command, long delayMs) {
+        if (command == null || command.isBlank()) return;
+        // Priority affects ordering only; server cooldown and retry handling still apply.
+        QUEUE.addFirst(new QueuedMessage(MessageType.COMMAND, command, Math.max(0L, delayMs)));
+    }
+
     public static void removeQueuedCommandsContaining(String fragment) {
         if (fragment == null || fragment.isEmpty()) {
             return;

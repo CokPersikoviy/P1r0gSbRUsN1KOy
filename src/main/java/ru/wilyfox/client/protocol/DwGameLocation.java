@@ -137,10 +137,18 @@ public record DwGameLocation(String id) {
     }
 
     public String bossId() {
-        if (!isBoss() || id.length() <= 5) {
+        if (!isBoss() || id.length() <= 4) {
             return null;
         }
-        return id.substring(5);
+        int idStart = 4;
+        while (idStart < id.length()) {
+            char separator = id.charAt(idStart);
+            if (separator != '_' && separator != '-' && separator != ':' && separator != '/' && !Character.isWhitespace(separator)) {
+                break;
+            }
+            idStart++;
+        }
+        return idStart < id.length() ? id.substring(idStart) : null;
     }
 
     public boolean isProceduralDungeon() {

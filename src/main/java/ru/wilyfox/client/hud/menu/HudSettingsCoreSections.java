@@ -1,10 +1,8 @@
 package ru.wilyfox.client.hud.menu;
 
 import ru.wilyfox.client.hud.config.ConfigManager;
-import ru.wilyfox.client.hud.config.PotionRecipeVisibility;
 import ru.wilyfox.client.hud.config.SellerCooldownFilter;
 import ru.wilyfox.client.hud.config.WidgetChrome;
-import ru.wilyfox.client.moduser.BackendSocialClient;
 
 import java.util.List;
 import java.util.Map;
@@ -32,7 +30,6 @@ final class HudSettingsCoreSections {
                 value -> ConfigManager.get().render.cleanPlayerNames = value);
         toggle(items, "FrogHelper Badge On Nametags", () -> ConfigManager.get().render.modUserBadge,
                 value -> ConfigManager.get().render.modUserBadge = value);
-        toggle(items, "Socials", () -> ConfigManager.get().render.socialsEnabled, BackendSocialClient::setSocialsEnabled);
         toggle(items, "Hide block particles", () -> ConfigManager.get().render.hideBlockBreakParticles,
                 value -> ConfigManager.get().render.hideBlockBreakParticles = value);
         toggle(items, "Hide lightning", () -> ConfigManager.get().render.hideLightningEffect,
@@ -101,12 +98,6 @@ final class HudSettingsCoreSections {
                 value -> ConfigManager.get().estimatedTps.active = value);
 
         section(items, "Recipes");
-        toggle(items, "Show Potion Recipe Widget", () -> ConfigManager.get().potionRecipe.active,
-                value -> ConfigManager.get().potionRecipe.active = value);
-        items.add(cycle("Potion Recipe Visibility", () -> ConfigManager.get().potionRecipe.visibility,
-                value -> ConfigManager.get().potionRecipe.visibility = value,
-                PotionRecipeVisibility.values(), PotionRecipeVisibility::getTitle)
-                .withVisibility(() -> ConfigManager.get().potionRecipe.active));
         toggle(items, "Show Craft Recipe Widget", () -> ConfigManager.get().craftRecipe.active,
                 value -> ConfigManager.get().craftRecipe.active = value);
         toggle(items, "Compact Craft Recipe", () -> ConfigManager.get().craftRecipe.compact,

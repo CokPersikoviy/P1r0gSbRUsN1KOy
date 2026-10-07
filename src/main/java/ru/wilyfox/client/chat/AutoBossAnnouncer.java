@@ -24,11 +24,15 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+
+import static ru.wilyfox.FrogHelper.LOGGER;
 
 public final class AutoBossAnnouncer {
     private static final int CURSED_BAR_COLOR = 0x25D192;
@@ -39,6 +43,7 @@ public final class AutoBossAnnouncer {
     private static final Map<String, Long> announcedRespawns = new HashMap<>();
     private static final Map<String, Long> announcedSpawns = new HashMap<>();
     private static final Map<String, Long> lowHealthAnnouncements = new HashMap<>();
+    private static final Map<UUID, String> rejectedLowHealthBars = new HashMap<>();
 
     private static BossRepository repository;
     private static boolean initialized = false;
@@ -150,64 +155,76 @@ public final class AutoBossAnnouncer {
             return;
         }
 
-        BossBarSnapshot snapshot = getCurrentBossBarSnapshot();
-        if (snapshot == null || snapshot.percent() > config.lowHealthPercent) {
-            return;
-        }
-
         long now = System.currentTimeMillis();
         long cooldownMs = Math.max(1, config.lowHealthCooldownSeconds) * 1000L;
-        String bossKey = snapshot.name().trim().toLowerCase(Locale.ROOT) + "#" + snapshot.level();
-        long lastSent = lowHealthAnnouncements.getOrDefault(bossKey, 0L);
-        if (now - lastSent < cooldownMs) {
-            return;
+        for (BossBarSnapshot snapshot : getCurrentBossBarSnapshots()) {
+            if (snapshot.percent() > config.lowHealthPercent) {
+                continue;
+            }
+            String bossKey = snapshot.name().trim().toLowerCase(Locale.ROOT) + "#" + snapshot.level();
+            long lastSent = lowHealthAnnouncements.getOrDefault(bossKey, 0L);
+            if (now - lastSent < cooldownMs) {
+                continue;
+            }
+
+            // The absolute HP number is best-effort; when the title didn't yield one, report the percent only.
+            String healthText = snapshot.health() >= 0.0d
+                    ? " осталось " + HEALTH_FORMAT.format(snapshot.health()) + " HP (" + Math.round(snapshot.percent()) + "%)"
+                    : " осталось " + Math.round(snapshot.percent()) + "% HP";
+
+            String curseMarker = snapshot.cursed() ? " [Прок]" : "";
+            publishMessage(
+                    formatServerPrefix() + formatBossLabel(snapshot.name(), snapshot.level()) + curseMarker + healthText,
+                    config.lowHealthMessage,
+                    config.lowHealthClanMessage
+            );
+            lowHealthAnnouncements.put(bossKey, now);
         }
-
-        // The absolute HP number is best-effort; when the title didn't yield one, report the percent only.
-        String healthText = snapshot.health() >= 0.0d
-                ? " осталось " + HEALTH_FORMAT.format(snapshot.health()) + " HP (" + Math.round(snapshot.percent()) + "%)"
-                : " осталось " + Math.round(snapshot.percent()) + "% HP";
-
-        String curseMarker = snapshot.cursed() ? " [Прок]" : "";
-        publishMessage(
-                formatServerPrefix() + formatBossLabel(snapshot.name(), snapshot.level()) + curseMarker + healthText,
-                config.lowHealthMessage,
-                config.lowHealthClanMessage
-        );
-        lowHealthAnnouncements.put(bossKey, now);
     }
 
-    private static BossBarSnapshot getCurrentBossBarSnapshot() {
+    private static List<BossBarSnapshot> getCurrentBossBarSnapshots() {
         if (!DiamondWorldProtocolClient.isCurrentBossLocation()) {
-            return null;
+            return List.of();
         }
 
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.gui == null) {
-            return null;
+            return List.of();
         }
 
         BossHealthOverlay overlay = minecraft.gui.hud.getBossOverlay();
         if (!(overlay instanceof BossHealthOverlayAccessor accessor)) {
-            return null;
+            return List.of();
         }
 
         List<LerpingBossEvent> events = accessor.froghelper$getEvents();
+        rejectedLowHealthBars.keySet().retainAll(events.stream().map(LerpingBossEvent::getId).toList());
+        List<BossBarSnapshot> snapshots = new ArrayList<>();
         for (LerpingBossEvent event : events) {
             BossMessageParser.BossBarText parsed = BossMessageParser.parseBossBar(event.getName().getString());
             if (parsed == null) {
+                logRejectedBossBar(event, "unrecognized-title");
                 continue;
             }
 
             DwBossType type = DiamondWorldProtocolClient.getBossTypeByName(parsed.bossName());
             if (type == null) {
+                logRejectedBossBar(event, "unknown-boss-type");
                 continue;
             }
-            double percent = Math.max(0.0d, Math.min(100.0d, event.getProgress() * 100.0d));
-            return new BossBarSnapshot(type.name(), type.level(), parsed.health(), percent, isCursed(event.getName()));
+            rejectedLowHealthBars.remove(event.getId());
+            // Both values originate as floats; avoid 0.2f becoming 20.000000298% at a 20% threshold.
+            double percent = Math.max(0.0d, Math.min(100.0d, event.getProgress() * 100.0F));
+            snapshots.add(new BossBarSnapshot(type.name(), type.level(), parsed.health(), percent, isCursed(event.getName())));
         }
 
-        return null;
+        return snapshots;
+    }
+
+    private static void logRejectedBossBar(LerpingBossEvent event, String reason) {
+        if (reason.equals(rejectedLowHealthBars.put(event.getId(), reason))) return;
+        LOGGER.info("Low HP message: skipped boss bar; reason={}, location={}, title='{}'",
+                reason, DiamondWorldProtocolClient.getCurrentGameLocation(), event.getName().getString());
     }
 
     private static void resetAnnouncementsIfRespawnChanged(Map<String, Long> storage, String bossKey, long respawnAt) {
@@ -317,6 +334,7 @@ public final class AutoBossAnnouncer {
         announcedRespawns.clear();
         announcedSpawns.clear();
         lowHealthAnnouncements.clear();
+        rejectedLowHealthBars.clear();
     }
 
     private record BossBarSnapshot(String name, int level, double health, double percent, boolean cursed) {

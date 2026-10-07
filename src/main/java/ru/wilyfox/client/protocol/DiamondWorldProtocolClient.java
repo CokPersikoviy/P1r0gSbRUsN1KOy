@@ -15,13 +15,12 @@ import ru.wilyfox.client.rune.ActiveRunesStore;
 import ru.wilyfox.client.seller.SellerCooldownStore;
 import ru.wilyfox.client.statistic.DailyBlocksStore;
 import ru.wilyfox.client.wand.WandCooldownTracker;
+import ru.wilyfox.utils.BossName;
 
 import java.util.Locale;
 import java.util.Map;
 import java.util.List;
 import java.util.Set;
-
-import static ru.wilyfox.utils.Formatting.stripMinecraftFormatting;
 
 public final class DiamondWorldProtocolClient {
     private static final ProtocolState STATE = new ProtocolState();
@@ -91,9 +90,8 @@ public final class DiamondWorldProtocolClient {
     }
 
     public static String getCurrentServerDisplayName(Component footer) {
-        if (STATE.currentServerInfo != null && STATE.currentServerInfo.isKnown()) {
-            return STATE.currentServerInfo.displayName();
-        }
+        String display = STATE.serverDisplay.displayName();
+        if (!display.isBlank()) return display;
 
         if (footer != null) {
             CurrentServerInfo fallback = CurrentServerInfo.fromDisplayText(footer.getString());
@@ -103,6 +101,10 @@ public final class DiamondWorldProtocolClient {
         }
 
         return "";
+    }
+
+    public static void onTabFooter(Component footer) {
+        STATE.serverDisplay.tabUpdated(footer == null ? "" : footer.getString());
     }
 
     public static CurrentServerInfo getCurrentServerInfo() {
@@ -299,6 +301,10 @@ public final class DiamondWorldProtocolClient {
         return Map.copyOf(STATE.hourlyQuestProgress);
     }
 
+    public static Map<String, DwQuest> getQuests() {
+        return Map.copyOf(STATE.quests);
+    }
+
     public static String getFishingLocationName(String locationId) {
         String normalized = normalizeLocationId(locationId);
         if (normalized == null) {
@@ -342,26 +348,12 @@ public final class DiamondWorldProtocolClient {
     }
 
     public static DwBossType getBossTypeByName(String bossName) {
-        if (normalizeBossName(bossName).isEmpty()) {
-            return null;
-        }
-
-        for (DwBossType type : STATE.bossTypes.values()) {
-            if (bossNamesMatch(type.name(), bossName)) {
-                return type;
-            }
-        }
-        return null;
+        return BossName.resolveRegistryType(bossName, STATE.bossTypes.values());
     }
 
     static boolean bossNamesMatch(String registeredName, String observedName) {
-        String registered = normalizeBossName(registeredName);
-        String observed = normalizeBossName(observedName);
-        if (registered.equals(observed)) {
-            return !registered.isEmpty();
-        }
-        return observed.equals("командир легиона")
-                && (registered.equals("бессмертный легион") || registered.equals("бессмертныи легион"));
+        return BossName.resolveRegistryType(observedName,
+                List.of(new DwBossType("", registeredName, "", 0, 0, 0, false))) != null;
     }
 
     public static boolean isCurrentBossLocation() {
@@ -374,23 +366,8 @@ public final class DiamondWorldProtocolClient {
     }
 
     static String bossIdFromLocation(String location) {
-        if (location == null) {
-            return null;
-        }
-
-        location = location.trim();
-        if (!location.regionMatches(true, 0, "boss", 0, 4) || location.length() <= 4) {
-            return null;
-        }
-        int idStart = 4;
-        while (idStart < location.length()) {
-            char separator = location.charAt(idStart);
-            if (separator != '_' && separator != '-' && separator != ':' && separator != '/' && !Character.isWhitespace(separator)) {
-                break;
-            }
-            idStart++;
-        }
-        return idStart < location.length() ? location.substring(idStart) : null;
+        DwGameLocation parsed = createGameLocation(location);
+        return parsed != null ? parsed.bossId() : null;
     }
 
     /** Null means that the level is unknown or intentionally excluded from collection tracking. */
@@ -453,18 +430,6 @@ public final class DiamondWorldProtocolClient {
 
         String normalized = value.trim().toLowerCase(Locale.ROOT);
         return normalized.isBlank() ? null : normalized;
-    }
-
-    private static String normalizeBossName(String value) {
-        if (value == null) {
-            return "";
-        }
-        return stripMinecraftFormatting(value)
-                .replace('\u00A0', ' ')
-                .replaceAll("\\s+[\\uE124\\uE125\\uE126](?:\\s+x\\d+)?", "")
-                .replaceAll("\\s+", " ")
-                .trim()
-                .toLowerCase(Locale.ROOT);
     }
 
     static boolean isFishingLocation(String value) {

@@ -14,6 +14,7 @@ import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import ru.wilyfox.client.protocol.DwHourlyQuestProgress;
 import ru.wilyfox.client.protocol.DwHourlyQuestType;
+import ru.wilyfox.client.protocol.DwQuest;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -106,12 +107,20 @@ public final class FishingQuestsWidget extends AbstractWidget {
         boolean showDescription = matchesDescription(ConfigManager.get().fishing.questsDescription);
         FishingQuestTypeFilter filter = ConfigManager.get().fishing.questsTypeFilter;
 
-        List<QuestView> result = progress.values().stream()
+        List<QuestView> result = new ArrayList<>();
+        DiamondWorldProtocolClient.getQuests().values().stream()
+                .filter(quest -> quest.category() == DwQuest.Category.FISHING)
+                .map(quest -> createView(normalizeType(quest.dimension().name()), quest.name(), quest.description(),
+                        quest.progress(), quest.required(), showDescription, filter))
+                .filter(java.util.Objects::nonNull)
+                .forEach(result::add);
+        progress.values().stream()
                 .filter(entry -> entry.remainingMillis() > 0L)
                 .map(entry -> createView(types.get(entry.id()), entry, showDescription, filter))
                 .filter(java.util.Objects::nonNull)
-                .sorted(Comparator.comparingInt(view -> typeOrder(view.type())))
-                .toList();
+                .forEach(result::add);
+        result.sort(Comparator.comparingInt((QuestView view) -> typeOrder(view.type()))
+                .thenComparing(view -> view.lines().getFirst().text()));
 
         if (!result.isEmpty() || !isEditorPreview()) {
             return result;
@@ -127,24 +136,29 @@ public final class FishingQuestsWidget extends AbstractWidget {
         if (type == null) {
             return null;
         }
-        String questType = normalizeType(type.type());
+        return createView(normalizeType(type.type()), type.name() + " " + formatRemaining(progress.remainingMillis()),
+                type.lore(), progress.progress(), type.needed(), showDescription, filter);
+    }
+
+    private QuestView createView(String questType, String title, String description, int progress, int required,
+                                 boolean showDescription, FishingQuestTypeFilter filter) {
         if (filter != FishingQuestTypeFilter.ALL && !filter.name().equals(questType)) {
             return null;
         }
 
         List<QuestLine> lines = new ArrayList<>();
-        lines.add(new QuestLine(type.name() + " " + formatRemaining(progress.remainingMillis()), WidgetTheme.TEXT_PRIMARY));
-        boolean completed = progress.progress() >= type.needed();
-        boolean claimed = progress.progress() < 0;
-        if (!completed && !claimed && showDescription && type.lore() != null && !type.lore().isBlank()) {
-            for (String line : wrap(type.lore(), 44)) {
+        lines.add(new QuestLine(title, WidgetTheme.TEXT_PRIMARY));
+        boolean completed = progress >= required;
+        boolean claimed = progress < 0;
+        if (!completed && !claimed && showDescription && description != null && !description.isBlank()) {
+            for (String line : wrap(description, 44)) {
                 lines.add(new QuestLine(line, WidgetTheme.TEXT_MUTED));
             }
         }
         if (completed) {
             lines.add(new QuestLine("Claim reward", WidgetTheme.TEXT_PRIMARY));
         } else if (!claimed) {
-            lines.add(new QuestLine("Progress: " + progress.progress() + "/" + type.needed(), WidgetTheme.TEXT_SOFT));
+            lines.add(new QuestLine("Progress: " + progress + "/" + required, WidgetTheme.TEXT_SOFT));
         }
         return new QuestView(questType, List.copyOf(lines));
     }

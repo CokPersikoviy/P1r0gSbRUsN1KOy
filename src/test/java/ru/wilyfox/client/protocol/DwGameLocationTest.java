@@ -11,6 +11,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DwGameLocationTest {
     @Test
+    void bossIdsMatchTheProtocolLookupForEverySupportedSeparator() {
+        for (String id : new String[]{"boss_RatKing", "boss:RatKing", "boss-RatKing", "boss/RatKing",
+                "boss RatKing", "bossRatKing", "boss__RatKing", "BOSS_RatKing"}) {
+            assertEquals("RatKing", new DwGameLocation(id).bossId(), id);
+            assertEquals(new DwGameLocation(id).bossId(), DiamondWorldProtocolClient.bossIdFromLocation(id), id);
+        }
+    }
+
+    @Test
+    void emptyBossSuffixDoesNotProduceARegistryId() {
+        for (String id : new String[]{"boss", "boss_", "boss___", "spawn"}) {
+            assertNull(new DwGameLocation(id).bossId(), id);
+        }
+    }
+
+    @Test
     void alchemySubLocationsUse332PrefixClassification() {
         assertTrue(new DwGameLocation("alchemy").isAlchemy());
         assertTrue(new DwGameLocation("alchemy_nether").isAlchemy());

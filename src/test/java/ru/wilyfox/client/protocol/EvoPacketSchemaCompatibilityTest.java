@@ -102,6 +102,12 @@ class EvoPacketSchemaCompatibilityTest {
     }
 
     private void assertReferenceRoundTrip(String channel, byte[] payload) throws Exception {
+        if (channel.equals("questssetup")) {
+            assertEquals(Map.of("quest-id", new DwQuest("quest-id", DwQuest.Dimension.OVERWORLD,
+                    DwQuest.Category.FISHING, "Quest", "Lore", 12, 5_000)), DwQuestsSetupDecoder.decode(payload));
+        } else if (channel.equals("questupdate")) {
+            assertEquals(new DwQuestUpdateDecoder.Update("quest-id", 13), DwQuestUpdateDecoder.decode(payload));
+        }
         try (var loader = new URLClassLoader(new java.net.URL[]{
                 Path.of(System.getProperty("froghelper.evoReference")).toUri().toURL()}, getClass().getClassLoader())) {
             Class<?> packetClass = loader.loadClass(PACKET_CLASSES.get(channel));

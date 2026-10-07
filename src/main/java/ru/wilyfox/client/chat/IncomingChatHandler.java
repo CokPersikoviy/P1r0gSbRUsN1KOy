@@ -40,7 +40,6 @@ public final class IncomingChatHandler {
         }
 
         run("boosterDebug", () -> BoosterChatDebug.onIncomingMessage(logicalComponent));
-        run("autoThanks", () -> AutoThanks.onIncomingMessage(logicalComponent));
         run("bossAnnouncer", () -> AutoBossAnnouncer.onIncomingMessage(logicalComponent));
         run("privateMessagePopup", () -> PrivateMessagePopUpNotifier.onIncomingMessage(logicalComponent));
         run("visibility", () -> VisibilityStatusTracker.onIncomingMessage(logicalComponent));

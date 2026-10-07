@@ -53,6 +53,7 @@ final class ProtocolState {
     WandCooldownTracker wandCooldownTracker;
 
     CurrentServerInfo currentServerInfo = CurrentServerInfo.unknown();
+    ServerDisplayState serverDisplay = new ServerDisplayState();
     DwGameEvent currentGameEvent = DwGameEvent.NONE;
     DwClanState clanInfo = DwClanState.empty();
     Set<Integer> capturedBossLevels = Set.of();
@@ -67,6 +68,7 @@ final class ProtocolState {
     Map<String, Double> fishingNibbles = new LinkedHashMap<>();
     Map<Integer, DwHourlyQuestType> hourlyQuestTypes = new LinkedHashMap<>();
     Map<Integer, DwHourlyQuestProgress> hourlyQuestProgress = new LinkedHashMap<>();
+    Map<String, DwQuest> quests = new LinkedHashMap<>();
 
     void resetRuntimeState() {
         gameToken = null;
@@ -85,6 +87,7 @@ final class ProtocolState {
         diagnostics = new ProtocolDiagnostics();
 
         currentServerInfo = CurrentServerInfo.unknown();
+        serverDisplay = new ServerDisplayState();
         currentGameEvent = DwGameEvent.NONE;
         clanInfo = DwClanState.empty();
         capturedBossLevels = Set.of();
@@ -99,6 +102,7 @@ final class ProtocolState {
         fishingNibbles = new LinkedHashMap<>();
         hourlyQuestTypes = new LinkedHashMap<>();
         hourlyQuestProgress = new LinkedHashMap<>();
+        quests = new LinkedHashMap<>();
     }
 
 }

@@ -44,6 +44,8 @@ final class ProtocolRouter {
             case "spotnibbles" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleSpotNibbles(state, body), state);
             case "hourlyquestypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleHourlyQuestTypes(state, body), state);
             case "hourlyquestinfo" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleHourlyQuestInfo(state, body), state);
+            case "questssetup" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleQuestsSetup(state, body), state);
+            case "questupdate" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleQuestUpdate(state, body), state);
             case "stafftypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleStaffTypes(state, body), state);
             case "stafftimers" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleStaffTimers(state, body), state);
             case "abilitytypes" -> dispatch(typeId, body, () -> ProtocolPayloadHandlers.handleAbilityTypes(state, body), state);

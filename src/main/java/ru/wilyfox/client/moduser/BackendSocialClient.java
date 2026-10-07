@@ -5,7 +5,6 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.Minecraft;
 import net.fabricmc.loader.api.FabricLoader;
 import ru.wilyfox.FrogHelper;
-import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.protocol.CurrentServerInfo;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 
@@ -70,11 +69,6 @@ public final class BackendSocialClient {
         ClientTickEvents.END_CLIENT_TICK.register(client -> DEFAULT.tick(client));
     }
 
-    public static void setSocialsEnabled(boolean enabled) {
-        ConfigManager.get().render.socialsEnabled = enabled;
-        DEFAULT.reset();
-    }
-
     public static String statusText() { return DEFAULT.status; }
     public static DebugSnapshot diagnosticSnapshot() {
         return new DebugSnapshot(DEFAULT.bufferedCharacters, DEFAULT.socket == null ? 0 : 1, DEFAULT.request == null ? 0 : 1);
@@ -86,11 +80,11 @@ public final class BackendSocialClient {
         CurrentServerInfo server = DiamondWorldProtocolClient.getCurrentServerInfo();
         String nextToken = DiamondWorldProtocolClient.getGameToken();
         String nextScope = server.isKnown() ? server.family() + server.serverNumber() + ":" + server.mirror() : null;
-        if (!ConfigManager.get().render.socialsEnabled || client.player == null || client.getConnection() == null
+        if (client.player == null || client.getConnection() == null
                 || nextToken == null || nextToken.isBlank() || nextScope == null) {
             if (token != null || socket != null || request != null) reset();
             PresenceStore.clear();
-            status = ConfigManager.get().render.socialsEnabled ? "social.froghelper.waiting" : "social.froghelper.disabled";
+            status = "social.froghelper.waiting";
             return;
         }
         if (!Objects.equals(token, nextToken) || !Objects.equals(scope, nextScope)) {

@@ -3,6 +3,8 @@ package ru.wilyfox.client.highlight;
 import com.mojang.authlib.properties.Property;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.gizmos.Gizmos;
 import net.minecraft.gizmos.GizmoStyle;
@@ -58,6 +60,7 @@ public final class UsefulWorldHighlightRenderHook {
     private static final int ENTITY_SCAN_INTERVAL_TICKS = 10;
     private static final int GOLDEN_CRYSTAL_DISCOVERY_RETENTION_TICKS = 100;
     private static final int BLOCK_SCAN_REFRESH_TICKS = 100;
+    private static final long WORLD_CONTEXT_WAIT_NANOS = 1_000_000_000L;
     private static final int DIRTY_CHUNK_RESCAN_LIMIT = 2;
     private static final int DIRTY_LOCAL_RESCAN_RADIUS = 1;
     private static final int DIRTY_FULL_RESCAN_THRESHOLD = 6;
@@ -93,6 +96,9 @@ public final class UsefulWorldHighlightRenderHook {
     private static int lastMaxChunkZ = Integer.MIN_VALUE;
     private static boolean waitingForWorldContext;
     private static long gameLocationRevisionAtTransition;
+    private static long worldContextWaitStartedAt;
+    private static boolean entityScanDirty = true;
+    private static BlockPos lastScanCenter;
     private static CurrentServerInfo lastServerInfo;
     private static String lastGameLocation;
     private static ClientLevel cachedLevel;
@@ -105,6 +111,30 @@ public final class UsefulWorldHighlightRenderHook {
         if (registered) return;
         registered = true;
         LevelRenderEvents.BEFORE_GIZMOS.register(UsefulWorldHighlightRenderHook::onAfterEntities);
+        ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> {
+            Minecraft mc = Minecraft.getInstance();
+            if (level != mc.level || mc.player == null || !ConfigManager.get().render.usefulItemsHighlight) return;
+            BlockPos center = mc.player.blockPosition();
+            ChunkPos pos = chunk.getPos();
+            if (pos.x() >= SectionPos.blockToSectionCoord(center.getX() - HORIZONTAL_SCAN_RADIUS)
+                    && pos.x() <= SectionPos.blockToSectionCoord(center.getX() + HORIZONTAL_SCAN_RADIUS)
+                    && pos.z() >= SectionPos.blockToSectionCoord(center.getZ() - HORIZONTAL_SCAN_RADIUS)
+                    && pos.z() <= SectionPos.blockToSectionCoord(center.getZ() + HORIZONTAL_SCAN_RADIUS)) {
+                PENDING_BLOCK_SCAN_KEYS.add(pos.pack());
+            }
+        });
+        ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> {
+            if (level != Minecraft.getInstance().level) return;
+            long key = chunk.getPos().pack();
+            BLOCK_CHUNK_CACHE.remove(key);
+            PENDING_BLOCK_SCAN_KEYS.remove(key);
+            DIRTY_CHUNK_KEYS.remove(key);
+            DIRTY_BLOCK_POSITIONS.remove(key);
+            DIRTY_CHUNK_MARK_TIMES.remove(key);
+            rebuildBlockBoxes();
+        });
+        ClientEntityEvents.ENTITY_LOAD.register((entity, level) -> markEntityDirty(entity));
+        ClientEntityEvents.ENTITY_UNLOAD.register((entity, level) -> markEntityDirty(entity));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             clearCache();
             cachedLevel = null;
@@ -116,10 +146,21 @@ public final class UsefulWorldHighlightRenderHook {
     }
 
     public static void onPlayerTeleport() {
+        PopUpManager.getInstance().removeSources(PopUpSource.BARREL_FOUND, PopUpSource.GOLDEN_CRYSTAL_FOUND);
         waitingForWorldContext = true;
         gameLocationRevisionAtTransition = DiamondWorldProtocolClient.getGameLocationRevision();
+        worldContextWaitStartedAt = System.nanoTime();
         clearCache();
         count("worldContext/transition");
+    }
+
+    public static void markEntityDirty(int entityId) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level != null) markEntityDirty(mc.level.getEntity(entityId));
+    }
+
+    private static void markEntityDirty(Entity entity) {
+        if (entity != null && isUsefulHighlightEntity(entity)) entityScanDirty = true;
     }
 
     public static void markBlockDirty(BlockPos blockPos) {
@@ -252,10 +293,13 @@ public final class UsefulWorldHighlightRenderHook {
             return false;
         }
 
-        if (locationRevision != gameLocationRevisionAtTransition) {
+        // Teleports within one mine do not necessarily produce a new game-location packet.
+        if (locationRevision != gameLocationRevisionAtTransition || contextChanged
+                || System.nanoTime() - worldContextWaitStartedAt >= WORLD_CONTEXT_WAIT_NANOS) {
             waitingForWorldContext = false;
             clearCache();
-            count("worldContext/locationPacketReceived");
+            count(locationRevision != gameLocationRevisionAtTransition
+                    ? "worldContext/locationPacketReceived" : "worldContext/waitReleasedWithoutLocationPacket");
             return false;
         }
 
@@ -288,7 +332,11 @@ public final class UsefulWorldHighlightRenderHook {
             boolean chunkWindowChanged = minChunkX != lastMinChunkX
                     || maxChunkX != lastMaxChunkX
                     || minChunkZ != lastMinChunkZ
-                    || maxChunkZ != lastMaxChunkZ;
+                    || maxChunkZ != lastMaxChunkZ
+                    || lastScanCenter == null
+                    || Math.abs(playerPos.getY() - lastScanCenter.getY()) >= 2
+                    || Math.abs(playerPos.getX() - lastScanCenter.getX()) >= 4
+                    || Math.abs(playerPos.getZ() - lastScanCenter.getZ()) >= 4;
             boolean refreshExpired = lastBlockRefreshTick == Long.MIN_VALUE
                     || gameTime < lastBlockRefreshTick
                     || gameTime - lastBlockRefreshTick >= BLOCK_SCAN_REFRESH_TICKS;
@@ -309,6 +357,7 @@ public final class UsefulWorldHighlightRenderHook {
             lastMaxChunkX = maxChunkX;
             lastMinChunkZ = minChunkZ;
             lastMaxChunkZ = maxChunkZ;
+            if (chunkWindowChanged || refreshExpired) lastScanCenter = playerPos;
 
             Set<Long> activeChunkKeys = new HashSet<>();
             int newlyQueuedChunks = 0;
@@ -476,8 +525,12 @@ public final class UsefulWorldHighlightRenderHook {
             int missingChunks = 0;
             int scanBudget = chunkScanBudgetPerFrame();
             List<Long> completedChunkKeys = new ArrayList<>();
+            List<Long> nearestFirst = new ArrayList<>(PENDING_BLOCK_SCAN_KEYS);
+            ChunkPos playerChunk = mc.player.chunkPosition();
+            nearestFirst.sort(java.util.Comparator.comparingInt(key ->
+                    Math.abs(ChunkPos.getX(key) - playerChunk.x()) + Math.abs(ChunkPos.getZ(key) - playerChunk.z())));
             try (ModProfiler.Scope iterateScope = profile("processPendingChunkScans/iterate")) {
-                for (long chunkKey : PENDING_BLOCK_SCAN_KEYS) {
+                for (long chunkKey : nearestFirst) {
                     int chunkX = ChunkPos.getX(chunkKey);
                     int chunkZ = ChunkPos.getZ(chunkKey);
                     LevelChunk chunk = mc.level.getChunkSource().getChunkNow(chunkX, chunkZ);
@@ -554,12 +607,13 @@ public final class UsefulWorldHighlightRenderHook {
             // A successful empty scan is still a cached result. Rechecking it every tick
             // made an empty mine more expensive than one with highlighted entities.
             if (lastEntityScanTick != Long.MIN_VALUE && gameTime >= lastEntityScanTick
-                    && gameTime - lastEntityScanTick < ENTITY_SCAN_INTERVAL_TICKS) {
+                    && gameTime - lastEntityScanTick < ENTITY_SCAN_INTERVAL_TICKS && !entityScanDirty) {
                 count("refreshEntityCache/skippedInterval");
                 return;
             }
 
             lastEntityScanTick = gameTime;
+            entityScanDirty = false;
             ENTITY_BOXES.clear();
             collectNearbyEntities(mc);
             count("refreshEntityCache/outputBoxes", ENTITY_BOXES.size());
@@ -636,6 +690,8 @@ public final class UsefulWorldHighlightRenderHook {
         lastMaxChunkX = Integer.MIN_VALUE;
         lastMinChunkZ = Integer.MIN_VALUE;
         lastMaxChunkZ = Integer.MIN_VALUE;
+        lastScanCenter = null;
+        entityScanDirty = true;
     }
 
     private static boolean isUsefulHighlightEntity(Entity entity) {
@@ -819,6 +875,12 @@ public final class UsefulWorldHighlightRenderHook {
         private static final String BASE_LUCKY_BLOCK_TEXTURE = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvMjM4YzBkMmYxZWMyNjc1NGRjYTNjN2NkYWUzMWYxZjE2NDg4M2Q0NTNlNjg4NjQzZGEwNDc1NjhlN2ZhNWNjOSJ9fX0=";
         private static final String RARE_LUCKY_BLOCK_TEXTURE = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmUwMDJkOTc3MjNiOGNjOTgwMmQzMGZlOGU0Y2VmMzYxZTU2Y2YyZTQ5YWU5MWYyNzRkYTcyZjQ3ODEzNDExOCJ9fX0=";
         private static final String LEGENDARY_LUCKY_BLOCK_TEXTURE = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvMTA2ZWExMDRjYjliZTcwM2NjZWQxYjFmNTY1Mjg2NzUyZTI3MTc1MmM1YWM4NWU4MTEzYjNlMmRjNDM1MmMyMCJ9fX0=";
+        private static final Map<String, HighlightBlockType> TEXTURE_TYPES = Map.of(
+                SkinTextureId.fromValue(GOLDEN_SHARD_TEXTURE), GOLDEN_SHARD,
+                SkinTextureId.fromValue(DIAMOND_SHARD_TEXTURE), DIAMOND_SHARD,
+                SkinTextureId.fromValue(BASE_LUCKY_BLOCK_TEXTURE), BASE_LUCKY_BLOCK,
+                SkinTextureId.fromValue(RARE_LUCKY_BLOCK_TEXTURE), RARE_LUCKY_BLOCK,
+                SkinTextureId.fromValue(LEGENDARY_LUCKY_BLOCK_TEXTURE), LEGENDARY_LUCKY_BLOCK);
 
         private final float red;
         private final float green;
@@ -850,22 +912,7 @@ public final class UsefulWorldHighlightRenderHook {
                 if (texture == null) {
                     return null;
                 }
-                if (GOLDEN_SHARD_TEXTURE.equals(texture)) {
-                    return GOLDEN_SHARD;
-                }
-                if (DIAMOND_SHARD_TEXTURE.equals(texture)) {
-                    return DIAMOND_SHARD;
-                }
-                if (BASE_LUCKY_BLOCK_TEXTURE.equals(texture)) {
-                    return BASE_LUCKY_BLOCK;
-                }
-                if (RARE_LUCKY_BLOCK_TEXTURE.equals(texture)) {
-                    return RARE_LUCKY_BLOCK;
-                }
-                if (LEGENDARY_LUCKY_BLOCK_TEXTURE.equals(texture)) {
-                    return LEGENDARY_LUCKY_BLOCK;
-                }
-                return null;
+                return fromTextureValue(texture);
             }
 
             if (!(blockState.getBlock() instanceof NoteBlock)) {
@@ -891,6 +938,10 @@ public final class UsefulWorldHighlightRenderHook {
             return blockState.getBlock() instanceof PlayerHeadBlock
                     || blockState.getBlock() instanceof PlayerWallHeadBlock
                     || blockState.getBlock() instanceof NoteBlock;
+        }
+
+        static HighlightBlockType fromTextureValue(String texture) {
+            return TEXTURE_TYPES.get(SkinTextureId.fromValue(texture));
         }
 
         private AABB createBox(BlockPos blockPos, BlockState blockState) {

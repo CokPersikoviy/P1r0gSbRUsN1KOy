@@ -39,6 +39,8 @@ public final class ProtocolGraphTelemetry {
         registerRoute("spotnibbles", "DwSpotNibblesDecoder", "handleSpotNibbles", outputs(state("fishingNibbles"), widget("FishingNibblesWidget")));
         registerRoute("hourlyquestypes", "DwHourlyQuestTypesDecoder", "handleHourlyQuestTypes", outputs(state("hourlyQuestTypes"), widget("FishingQuestsWidget")));
         registerRoute("hourlyquestinfo", "DwHourlyQuestInfoDecoder", "handleHourlyQuestInfo", outputs(state("hourlyQuestProgress"), widget("FishingQuestsWidget")));
+        registerRoute("questssetup", "DwQuestsSetupDecoder", "handleQuestsSetup", outputs(state("quests"), widget("FishingQuestsWidget")));
+        registerRoute("questupdate", "DwQuestUpdateDecoder", "handleQuestUpdate", outputs(state("quests"), widget("FishingQuestsWidget")));
         registerRoute("stafftypes", "DwStaffTypesDecoder", "handleStaffTypes", outputs(state("staffTypes"), widget("WandCooldownWidget")));
         registerRoute("stafftimers", "DwStaffTimersDecoder", "handleStaffTimers", outputs(store("WandCooldownTracker"), widget("WandCooldownWidget")));
         registerRoute("abilitytypes", "DwAbilityTypesDecoder", "handleAbilityTypes", outputs(state("abilityTypes"), widget("AbilityCooldownWidget")));
