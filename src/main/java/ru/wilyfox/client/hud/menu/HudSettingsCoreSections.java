@@ -19,6 +19,7 @@ final class HudSettingsCoreSections {
     static void populate(Map<SettingsCategory, List<SettingsComponent>> sections) {
         populateRender(sections.get(SettingsCategory.RENDER));
         populateWidgets(sections.get(SettingsCategory.WIDGET));
+        HudSettingsVisualsSection.populate(sections.get(SettingsCategory.VISUALS));
     }
 
     private static void populateRender(List<SettingsComponent> items) {
@@ -75,6 +76,8 @@ final class HudSettingsCoreSections {
                 value -> ConfigManager.get().render.widgetChrome = value, WidgetChrome.values(), WidgetChrome::label);
         toggle(items, "Native Renderer (no blur, if glass lags)", () -> ConfigManager.get().render.nativeRenderer,
                 value -> ConfigManager.get().render.nativeRenderer = value);
+        toggle(items, "Lightweight HUD (no blur / item icons)", () -> ConfigManager.get().render.lightweightHud,
+                value -> ConfigManager.get().render.lightweightHud = value);
         toggle(items, "Render BossBar as Widget", () -> ConfigManager.get().bossBar.active,
                 value -> ConfigManager.get().bossBar.active = value);
         toggle(items, "Render Scoreboard as Widget", () -> ConfigManager.get().scoreboard.active,

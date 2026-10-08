@@ -116,7 +116,7 @@ public class PotionTimersWidget extends AbstractWidget {
         if (showIcons()) {
             ItemStack icon = entry.icon();
             if (!icon.isEmpty()) {
-                context.item(icon, iconX, iconY);
+                WidgetUtils.drawItemIcon(context, icon, iconX, iconY);
             }
         }
 

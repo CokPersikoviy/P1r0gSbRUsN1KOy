@@ -148,7 +148,7 @@ public class ActiveMinersWidget extends AbstractWidget {
         int iconY = y + Math.max(0, (rowHeight - ICON_SIZE) / 2);
         ItemStack icon = miner.icon();
         if (!icon.isEmpty()) {
-            context.item(icon, iconX, iconY);
+            WidgetUtils.drawItemIcon(context, icon, iconX, iconY);
         }
 
         String levelText = formatLevel(miner.level());

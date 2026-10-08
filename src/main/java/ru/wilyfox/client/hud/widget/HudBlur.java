@@ -25,6 +25,10 @@ public final class HudBlur {
     private HudBlur() {}
 
     public static void beginFrame(GuiGraphicsExtractor context) {
+        if (HudSurface.nativeRenderer()) {
+            if (blurred != null || pool != null) close();
+            return;
+        }
         if (!HudSurface.shouldUseBlur(HudSurface.chrome(), HudSurface.nativeRenderer())) {
             return;
         }
@@ -81,6 +85,7 @@ public final class HudBlur {
     }
 
     public static void blurBehind(GuiGraphicsExtractor context, int x, int y, int w, int h, int radius) {
+        if (HudSurface.nativeRenderer()) return;
         // Screens can explicitly request FROST even when gameplay widgets use BARE/SOLID.
         // Preparing here also covers standalone screens without an explicit beginFrame call.
         prepareTarget(context);

@@ -42,14 +42,26 @@ class FishingSpotTrackerTest {
     }
 
     @Test
-    void isolatedParticleNoiseDoesNotProduceMarkers() {
+    void isolatedServerSignalsStillProduceMarkers() {
         List<FishingSpot> spots = FishingSpotTracker.clusterBubbles(List.of(
                 bubble(0.0D, 64.0D, 0.0D, 1_000L),
                 bubble(5.0D, 64.0D, 5.0D, 1_100L),
                 bubble(10.0D, 64.0D, 10.0D, 1_200L)
         ));
 
-        assertTrue(spots.isEmpty());
+        assertEquals(3, spots.size());
+        assertTrue(spots.stream().allMatch(spot -> spot.bubbleCount() == 1));
+    }
+
+    @Test
+    void packetStrengthWeightsTheClusterWithoutCreatingAnEntryPerParticle() {
+        var spots = FishingSpotTracker.clusterBubbles(List.of(
+                new FishingBubbleEntry(new Vec3(0.1D, 64D, 0.1D), 1_000L, 5),
+                new FishingBubbleEntry(new Vec3(0.3D, 64D, 0.3D), 1_100L, 15)));
+        assertEquals(1, spots.size());
+        assertEquals(20, spots.getFirst().bubbleCount());
+        assertEquals(0.25D, spots.getFirst().center().x, 0.0001D);
+        assertEquals(1_100L, spots.getFirst().latestTimestamp());
     }
 
     private static FishingBubbleEntry bubble(double x, double y, double z, long timestamp) {

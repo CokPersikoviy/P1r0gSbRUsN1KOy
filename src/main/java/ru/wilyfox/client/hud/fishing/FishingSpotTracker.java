@@ -1,14 +1,16 @@
 package ru.wilyfox.client.hud.fishing;
 
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket;
+import ru.wilyfox.client.debug.DebugLogger;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -19,9 +21,10 @@ public final class FishingSpotTracker {
     private static final long LIFETIME_MS = 1_000L;
     private static final double Y_OFFSET = 0.25D;
     private static final double GRID_SIZE = 0.5D;
-    private static final int MIN_BUBBLES_PER_SPOT = 3;
+    private static final int MAX_TRACKED_PACKETS = 2_048;
 
-    private final List<FishingBubbleEntry> particles = new ArrayList<>();
+    private final ArrayDeque<FishingBubbleEntry> particles = new ArrayDeque<>();
+    private String trackedLocationId;
 
     private FishingSpotTracker() {
     }
@@ -36,7 +39,7 @@ public final class FishingSpotTracker {
     }
 
     public boolean shouldDebugParticles() {
-        return DiamondWorldProtocolClient.isCurrentFishingLocation();
+        return DebugLogger.isEnabled() && DiamondWorldProtocolClient.isCurrentFishingLocation();
     }
 
     public String getCurrentFishingLocationId() {
@@ -46,16 +49,21 @@ public final class FishingSpotTracker {
         return DiamondWorldProtocolClient.getCurrentGameLocationData().normalizedId();
     }
 
-    public synchronized void addBubble(double x, double y, double z) {
+    public synchronized void onParticlePacket(ClientboundLevelParticlesPacket packet) {
         if (!shouldTrackParticles()) {
             clear();
             return;
         }
+        if (packet == null || !FishingParticleTypes.isFishingSpot(packet.getParticle())) return;
+        refreshLocation();
 
         long now = System.currentTimeMillis();
-        Vec3 position = new Vec3(x, y + Y_OFFSET, z);
+        Vec3 position = new Vec3(packet.getX(), packet.getY() + Y_OFFSET, packet.getZ());
         cleanup(now);
-        particles.add(new FishingBubbleEntry(position, now));
+        if (particles.size() >= MAX_TRACKED_PACKETS) particles.removeFirst();
+        // Count zero is a valid directional particle packet. Cap marker strength, not packet handling.
+        int strength = Math.max(1, Math.min(45, packet.getCount()));
+        particles.addLast(new FishingBubbleEntry(position, now, strength));
     }
 
     public synchronized List<FishingBubbleEntry> getActiveBubbles() {
@@ -63,6 +71,7 @@ public final class FishingSpotTracker {
             clear();
             return List.of();
         }
+        refreshLocation();
         cleanup(System.currentTimeMillis());
         return List.copyOf(particles);
     }
@@ -73,11 +82,12 @@ public final class FishingSpotTracker {
             return List.of();
         }
 
+        refreshLocation();
         cleanup(System.currentTimeMillis());
         return clusterBubbles(particles);
     }
 
-    static List<FishingSpot> clusterBubbles(List<FishingBubbleEntry> bubbles) {
+    static List<FishingSpot> clusterBubbles(Collection<FishingBubbleEntry> bubbles) {
         if (bubbles == null || bubbles.isEmpty()) {
             return List.of();
         }
@@ -86,7 +96,7 @@ public final class FishingSpotTracker {
         for (FishingBubbleEntry bubble : bubbles) {
             GridPos cell = GridPos.fromVec(bubble.position());
             cells.computeIfAbsent(cell, ignored -> new CellData())
-                    .add(bubble.position(), bubble.timestamp());
+                    .add(bubble.position(), bubble.timestamp(), bubble.particleCount());
         }
 
         List<FishingSpot> spots = new ArrayList<>();
@@ -121,25 +131,28 @@ public final class FishingSpotTracker {
                 }
             }
 
-            if (cluster.count >= MIN_BUBBLES_PER_SPOT) {
-                spots.add(cluster.toSpot());
-            }
+            // A recognized server packet already identifies a spot, even with one rendered particle.
+            spots.add(cluster.toSpot());
         }
 
         return List.copyOf(spots);
     }
 
     private void cleanup(long now) {
-        Iterator<FishingBubbleEntry> iterator = particles.iterator();
-        while (iterator.hasNext()) {
-            if (now - iterator.next().timestamp() > LIFETIME_MS) {
-                iterator.remove();
-            }
-        }
+        while (!particles.isEmpty() && now - particles.getFirst().timestamp() > LIFETIME_MS) particles.removeFirst();
     }
 
     public synchronized void clear() {
         particles.clear();
+        trackedLocationId = null;
+    }
+
+    private void refreshLocation() {
+        String locationId = getCurrentFishingLocationId();
+        if (!java.util.Objects.equals(trackedLocationId, locationId)) {
+            clear();
+            trackedLocationId = locationId;
+        }
     }
 
     public synchronized int diagnosticParticleCount() {
@@ -154,12 +167,12 @@ public final class FishingSpotTracker {
         private double sumY;
         private double sumZ;
 
-        private void add(Vec3 position, long timestamp) {
-            count++;
+        private void add(Vec3 position, long timestamp, int particleCount) {
+            count += particleCount;
             latestTimestamp = Math.max(latestTimestamp, timestamp);
-            sumX += position.x;
-            sumY += position.y;
-            sumZ += position.z;
+            sumX += position.x * particleCount;
+            sumY += position.y * particleCount;
+            sumZ += position.z * particleCount;
         }
 
         private void add(CellData other) {

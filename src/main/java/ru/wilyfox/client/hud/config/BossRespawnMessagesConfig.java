@@ -12,4 +12,5 @@ public class BossRespawnMessagesConfig {
     public int preRespawnSeconds = 30;
     public int lowHealthPercent = 25;
     public int lowHealthCooldownSeconds = 10;
+    public LowHpMessageFormatConfig lowHealthFormat = new LowHpMessageFormatConfig();
 }

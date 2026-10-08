@@ -1,10 +1,12 @@
 package ru.wilyfox.client.hud.menu;
 
 import net.minecraft.client.Minecraft;
+import ru.wilyfox.client.chat.LowHpMessageFormatter;
 import ru.wilyfox.client.discord.DiscordRpcService;
 import ru.wilyfox.client.hud.config.BossTimerSourceMode;
 import ru.wilyfox.client.hud.config.BossWidgetConfig;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.LowHpMessageElement;
 import ru.wilyfox.client.hud.config.FishingNibblesSort;
 import ru.wilyfox.client.hud.config.FishingQuestDescriptionMode;
 import ru.wilyfox.client.hud.config.FishingQuestTypeFilter;
@@ -306,7 +308,7 @@ final class HudSettingsFeatureSections {
                 )
         );
 
-        componentsByCategory.get(SettingsCategory.BOSS_RESPAWN_MESSAGES).add(
+        componentsByCategory.get(SettingsCategory.LOW_HP_MESSAGES).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
                         "Low HP message",
@@ -314,7 +316,7 @@ final class HudSettingsFeatureSections {
                         value -> ConfigManager.get().bossRespawnMessages.lowHealthMessage = value
                 )
         );
-        componentsByCategory.get(SettingsCategory.BOSS_RESPAWN_MESSAGES).add(
+        componentsByCategory.get(SettingsCategory.LOW_HP_MESSAGES).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
                         "Low HP clan message",
@@ -323,7 +325,7 @@ final class HudSettingsFeatureSections {
                 )
         );
 
-        componentsByCategory.get(SettingsCategory.BOSS_RESPAWN_MESSAGES).add(
+        componentsByCategory.get(SettingsCategory.LOW_HP_MESSAGES).add(
                 new StepperSettingsComponent(
                         0, 0, 0, 0,
                         "Low HP percent",
@@ -333,7 +335,7 @@ final class HudSettingsFeatureSections {
                 )
         );
 
-        componentsByCategory.get(SettingsCategory.BOSS_RESPAWN_MESSAGES).add(
+        componentsByCategory.get(SettingsCategory.LOW_HP_MESSAGES).add(
                 new StepperSettingsComponent(
                         0, 0, 0, 0,
                         "Low HP cooldown",
@@ -342,6 +344,28 @@ final class HudSettingsFeatureSections {
                         1, 60, 1
                 )
         );
+
+        var lowHpComponents = componentsByCategory.get(SettingsCategory.LOW_HP_MESSAGES);
+        lowHpComponents.add(new BreakLineSettingsComponent("Message builder"));
+        lowHpComponents.add(new LowHpMessagePreviewComponent(
+                () -> ConfigManager.get().bossRespawnMessages.lowHealthFormat));
+        lowHpComponents.add(new StatusSettingsComponent("Colors: &0 - &f", () -> {
+            for (LowHpMessageElement part : LowHpMessageElement.values()) {
+                var style = ConfigManager.get().bossRespawnMessages.lowHealthFormat.element(part);
+                if (style.visible && !LowHpMessageFormatter.isValidColor(style.colorCode)) return "Invalid code: default color";
+            }
+            return "Also accepts section-sign codes";
+        }));
+        for (LowHpMessageElement part : LowHpMessageElement.values()) {
+            lowHpComponents.add(new ToggleSettingsComponent(0, 0, 0, 0, part.title(),
+                    () -> ConfigManager.get().bossRespawnMessages.lowHealthFormat.element(part).visible,
+                    value -> ConfigManager.get().bossRespawnMessages.lowHealthFormat.element(part).visible = value));
+            lowHpComponents.add(new TextInputSettingsComponent(0, 0, 0, 0, "Color code",
+                    () -> ConfigManager.get().bossRespawnMessages.lowHealthFormat.element(part).colorCode.replace('§', '&'),
+                    value -> ConfigManager.get().bossRespawnMessages.lowHealthFormat.element(part).colorCode = value.replace('§', '&'), 2)
+                    .withIndent(12)
+                    .withVisibility(() -> ConfigManager.get().bossRespawnMessages.lowHealthFormat.element(part).visible));
+        }
 
         componentsByCategory.get(SettingsCategory.PLAYER_HEALTH_BARS).add(
                 new ToggleSettingsComponent(

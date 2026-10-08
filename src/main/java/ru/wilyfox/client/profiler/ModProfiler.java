@@ -13,12 +13,12 @@ import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ClientboundTabListPacket;
 import ru.wilyfox.client.chat.ChatTabManager;
+import ru.wilyfox.utils.AtomicFileWriter;
 
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryUsage;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -84,6 +84,8 @@ public final class ModProfiler {
     private StallCapture activeStall;
     private String observedDimension = "";
     private volatile boolean diagnosticCaptureInProgress;
+    private volatile ProfilerCrashRecorder crashRecorder;
+    private long lastCrashCheckpointAtMs;
 
     private ModProfiler() {
     }
@@ -123,6 +125,7 @@ public final class ModProfiler {
     }
 
     public synchronized void start() {
+        if (crashRecorder != null) crashRecorder.finish();
         enabled = true;
         sessionStartedAt = System.currentTimeMillis();
         sessionStoppedAt = 0L;
@@ -130,7 +133,23 @@ public final class ModProfiler {
         lastClientHeartbeatAtMs = sessionStartedAt;
         lastProtocolPayloadAtMs = 0L;
         activeStall = null;
+        try {
+            var environment = Map.of(
+                    "context", SessionContext.capture(),
+                    "jvmArguments", ManagementFactory.getRuntimeMXBean().getInputArguments(),
+                    "java", System.getProperty("java.version"),
+                    "os", System.getProperty("os.name") + " " + System.getProperty("os.version"),
+                    "mods", FabricLoader.getInstance().getAllMods().stream().map(mod -> Map.of(
+                            "id", mod.getMetadata().getId(), "version", mod.getMetadata().getVersion().getFriendlyString())).toList());
+            crashRecorder = new ProfilerCrashRecorder(Minecraft.getInstance().gameDirectory.toPath()
+                    .resolve("froghelper-profiler"), environment, true,
+                    error -> ru.wilyfox.FrogHelper.LOGGER.warn("Profiler automatic save failed: {}", error));
+        } catch (Throwable exception) {
+            crashRecorder = null;
+            ru.wilyfox.FrogHelper.LOGGER.warn("Cannot start profiler automatic save", exception);
+        }
         recordTimelineEventLocked("profiler/start", currentDimension(Minecraft.getInstance()));
+        checkpointCrashReport();
     }
 
     public synchronized void stop() {
@@ -144,6 +163,8 @@ public final class ModProfiler {
         }
         enabled = false;
         sessionStoppedAt = now;
+        checkpointCrashReport();
+        if (crashRecorder != null) crashRecorder.finish();
     }
 
     public synchronized void reset() {
@@ -159,6 +180,10 @@ public final class ModProfiler {
         lastClientHeartbeatAtMs = enabled ? sessionStartedAt : 0L;
         lastProtocolPayloadAtMs = 0L;
         activeStall = null;
+        if (crashRecorder != null && enabled) {
+            crashRecorder.append("profiler/reset", Map.of(), true);
+            checkpointCrashReport();
+        }
     }
 
     public boolean isEnabled() {
@@ -261,6 +286,9 @@ public final class ModProfiler {
         if (capturePersistentSample) {
             capturePersistentSample(minecraft);
         }
+        if (enabled && crashRecorder != null && nowMs - lastCrashCheckpointAtMs >= 5_000L) {
+            checkpointCrashReport();
+        }
     }
 
     private void capturePersistentSample(Minecraft minecraft) {
@@ -275,6 +303,7 @@ public final class ModProfiler {
             while (persistentSamples.size() > PERSISTENT_SAMPLE_HISTORY_LIMIT) {
                 persistentSamples.removeFirst();
             }
+            if (crashRecorder != null && enabled) crashRecorder.append("client/sample", sample, false);
         }
     }
 
@@ -352,6 +381,9 @@ public final class ModProfiler {
         synchronized (this) {
             capture.threadStacks = stacks;
             capture.diagnostics = diagnostics;
+            if (crashRecorder != null) {
+                crashRecorder.append("watchdog/stall", capture.toView(System.currentTimeMillis()), true);
+            }
         }
     }
 
@@ -441,13 +473,19 @@ public final class ModProfiler {
     }
 
     private void recordLifetimeTimelineEventLocked(String event, String detail) {
-        lifetimeTimeline.addLast(new TimelineEvent(
+        TimelineEvent entry = new TimelineEvent(
                 System.currentTimeMillis(),
                 safeTimelineValue(event),
                 safeTimelineValue(detail)
-        ));
+        );
+        lifetimeTimeline.addLast(entry);
         while (lifetimeTimeline.size() > LIFETIME_TIMELINE_HISTORY_LIMIT) {
             lifetimeTimeline.removeFirst();
+        }
+        if (crashRecorder != null && enabled) {
+            crashRecorder.append("event", new TimelineEventView(entry.timestampMs, entry.event, entry.detail),
+                    event.startsWith("connection/") || event.startsWith("dimension/")
+                            || event.startsWith("client/") || event.startsWith("watchdog/") || event.startsWith("profiler/"));
         }
     }
 
@@ -571,20 +609,53 @@ public final class ModProfiler {
                 + ", sessionMs=" + sessionDurationMs();
     }
 
+    public String crashSaveStatus() {
+        var recorder = crashRecorder;
+        return recorder == null ? "Automatic save has not started" : recorder.status();
+    }
+
+    // Capture immutable values on the client thread, format/write on the save thread. No
+    // histogram or extra world scan; one pending checkpoint and only 60 recent samples.
+    private synchronized void checkpointCrashReport() {
+        var recorder = crashRecorder;
+        if (recorder == null) return;
+        try {
+            ReportSnapshot original = snapshotLocked(null);
+            ReportSnapshot recent = new ReportSnapshot(original.enabled(), original.sessionStartedAtMs(),
+                    original.sessionStoppedAtMs(), original.sessionDurationMs(), original.generatedAtMs(),
+                    original.measuredNanos(), original.sections(), original.counters(), original.callTreeRoots(),
+                    original.samples(), original.context(), original.runtimeDiagnostics(), original.stalls(),
+                    original.timeline(), tail(original.persistentSamples(), 60), null,
+                    tail(original.lifetimeTimeline(), 128), original.lifetime(), null);
+            recorder.checkpoint(() -> buildMarkdownReport(recent));
+            lastCrashCheckpointAtMs = System.currentTimeMillis();
+        } catch (Throwable ignored) {
+            // Existing journal/JFR checkpoints must keep running if a snapshot cannot allocate.
+        }
+    }
+
+    private static <T> List<T> tail(List<T> entries, int limit) {
+        return List.copyOf(entries.subList(Math.max(0, entries.size() - limit), entries.size()));
+    }
+
     public Path writeMarkdownReport(Path directory) throws IOException {
         return writeMarkdownReport(directory, null);
     }
 
     public Path writeMarkdownReport(Path directory, String prefixFilter) throws IOException {
+        return writeMarkdownReport(directory, prefixFilter, false);
+    }
+
+    public Path writeMarkdownReport(Path directory, String prefixFilter, boolean includeHistogram) throws IOException {
         recordTimelineEvent("profiler/dump", normalizePrefix(prefixFilter) == null ? "full" : prefixFilter);
-        ReportSnapshot snapshot = filterSnapshot(snapshot(true), prefixFilter);
+        ReportSnapshot snapshot = filterSnapshot(snapshot(includeHistogram), prefixFilter);
         String timestamp = FILE_TIMESTAMP_FORMAT.format(Instant.ofEpochMilli(snapshot.generatedAtMs()));
         String baseName = snapshot.focusPrefix() == null
                 ? "fhprof-" + timestamp
                 : "fhprof-" + sanitizeFileComponent(snapshot.focusPrefix()) + "-" + timestamp;
         Path output = directory.resolve(baseName + ".md");
         Files.createDirectories(directory);
-        Files.writeString(output, buildMarkdownReport(snapshot), StandardCharsets.UTF_8);
+        AtomicFileWriter.write(output, writer -> writer.write(buildMarkdownReport(snapshot)));
         return output.toAbsolutePath().normalize();
     }
 
@@ -844,7 +915,7 @@ public final class ModProfiler {
 
     private void appendReportHeader(StringBuilder markdown, ReportSnapshot snapshot) {
         markdown.append("# FrogHelper Profiler Report\n\n");
-        markdown.append("> Generated by `/fhprof dump` for local client-side diagnostics.\n\n");
+        markdown.append("> Local client-side diagnostics.\n\n");
         if (snapshot.focusPrefix() != null) {
             markdown.append("> Focused view for prefix: <code>").append(escapeHtml(snapshot.focusPrefix())).append("</code>\n\n");
         }
@@ -1314,6 +1385,10 @@ public final class ModProfiler {
     private void appendClassHistogram(StringBuilder markdown, ProfilerDiagnostics.FullDiagnostics diagnostics) {
         markdown.append("### JVM Class Histogram\n\n");
         if (diagnostics.classHistogram().isEmpty()) {
+            if (diagnostics.histogramError().isEmpty()) {
+                markdown.append("> Histogram skipped to avoid a JVM pause. Use `/fhprof dump-full` for an explicit heap inspection.\n\n");
+                return;
+            }
             markdown.append("> Histogram unavailable: <code>")
                     .append(escapeHtml(diagnostics.histogramError())).append("</code>\n\n");
             return;

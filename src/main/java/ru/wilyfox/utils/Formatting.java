@@ -1,11 +1,12 @@
 package ru.wilyfox.utils;
 
-import java.time.Instant;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class Formatting {
     private static final Pattern COLON_TIME = Pattern.compile("(\\d{1,2}):(\\d{2})(?::(\\d{2}))?");
+    private static final Pattern SANITIZE_PUNCTUATION = Pattern.compile("[^\\p{L}\\p{N} ]+");
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
     private static final Pattern WORD_TIME = Pattern.compile(
             "(\\d+)\\s*(ч|час|часа|часов|h|hr|hrs|мин|min|m|сек|с|sec|secs|seconds)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
@@ -20,13 +21,11 @@ public final class Formatting {
             return "";
         }
 
-        return stripped
+        String plain = stripped
                 .replace("\r", "")
                 .replace("\n", "")
-                .replace('\u00A0', ' ')
-                .replaceAll("[^\\p{L}\\p{N} ]+", "")
-                .replaceAll("\\s+", " ")
-                .trim();
+                .replace('\u00A0', ' ');
+        return WHITESPACE.matcher(SANITIZE_PUNCTUATION.matcher(plain).replaceAll("")).replaceAll(" ").trim();
     }
 
     public static String stripMinecraftFormatting(String text) {
@@ -116,37 +115,30 @@ public final class Formatting {
     }
 
     public static String formatMillis(long millis) {
-        long diff = millis - Instant.now().toEpochMilli();
-        if (diff < 0L) {
-            diff = 0L;
-        }
+        return formatMillis(millis, System.currentTimeMillis());
+    }
 
-        long totalSeconds = diff / 1000L;
-        long hours = totalSeconds / 3600L;
-        long minutes = (totalSeconds % 3600L) / 60L;
-        long seconds = totalSeconds % 60L;
-
-        if (hours > 0L) {
-            return String.format("%02d:%02d:%02d", hours, minutes, seconds);
-        }
-
-        return String.format("%02d:%02d", minutes, seconds);
+    public static String formatMillis(long millis, long now) {
+        return formatDuration(Math.max(0L, millis - now) / 1000L);
     }
 
     public static String formatMillisSigned(long millis) {
-        long diff = millis - Instant.now().toEpochMilli();
-        boolean negative = diff < 0L;
-        long absolute = Math.abs(diff);
+        return formatMillisSigned(millis, System.currentTimeMillis());
+    }
 
-        long totalSeconds = absolute / 1000L;
-        long hours = totalSeconds / 3600L;
-        long minutes = (totalSeconds % 3600L) / 60L;
-        long seconds = totalSeconds % 60L;
+    public static String formatMillisSigned(long millis, long now) {
+        long diff = millis - now;
+        String formatted = formatDuration(Math.abs(diff) / 1000L);
+        return diff < 0L ? "-" + formatted : formatted;
+    }
 
-        String formatted = hours > 0L
-                ? String.format("%02d:%02d:%02d", hours, minutes, seconds)
-                : String.format("%02d:%02d", minutes, seconds);
+    private static String formatDuration(long seconds) {
+        long hours = seconds / 3600L;
+        String tail = twoDigits((seconds % 3600L) / 60L) + ":" + twoDigits(seconds % 60L);
+        return hours > 0L ? twoDigits(hours) + ":" + tail : tail;
+    }
 
-        return negative ? "-" + formatted : formatted;
+    private static String twoDigits(long value) {
+        return value < 10L ? "0" + value : Long.toString(value);
     }
 }

@@ -9,6 +9,7 @@ public class HudConfig {
     public Integer lastWindowWidth;
     public Integer lastWindowHeight;
     public RenderConfig render = new RenderConfig();
+    public VisualsConfig visuals = new VisualsConfig();
     public AutoMessagesConfig autoMessages = new AutoMessagesConfig();
     public BossWidgetConfig bossWidget = new BossWidgetConfig();
     public ClickerConfig clicker = new ClickerConfig();

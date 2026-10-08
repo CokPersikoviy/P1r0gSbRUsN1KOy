@@ -60,7 +60,7 @@ public class CraftRecipeWidget extends AbstractWidget {
         } else {
             ItemStack icon = tracker.getIcon();
             int iconY = y + Math.max(0, (mc.font.lineHeight - ICON_SIZE) / 2);
-            context.item(icon, PADDING_X, iconY);
+            WidgetUtils.drawItemIcon(context, icon, PADDING_X, iconY);
 
             int textX = PADDING_X + ICON_SIZE + ICON_TEXT_GAP;
             context.text(mc.font, tracker.getTitle(), textX, y, WidgetTheme.TITLE);

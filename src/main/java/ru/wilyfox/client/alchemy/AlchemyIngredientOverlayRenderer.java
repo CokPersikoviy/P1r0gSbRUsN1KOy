@@ -39,7 +39,7 @@ public final class AlchemyIngredientOverlayRenderer {
             }
 
             int half = size / 2;
-            int color = WidgetTheme.withAlpha(WidgetTheme.HARD_ACCENT, alpha);
+            int color = WidgetTheme.withAlpha(WidgetTheme.ACCENT_LINE, alpha);
             WidgetUtils.drawCorners(context, point.x() - half, point.y() - half, size, size, color);
         }
     }

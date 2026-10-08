@@ -1,6 +1,7 @@
 package ru.wilyfox.boss;
 
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import ru.wilyfox.client.protocol.BossTypeCatalog;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
@@ -11,6 +12,9 @@ import ru.wilyfox.utils.Formatting;
 
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.List;
 import java.util.Iterator;
 import java.util.Set;
 
@@ -19,6 +23,9 @@ import static ru.wilyfox.client.debug.DebugLogger.info;
 
 public class BossTracker {
     private final Set<Integer> pendingEntityIds = new HashSet<>();
+    // Keep only name/registry snapshots, never entities or old worlds. Decorations often keep
+    // an unrelated custom name for their entire lifetime; do not parse it on every tick.
+    private final Map<Integer, CheckedName> checkedNames = new HashMap<>();
     private final BossRepository repository;
     private ClientLevel trackedWorld;
 
@@ -31,11 +38,13 @@ public class BossTracker {
 
     public void onEntityLoad(Entity entity) {
         if (entity.level() instanceof ClientLevel world) observeWorld(world);
+        checkedNames.remove(entity.getId());
         pendingEntityIds.add(entity.getId());
     }
 
     public void reset() {
         pendingEntityIds.clear();
+        checkedNames.clear();
         pendingBossName = null;
         pendingBossTimeMillis = null;
         trackedWorld = null;
@@ -51,28 +60,39 @@ public class BossTracker {
     public void onWorldTick(ClientLevel world) {
         observeWorld(world);
         Iterator<Integer> it = pendingEntityIds.iterator();
+        long catalogRevision = BossTypeCatalog.revision();
+        List<DwBossType> catalog = null;
 
         while (it.hasNext()) {
-            int id = it.next();
+            Integer id = it.next();
             Entity entity = world.getEntity(id);
 
             if (entity == null) {
                 it.remove();
+                checkedNames.remove(id);
                 continue;
             }
 
-            if (entity.getCustomName() == null) {
+            Component customName = entity.getCustomName();
+            if (customName == null) {
+                checkedNames.remove(id);
                 continue;
             }
 
-            String raw = entity.getCustomName().getString();
+            CheckedName previous = checkedNames.get(id);
+            if (previous != null && previous.catalogRevision() == catalogRevision && previous.name().equals(customName)) {
+                continue;
+            }
+            String raw = customName.getString();
             String bossName = BossName.getBossName(raw);
             if (bossName == null) {
-                bossName = BossName.resolveRegistryName(raw, BossTypeCatalog.snapshot());
+                if (catalog == null) catalog = BossTypeCatalog.snapshot();
+                bossName = BossName.resolveRegistryName(raw, catalog);
             }
             if (bossName != null) {
                 pendingBossName = bossName;
                 it.remove();
+                checkedNames.remove(id);
                 tryCommit();
                 continue;
             }
@@ -82,9 +102,24 @@ public class BossTracker {
             if (millis != -1) {
                 pendingBossTimeMillis = millis;
                 it.remove();
+                checkedNames.remove(id);
                 tryCommit();
+            } else {
+                checkedNames.put(id, new CheckedName(snapshotName(customName), catalogRevision));
             }
         }
+    }
+
+    private record CheckedName(Component name, long catalogRevision) {}
+
+    private static Component snapshotName(Component name) {
+        var copy = name.copy();
+        // Preserve detection even if another mod mutates a sibling in place instead of
+        // replacing the custom-name component with a new metadata packet.
+        for (int i = 0; i < copy.getSiblings().size(); i++) {
+            copy.getSiblings().set(i, snapshotName(copy.getSiblings().get(i)));
+        }
+        return copy;
     }
 
     private void tryCommit() {

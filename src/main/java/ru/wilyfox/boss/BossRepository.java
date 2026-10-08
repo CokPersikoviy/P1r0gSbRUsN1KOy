@@ -4,19 +4,17 @@ import net.minecraft.world.item.ItemStack;
 import ru.wilyfox.client.hud.config.BossWidgetConfig;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.utils.BossLevel;
+import ru.wilyfox.utils.BossName;
 
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.LongSupplier;
-import java.util.stream.Collectors;
-
-import static ru.wilyfox.utils.Formatting.stripMinecraftFormatting;
 
 public class BossRepository {
     private final Map<String, BossInfo> worldBosses = new LinkedHashMap<>();
@@ -25,6 +23,12 @@ public class BossRepository {
     private final Map<String, ItemStack> discoveredBossIcons = new LinkedHashMap<>();
     private final LongSupplier clock;
     private final LongSupplier spawnGraceSupplier;
+    private SourceStamp worldStamp;
+    private SourceStamp protocolStamp;
+    private List<BossInfo> worldView = List.of();
+    private List<BossInfo> protocolView = List.of();
+    private List<BossInfo> mergedView = List.of();
+    private long iconRevision;
 
     public BossRepository() {
         this(System::currentTimeMillis, BossRepository::configuredSpawnGraceMs);
@@ -38,7 +42,7 @@ public class BossRepository {
     public void upsert(String bossName, long respawnAtMillis) {
         int fallbackLevel = Objects.requireNonNullElse(BossLevel.getBossLevel(bossName), 0);
         int level = protocolLevelsByName.getOrDefault(nameKey(bossName), fallbackLevel);
-        upsert(worldBosses, bossName, null, bossName, respawnAtMillis, level);
+        upsert(worldBosses, nameKey(bossName), null, bossName, respawnAtMillis, level);
     }
 
     public void upsertProtocol(String bossId, String bossName, long respawnAtMillis, int level) {
@@ -63,6 +67,7 @@ public class BossRepository {
         protocolBosses.clear();
         protocolLevelsByName.clear();
         discoveredBossIcons.clear();
+        iconRevision++;
     }
 
     public Collection<BossInfo> getAll() {
@@ -70,32 +75,38 @@ public class BossRepository {
     }
 
     public Collection<BossInfo> getAllWorld() {
-        return worldBosses.values().stream()
-                .sorted(Comparator.comparingLong(BossInfo::getRespawnAt))
-                .collect(Collectors.toList());
+        ensureViews();
+        return worldView;
     }
 
     public Collection<BossInfo> getAllProtocol() {
-        cleanupProtocol();
-        return deduplicateByName(protocolBosses.values()).stream()
-                .sorted(Comparator.comparingLong(BossInfo::getRespawnAt))
-                .collect(Collectors.toList());
+        ensureViews();
+        return protocolView;
     }
 
     public Collection<BossInfo> getAllMerged() {
+        ensureViews();
+        return mergedView;
+    }
+
+    private void ensureViews() {
         cleanupProtocol();
+        if (worldStamp != null && worldStamp.matches(worldBosses)
+                && protocolStamp.matches(protocolBosses)) return;
+        worldView = sorted(worldBosses.values());
+        protocolView = sorted(deduplicateByName(protocolBosses.values()));
         Map<String, BossInfo> merged = new LinkedHashMap<>();
         Set<Integer> protocolLevels = new HashSet<>();
 
-        for (BossInfo boss : deduplicateByName(protocolBosses.values())) {
-            merged.put(nameKey(boss.getName()), boss);
+        for (BossInfo boss : protocolView) {
+            merged.put(boss.getIdentityKey(), boss);
             if (boss.getLevel() > 0) {
                 protocolLevels.add(boss.getLevel());
             }
         }
 
         for (BossInfo boss : worldBosses.values()) {
-            String nameKey = nameKey(boss.getName());
+            String nameKey = boss.getIdentityKey();
             if (merged.containsKey(nameKey)
                     || boss.getLevel() > 0 && protocolLevels.contains(boss.getLevel())) {
                 continue;
@@ -103,9 +114,33 @@ public class BossRepository {
             merged.putIfAbsent(nameKey, boss);
         }
 
-        return merged.values().stream()
-                .sorted(Comparator.comparingLong(BossInfo::getRespawnAt))
-                .collect(Collectors.toList());
+        mergedView = sorted(merged.values());
+        worldStamp = new SourceStamp(worldBosses);
+        protocolStamp = new SourceStamp(protocolBosses);
+    }
+
+    private static List<BossInfo> sorted(Collection<BossInfo> source) {
+        return source.stream().sorted(Comparator.comparingLong(BossInfo::getRespawnAt)).toList();
+    }
+
+    /** Validate actual objects/deadlines, including mutations through BossInfo's existing setter. */
+    private static final class SourceStamp {
+        private final BossInfo[] bosses;
+        private final long[] deadlines;
+        private SourceStamp(Map<String, BossInfo> source) {
+            bosses = source.values().toArray(BossInfo[]::new);
+            deadlines = new long[bosses.length];
+            for (int i = 0; i < bosses.length; i++) deadlines[i] = bosses[i].getRespawnAt();
+        }
+        private boolean matches(Map<String, BossInfo> source) {
+            if (source.size() != bosses.length) return false;
+            int i = 0;
+            for (BossInfo boss : source.values()) {
+                if (boss != bosses[i] || boss.getRespawnAt() != deadlines[i]) return false;
+                i++;
+            }
+            return true;
+        }
     }
 
     public void mergeProtocol(Map<String, BossInfo> bosses) {
@@ -154,7 +189,7 @@ public class BossRepository {
             }
         }
 
-        ItemStack byName = discoveredBossIcons.get(iconKey(boss.getName()));
+        ItemStack byName = discoveredBossIcons.get("name:" + boss.getIdentityKey());
         return byName != null ? byName.copy() : null;
     }
 
@@ -164,6 +199,7 @@ public class BossRepository {
         }
 
         ItemStack icon = stack.copy();
+        iconRevision++;
         icon.setCount(1);
 
         if (bossName != null && !bossName.isBlank()) {
@@ -174,6 +210,8 @@ public class BossRepository {
             discoveredBossIcons.put(levelKey(level), icon.copy());
         }
     }
+
+    public long getIconRevision() { return iconRevision; }
 
     public String findBossNameByLevel(int level) {
         for (BossInfo boss : protocolBosses.values()) {
@@ -215,7 +253,7 @@ public class BossRepository {
     private Collection<BossInfo> deduplicateByName(Collection<BossInfo> bosses) {
         Map<String, BossInfo> unique = new LinkedHashMap<>();
         for (BossInfo boss : bosses) {
-            unique.merge(nameKey(boss.getName()), boss, (current, candidate) ->
+            unique.merge(boss.getIdentityKey(), boss, (current, candidate) ->
                     candidate.getRespawnAt() > current.getRespawnAt() ? candidate : current);
         }
         return unique.values();
@@ -232,10 +270,7 @@ public class BossRepository {
     }
 
     private String nameKey(String bossName) {
-        if (bossName == null) {
-            return "";
-        }
-        return stripMinecraftFormatting(bossName).trim().toLowerCase(Locale.ROOT);
+        return BossName.identityKey(bossName);
     }
 
     private String levelKey(int level) {

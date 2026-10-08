@@ -1,6 +1,7 @@
 package ru.wilyfox.boss;
 
 public class BossInfo {
+    private final String identityKey;
     private final String id;
     private final String name;
     private long respawnAt;
@@ -13,6 +14,7 @@ public class BossInfo {
     public BossInfo(String id, String n, long r, int l) {
         this.id = id;
         this.name = n;
+        this.identityKey = ru.wilyfox.utils.BossName.identityKey(n);
         this.respawnAt = r;
         this.level = l;
     }
@@ -23,6 +25,10 @@ public class BossInfo {
 
     public String getName() {
         return name;
+    }
+
+    public String getIdentityKey() {
+        return identityKey;
     }
 
     public long getRespawnAt() {

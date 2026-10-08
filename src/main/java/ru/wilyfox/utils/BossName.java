@@ -9,13 +9,26 @@ import java.util.regex.Pattern;
 
 public final class BossName {
     private static final Pattern MULTIPLICITY = Pattern.compile("[xXхХ×]\\d+");
+    private static final Pattern COMBINING_MARKS = Pattern.compile("\\p{M}+");
+    private static final Pattern REGISTRY_PUNCTUATION = Pattern.compile("[^a-zA-Zа-яА-Я]+");
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     private BossName() {}
 
+    /** Shared timer identity for holograms and server names, including known aliases. */
+    public static String identityKey(String value) {
+        if (value == null) return "";
+        String plain = WHITESPACE.matcher(Formatting.stripMinecraftFormatting(value).replace('\u00a0', ' ')
+                .trim()).replaceAll(" ");
+        String canonical = getBossName(plain);
+        return COMBINING_MARKS.matcher(Normalizer.normalize(canonical == null ? plain : canonical, Normalizer.Form.NFD))
+                .replaceAll("").toLowerCase(Locale.ROOT);
+    }
+
     public static String getBossName(String text) {
         if (text == null) return null;
-        text = Normalizer.normalize(Formatting.sanitize(withoutMultiplicity(text)), Normalizer.Form.NFD)
-                .replaceAll("\\p{M}+", "").toUpperCase(Locale.ROOT);
+        text = COMBINING_MARKS.matcher(Normalizer.normalize(Formatting.sanitize(withoutMultiplicity(text)), Normalizer.Form.NFD))
+                .replaceAll("").toUpperCase(Locale.ROOT);
         switch (text) {
             // Overworld
             case "КРИГЕР" -> {
@@ -230,9 +243,9 @@ public final class BossName {
 
     private static String lookupKey(String value) {
         if (value == null) return "";
-        return Normalizer.normalize(Formatting.stripMinecraftFormatting(withoutMultiplicity(value)), Normalizer.Form.NFD)
-                .replaceAll("\\p{M}+", "").replaceAll("[^a-zA-Zа-яА-Я]+", "")
-                .toUpperCase(Locale.ROOT);
+        String plain = COMBINING_MARKS.matcher(Normalizer.normalize(
+                Formatting.stripMinecraftFormatting(withoutMultiplicity(value)), Normalizer.Form.NFD)).replaceAll("");
+        return REGISTRY_PUNCTUATION.matcher(plain).replaceAll("").toUpperCase(Locale.ROOT);
     }
 
     private static String withoutMultiplicity(String text) {

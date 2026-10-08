@@ -25,4 +25,5 @@ public class RenderConfig {
     // Frost HUD surface language.
     public WidgetChrome widgetChrome = WidgetChrome.FROST;   // BARE / SOLID / FROST intensity
     public boolean nativeRenderer = false;                    // fall back to GuiGraphics (no blur/rounding)
+    public boolean lightweightHud = false;                   // flat panels and text, without item models
 }

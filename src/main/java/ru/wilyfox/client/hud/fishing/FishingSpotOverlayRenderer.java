@@ -43,7 +43,7 @@ public final class FishingSpotOverlayRenderer {
             }
 
             int half = size / 2;
-            int color = withAlpha(WidgetTheme.TEXT_SOFT, alpha);
+            int color = WidgetTheme.withAlpha(WidgetTheme.ACCENT_LINE, alpha);
 
             WidgetUtils.drawCorners(
                     context,
@@ -65,9 +65,8 @@ public final class FishingSpotOverlayRenderer {
     }
 
     private static int getMarkerAlpha(int bubbleCount, long ageMs) {
-        // Сила по пузырькам:
-        // 45+ = полностью видно
-        float bubbleFactor = Math.max(0.0f, Math.min(1.0f, bubbleCount / 45.0f));
+        // Even a single recognized server packet must produce a visible marker.
+        float bubbleFactor = Math.max(0.35f, Math.min(1.0f, bubbleCount / 45.0f));
 
         // Мягкий fade-out по возрасту:
         // чем ближе к удалению, тем слабее
@@ -77,10 +76,6 @@ public final class FishingSpotOverlayRenderer {
         ageFactor = 0.35f + ageFactor * 0.65f;
 
         return Math.round(255.0f * bubbleFactor * ageFactor);
-    }
-
-    private static int withAlpha(int rgb, int alpha) {
-        return ((alpha & 0xFF) << 24) | (rgb & 0xFFFFFF);
     }
 
     private static int getPulsingMarkerSize(FishingSpot spot, double distance) {

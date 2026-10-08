@@ -52,4 +52,22 @@ class BossTypeCatalogTest {
 
         assertTrue(BossTypeCatalog.snapshot().stream().anyMatch(type -> type.id().equals("unknown_boss")));
     }
+
+    @Test
+    void revisionChangesWhenAnUnknownHologramCanGainAType() {
+        long initial = BossTypeCatalog.revision();
+        BossTypeCatalog.observe("future", "Future Boss", 0);
+        long observed = BossTypeCatalog.revision();
+        assertTrue(observed > initial);
+        BossTypeCatalog.update(Map.of("future", new DwBossType("future", "Future Boss", "", 610, 0, 0, false)));
+        assertTrue(BossTypeCatalog.revision() > observed);
+    }
+
+    @Test
+    void plainIServerNameReplacesTheOldLegionFallbackDespiteNewLevel() {
+        BossTypeCatalog.update(Map.of("ImmortalLegion",
+                new DwBossType("ImmortalLegion", "Бессмертныи легион", "", 130, 0, 0, false)));
+        assertTrue(BossTypeCatalog.snapshot().stream().anyMatch(type -> type.id().equals("immortallegion")));
+        assertFalse(BossTypeCatalog.snapshot().stream().anyMatch(type -> type.id().equals("level:105")));
+    }
 }

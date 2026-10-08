@@ -46,11 +46,15 @@ public final class ProfilerDebugCommand {
         }
 
         switch (command) {
-            case "", "status" -> showLocalMessage(profiler.buildStatusLine());
+            case "", "status" -> {
+                showLocalMessage(profiler.buildStatusLine());
+                showLocalMessage(profiler.crashSaveStatus());
+            }
             case "start" -> {
                 profiler.reset();
                 profiler.start();
                 showLocalMessage("Profiler started. Long-running diagnostics retained.");
+                showLocalMessage("Automatic crash checkpoints: " + profiler.crashSaveStatus());
             }
             case "stop" -> {
                 profiler.stop();
@@ -62,17 +66,27 @@ public final class ProfilerDebugCommand {
             }
             case "report" -> showLines(profiler.buildReportLines(option));
             case "dump", "save" -> dumpReport(profiler, option);
-            default -> showLocalMessage("Usage: /fhprof <status|start|stop|reset|report [prefix]|dump [prefix]>");
+            case "dump-full" -> dumpFullReport(profiler, option);
+            default -> showLocalMessage("Usage: /fhprof <status|start|stop|reset|report [prefix]|dump [prefix]|dump-full [prefix]>");
         }
 
         return true;
     }
 
     private static void dumpReport(ModProfiler profiler, String prefixFilter) {
+        dumpReport(profiler, prefixFilter, false);
+    }
+
+    private static void dumpFullReport(ModProfiler profiler, String prefixFilter) {
+        showLocalMessage("Full dump collects a heap histogram and can temporarily freeze the client.");
+        dumpReport(profiler, prefixFilter, true);
+    }
+
+    private static void dumpReport(ModProfiler profiler, String prefixFilter, boolean includeHistogram) {
         Minecraft minecraft = Minecraft.getInstance();
         Path outputDirectory = minecraft.gameDirectory.toPath().resolve("froghelper-profiler");
         try {
-            Path outputFile = profiler.writeMarkdownReport(outputDirectory, prefixFilter);
+            Path outputFile = profiler.writeMarkdownReport(outputDirectory, prefixFilter, includeHistogram);
             showLocalMessage("Profiler report saved to " + outputFile);
         } catch (IOException exception) {
             showLocalMessage("Failed to save profiler report: " + exception.getMessage());

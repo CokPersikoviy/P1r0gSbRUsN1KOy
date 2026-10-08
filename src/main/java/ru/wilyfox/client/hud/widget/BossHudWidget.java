@@ -26,13 +26,14 @@ import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.Objects;
 import java.util.List;
 import java.util.Map;
 import java.util.function.ToLongFunction;
 
 import static ru.wilyfox.utils.Formatting.formatMillis;
 import static ru.wilyfox.utils.Formatting.formatMillisSigned;
-import static ru.wilyfox.utils.Formatting.stripMinecraftFormatting;
 
 public class BossHudWidget extends AbstractWidget {
     /** Prefixed to raid-boss names in the timer during a mythical event. */
@@ -40,7 +41,7 @@ public class BossHudWidget extends AbstractWidget {
     /** Prefixed to bosses the clan currently holds (captured / location busy). */
     private static final String CAPTURE_MARKER = "✗ ";
     /** Event boss (not a real respawn timer) — never listed in the boss timer. */
-    private static final String EXCLUDED_BOSS = "древний страж";
+    private static final String EXCLUDED_BOSS = ru.wilyfox.utils.BossName.identityKey("древний страж");
     private static final int PADDING_X = 6;
     private static final int PADDING_Y = 5;
     private static final int LINE_GAP = 1;
@@ -53,7 +54,27 @@ public class BossHudWidget extends AbstractWidget {
     private static final int EMPTY_HEIGHT = 28;
 
     private final BossRepository repository;
-    private final Map<String, ItemStack> iconCache = new HashMap<>();
+    private final Map<BossIconInfo, ItemStack> iconCache = new HashMap<>();
+    private final Map<BossInfo, RowText> rowCache = new IdentityHashMap<>();
+    private final Map<BossInfo, ResolvedIcon> resolvedIcons = new IdentityHashMap<>();
+
+    private static final class RowText {
+        final String level;
+        String prefix;
+        String suffix;
+        String name;
+        String compact;
+        String timer;
+        long seconds = Long.MIN_VALUE;
+        boolean spawned;
+        int nameWidth;
+        int levelWidth;
+        int compactWidth;
+        int timerWidth;
+        RowText(BossInfo boss) { level = "[" + boss.getLevel() + "]"; }
+    }
+
+    private record ResolvedIcon(BossIconInfo protocol, long revision, ItemStack stack) {}
 
     // Per-frame cache: the visible-boss list + its measured dimensions were rebuilt on every call, and
     // isVisible()/getWidth()/getHeight()/render() ask for them several times per frame (and the layout
@@ -114,13 +135,12 @@ public class BossHudWidget extends AbstractWidget {
         for (int line = 0; line < visibleBosses.size(); line++) {
             BossInfo boss = visibleBosses.get(line);
             int y = contentY + line * lineStep;
-            boolean spawned = isSpawned(boss);
-            long displayRespawnAt = getDisplayRespawnAt(boss);
-
-            String nameText = bossDisplayName(boss);
-            String compactMarkerText = showName ? "" : bossCompactMarkers(boss);
-            String levelText = "[" + boss.getLevel() + "]";
-            String timerText = spawned ? formatMillisSigned(displayRespawnAt) : formatMillis(displayRespawnAt);
+            RowText row = rowCache.get(boss);
+            boolean spawned = row.spawned;
+            String nameText = row.name;
+            String compactMarkerText = showName ? "" : row.compact;
+            String levelText = row.level;
+            String timerText = row.timer;
 
             int currentX = PADDING_X;
             int nameColor = spawned ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_PRIMARY;
@@ -129,7 +149,9 @@ public class BossHudWidget extends AbstractWidget {
             int iconY = y + Math.max(0, (mc.font.lineHeight - ICON_SIZE) / 2) + ICON_Y_OFFSET;
 
             if (showIcons) {
-                renderBossIcon(context, getBossIcon(boss), currentX, iconY);
+                if (!ConfigManager.get().render.lightweightHud) {
+                    renderBossIcon(context, getBossIcon(boss), currentX, iconY);
+                }
                 currentX += ICON_SIZE;
 
                 if (showName || showLevel || showTimer) {
@@ -154,7 +176,7 @@ public class BossHudWidget extends AbstractWidget {
                 if (fullAlignment) {
                     currentX += maxNameWidth;
                 } else {
-                    currentX += mc.font.width(nameText);
+                    currentX += row.nameWidth;
                 }
 
                 if (showLevel || showTimer) {
@@ -164,7 +186,7 @@ public class BossHudWidget extends AbstractWidget {
 
             if (showLevel) {
                 context.text(mc.font, levelText, currentX, y, levelColor);
-                currentX += fullAlignment ? maxLevelWidth : mc.font.width(levelText);
+                currentX += fullAlignment ? maxLevelWidth : row.levelWidth;
 
                 if (showTimer) {
                     currentX += COLUMN_GAP;
@@ -211,9 +233,40 @@ public class BossHudWidget extends AbstractWidget {
         cachedFrameTime = System.currentTimeMillis();
         List<BossInfo> bosses = computeVisibleBosses();
         cachedVisibleBosses = bosses;
+        // Keep only visible identities: packet replacements and world changes cannot grow these caches.
+        rowCache.keySet().retainAll(bosses);
+        resolvedIcons.keySet().retainAll(bosses);
+        for (BossInfo boss : bosses) refreshRow(boss);
         cachedUnscaledWidth = computeUnscaledWidth(bosses);
         cachedUnscaledHeight = computeUnscaledHeight(bosses);
         cachedFrameId = frame;
+    }
+
+    private void refreshRow(BossInfo boss) {
+        RowText row = rowCache.computeIfAbsent(boss, RowText::new);
+        String prefix = bossStatusPrefix(boss);
+        String suffix = bossCollectibleSuffix(boss);
+        if (!Objects.equals(row.prefix, prefix) || !Objects.equals(row.suffix, suffix)) {
+            row.prefix = prefix;
+            row.suffix = suffix;
+            row.name = prefix + boss.getName() + suffix;
+            row.compact = (prefix + suffix).trim().replace("  ", " ");
+        }
+        long remaining = getDisplayRespawnAt(boss) - cachedFrameTime;
+        boolean spawned = remaining < 0L;
+        long seconds = Math.abs(remaining) / 1000L;
+        if (row.timer == null || row.seconds != seconds || row.spawned != spawned) {
+            row.seconds = seconds;
+            row.spawned = spawned;
+            row.timer = spawned ? formatMillisSigned(getDisplayRespawnAt(boss), cachedFrameTime)
+                    : formatMillis(getDisplayRespawnAt(boss), cachedFrameTime);
+        }
+        // Measure against the current font each frame so resource-pack reloads remain correct.
+        var font = Minecraft.getInstance().font;
+        row.nameWidth = font.width(row.name);
+        row.levelWidth = font.width(row.level);
+        row.compactWidth = font.width(row.compact);
+        row.timerWidth = font.width(row.timer);
     }
 
     @Override
@@ -310,11 +363,7 @@ public class BossHudWidget extends AbstractWidget {
         int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Boss Timers") : 0;
 
         for (BossInfo boss : visibleBosses) {
-            boolean spawned = isSpawned(boss);
-            long displayRespawnAt = getDisplayRespawnAt(boss);
-            String nameText = bossDisplayName(boss);
-            String levelText = "[" + boss.getLevel() + "]";
-            String timerText = spawned ? formatMillisSigned(displayRespawnAt) : formatMillis(displayRespawnAt);
+            RowText row = rowCache.get(boss);
 
             int rowWidth = 0;
 
@@ -335,7 +384,7 @@ public class BossHudWidget extends AbstractWidget {
             }
 
             if (showName) {
-                rowWidth += fullAlignment ? maxNameWidth : mc.font.width(nameText);
+                rowWidth += fullAlignment ? maxNameWidth : row.nameWidth;
 
                 if (showLevel || showTimer) {
                     rowWidth += COLUMN_GAP;
@@ -343,7 +392,7 @@ public class BossHudWidget extends AbstractWidget {
             }
 
             if (showLevel) {
-                rowWidth += fullAlignment ? maxLevelWidth : mc.font.width(levelText);
+                rowWidth += fullAlignment ? maxLevelWidth : row.levelWidth;
 
                 if (showTimer) {
                     rowWidth += COLUMN_GAP;
@@ -351,7 +400,7 @@ public class BossHudWidget extends AbstractWidget {
             }
 
             if (showTimer) {
-                rowWidth += mc.font.width(timerText);
+                rowWidth += row.timerWidth;
             }
 
             maxWidth = Math.max(maxWidth, rowWidth);
@@ -431,7 +480,7 @@ public class BossHudWidget extends AbstractWidget {
         int max = 0;
 
         for (BossInfo boss : bosses) {
-            max = Math.max(max, mc.font.width(bossDisplayName(boss)));
+            max = Math.max(max, rowCache.get(boss).nameWidth);
         }
 
         return max;
@@ -441,7 +490,7 @@ public class BossHudWidget extends AbstractWidget {
         int max = 0;
 
         for (BossInfo boss : bosses) {
-            max = Math.max(max, mc.font.width(bossCompactMarkers(boss)));
+            max = Math.max(max, rowCache.get(boss).compactWidth);
         }
 
         return max;
@@ -451,7 +500,7 @@ public class BossHudWidget extends AbstractWidget {
         int max = 0;
 
         for (BossInfo boss : bosses) {
-            max = Math.max(max, mc.font.width("[" + boss.getLevel() + "]"));
+            max = Math.max(max, rowCache.get(boss).levelWidth);
         }
 
         return max;
@@ -473,35 +522,12 @@ public class BossHudWidget extends AbstractWidget {
         context.pose().pushMatrix();
         context.pose().translate(x, y);
         context.pose().scale(iconScale, iconScale);
-        context.item(stack, 0, 0);
+        WidgetUtils.drawItemIcon(context, stack, 0, 0);
         context.pose().popMatrix();
     }
 
-    private boolean isSpawned(BossInfo boss) {
-        return getDisplayRespawnAt(boss) < System.currentTimeMillis();
-    }
-
     private static boolean isExcludedBoss(BossInfo boss) {
-        String name = boss.getName();
-        return name != null
-                && stripMinecraftFormatting(name).toLowerCase(java.util.Locale.ROOT).contains(EXCLUDED_BOSS);
-    }
-
-    /** Boss name shown in the timer — captured bosses get a cross, raid bosses a star (mythic event). */
-    private String bossDisplayName(BossInfo boss) {
-        return bossStatusPrefix(boss) + boss.getName() + bossCollectibleSuffix(boss);
-    }
-
-    private String bossCompactMarkers(BossInfo boss) {
-        String status = bossStatusPrefix(boss).trim();
-        String collectible = bossCollectibleSuffix(boss).trim();
-        if (status.isEmpty()) {
-            return collectible;
-        }
-        if (collectible.isEmpty()) {
-            return status;
-        }
-        return status + " " + collectible;
+        return boss.getIdentityKey().contains(EXCLUDED_BOSS);
     }
 
     private String bossStatusPrefix(BossInfo boss) {
@@ -556,32 +582,31 @@ public class BossHudWidget extends AbstractWidget {
 
     private ItemStack getBossIcon(BossInfo boss) {
         BossIconInfo protocolIcon = DiamondWorldProtocolClient.getBossIconByLevel(boss.getLevel());
+        long revision = repository.getIconRevision();
+        ResolvedIcon cached = resolvedIcons.get(boss);
+        if (cached != null && cached.revision() == revision && Objects.equals(cached.protocol(), protocolIcon)) {
+            return cached.stack();
+        }
+        ItemStack stack;
         if (protocolIcon != null) {
-            return getOrCreateCachedIcon(protocolIcon);
+            stack = getOrCreateCachedIcon(protocolIcon);
+        } else {
+            stack = repository.getDiscoveredIcon(boss);
+            if (stack == null || stack.isEmpty()) {
+                BossIconInfo icon = BossStaticIconLookup.find(boss);
+                stack = icon == null ? new ItemStack(Items.CLOCK) : getOrCreateCachedIcon(icon);
+            }
         }
-
-        ItemStack discovered = repository.getDiscoveredIcon(boss);
-        if (discovered != null && !discovered.isEmpty()) {
-            return discovered;
-        }
-
-        BossIconInfo icon = BossStaticIconLookup.find(boss);
-        if (icon == null) {
-            return new ItemStack(Items.CLOCK);
-        }
-
-        return getOrCreateCachedIcon(icon);
+        resolvedIcons.put(boss, new ResolvedIcon(protocolIcon, revision, stack));
+        return stack;
     }
 
     private ItemStack getOrCreateCachedIcon(BossIconInfo icon) {
-        String cacheKey = icon.material() + "|" + icon.customModelData();
-        ItemStack cached = iconCache.get(cacheKey);
-        if (cached != null) {
-            return cached;
-        }
-
+        ItemStack cached = iconCache.get(icon);
+        if (cached != null) return cached;
+        if (iconCache.size() >= 64) iconCache.clear();
         ItemStack created = createBossIcon(icon);
-        iconCache.put(cacheKey, created);
+        iconCache.put(icon, created);
         return created;
     }
 

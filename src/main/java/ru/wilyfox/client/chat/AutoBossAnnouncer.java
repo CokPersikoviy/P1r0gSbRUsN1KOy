@@ -20,8 +20,6 @@ import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import ru.wilyfox.client.protocol.DwBossType;
 
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.ArrayList;
@@ -38,7 +36,6 @@ public final class AutoBossAnnouncer {
     private static final int CURSED_BAR_COLOR = 0x25D192;
     private static final long SPAWN_ANNOUNCE_WINDOW_MS = 2_000L;
     private static final long RESPAWN_RESET_GRACE_MS = 5_000L;
-    private static final DecimalFormat HEALTH_FORMAT = new DecimalFormat("0.##", DecimalFormatSymbols.getInstance(Locale.US));
 
     private static final Map<String, Long> announcedRespawns = new HashMap<>();
     private static final Map<String, Long> announcedSpawns = new HashMap<>();
@@ -61,6 +58,8 @@ public final class AutoBossAnnouncer {
         }
 
         initialized = true;
+        // Resolve the formatter and its component/color classes during initialization, before a fight.
+        LowHpMessageFormatter.warmUp();
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> clearState());
 
@@ -167,14 +166,11 @@ public final class AutoBossAnnouncer {
                 continue;
             }
 
-            // The absolute HP number is best-effort; when the title didn't yield one, report the percent only.
-            String healthText = snapshot.health() >= 0.0d
-                    ? " осталось " + HEALTH_FORMAT.format(snapshot.health()) + " HP (" + Math.round(snapshot.percent()) + "%)"
-                    : " осталось " + Math.round(snapshot.percent()) + "% HP";
-
-            String curseMarker = snapshot.cursed() ? " [Прок]" : "";
-            publishMessage(
-                    formatServerPrefix() + formatBossLabel(snapshot.name(), snapshot.level()) + curseMarker + healthText,
+            var message = LowHpMessageFormatter.format(config.lowHealthFormat,
+                    DiamondWorldProtocolClient.getCurrentServerDisplayName(null), snapshot.name(), snapshot.level(),
+                    snapshot.health(), snapshot.percent(), snapshot.cursed(), snapshot.label());
+            if (message.isEmpty()) continue;
+            publishMessage(message.component(), message.clanText(),
                     config.lowHealthMessage,
                     config.lowHealthClanMessage
             );
@@ -215,7 +211,7 @@ public final class AutoBossAnnouncer {
             rejectedLowHealthBars.remove(event.getId());
             // Both values originate as floats; avoid 0.2f becoming 20.000000298% at a 20% threshold.
             double percent = Math.max(0.0d, Math.min(100.0d, event.getProgress() * 100.0F));
-            snapshots.add(new BossBarSnapshot(type.name(), type.level(), parsed.health(), percent, isCursed(event.getName())));
+            snapshots.add(new BossBarSnapshot(type.name(), type.level(), parsed.health(), percent, isCursed(event.getName()), parsed.label()));
         }
 
         return snapshots;
@@ -280,21 +276,25 @@ public final class AutoBossAnnouncer {
         return seconds + "с";
     }
 
-    private static void showLocalMessage(String message) {
+    private static void showLocalMessage(Component message) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.gui != null) {
-            minecraft.gui.hud.getChat().addClientSystemMessage(Component.literal(message));
+            minecraft.gui.hud.getChat().addClientSystemMessage(message);
         }
     }
 
     private static void publishMessage(String message, boolean local, boolean clan) {
+        publishMessage(Component.literal(message), message, local, clan);
+    }
+
+    private static void publishMessage(Component localMessage, String clanMessage, boolean local, boolean clan) {
         if (local) {
-            showLocalMessage(message);
+            showLocalMessage(localMessage);
         }
         if (clan) {
             Minecraft minecraft = Minecraft.getInstance();
             if (minecraft.player != null && minecraft.player.connection != null) {
-                ChatDispatchQueue.enqueueChat("@" + message, 1_000L);
+                ChatDispatchQueue.enqueueChat("@" + clanMessage, 1_000L);
             }
         }
     }
@@ -337,6 +337,6 @@ public final class AutoBossAnnouncer {
         rejectedLowHealthBars.clear();
     }
 
-    private record BossBarSnapshot(String name, int level, double health, double percent, boolean cursed) {
+    private record BossBarSnapshot(String name, int level, double health, double percent, boolean cursed, String label) {
     }
 }

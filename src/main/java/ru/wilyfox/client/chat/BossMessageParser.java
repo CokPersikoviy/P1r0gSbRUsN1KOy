@@ -9,9 +9,10 @@ final class BossMessageParser {
     private static final Pattern CURSE = Pattern.compile("Босс проклят! Особенность: ([А-Яа-яЁё ]+)");
     private static final Pattern CAPTURE = Pattern.compile("^Босс (.*) захвачен кланом (.*)!$");
     private static final Pattern CLAN_WAVE = Pattern.compile("Испытание вызова (?:(|\\d+):|)(\\d+)");
-    // EvoPlus searches for name + HP inside the title; trailing clan text is independent.
+    // EvoPlus searches for name + HP inside the title; trailing labels are independent.
     // Keep our decimal HP support while ignoring resource-pack icons around the match.
     private static final Pattern HEALTH = Pattern.compile("([\\p{L} ]+)\\s+(\\d+(?:[.,]\\d+)?)(?=\\D|$)");
+    private static final Pattern HEALTH_LABEL = Pattern.compile("^[^\\p{L}\\p{N}()]*\\((.*)\\)");
 
     private BossMessageParser() {
     }
@@ -52,7 +53,9 @@ final class BossMessageParser {
         }
 
         try {
-            return new BossBarText(bossName, Double.parseDouble(matcher.group(2).replace(',', '.')));
+            Matcher label = HEALTH_LABEL.matcher(clean).region(matcher.end(), clean.length());
+            String labelText = label.lookingAt() ? label.group(1).trim() : "";
+            return new BossBarText(bossName, Double.parseDouble(matcher.group(2).replace(',', '.')), labelText);
         } catch (NumberFormatException ignored) {
             return null;
         }
@@ -65,6 +68,6 @@ final class BossMessageParser {
     record BossCapture(String bossName, String clanName) {
     }
 
-    record BossBarText(String bossName, double health) {
+    record BossBarText(String bossName, double health, String label) {
     }
 }

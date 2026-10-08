@@ -9,6 +9,8 @@ final class HudConfigSanitizer {
     static HudConfig sanitize(HudConfig config) {
         HudConfig sanitized = config != null ? config : new HudConfig();
 
+        if (sanitized.visuals == null) sanitized.visuals = new VisualsConfig();
+        sanitized.visuals.sanitize();
         if (sanitized.render == null) sanitized.render = new RenderConfig();
         if (sanitized.render.widgetChrome == null) sanitized.render.widgetChrome = WidgetChrome.FROST;
         if (sanitized.autoMessages == null) sanitized.autoMessages = new AutoMessagesConfig();
@@ -52,6 +54,10 @@ final class HudConfigSanitizer {
         if (sanitized.popUps == null) sanitized.popUps = new PopUpsConfig();
         if (sanitized.boosters == null) sanitized.boosters = new BoostersConfig();
         if (sanitized.bossRespawnMessages == null) sanitized.bossRespawnMessages = new BossRespawnMessagesConfig();
+        if (sanitized.bossRespawnMessages.lowHealthFormat == null) {
+            sanitized.bossRespawnMessages.lowHealthFormat = new LowHpMessageFormatConfig();
+        }
+        sanitized.bossRespawnMessages.lowHealthFormat.sanitize();
         if (sanitized.discordRpc == null) sanitized.discordRpc = new DiscordRpcConfig();
         if (sanitized.quickAccess == null) sanitized.quickAccess = new QuickAccessConfig();
         if (sanitized.theme == null) sanitized.theme = new ThemeConfig();

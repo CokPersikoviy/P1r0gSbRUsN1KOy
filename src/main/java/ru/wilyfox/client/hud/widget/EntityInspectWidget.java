@@ -99,7 +99,7 @@ public final class EntityInspectWidget extends AbstractWidget {
         context.fill(PREVIEW_BOX_X, PREVIEW_BOX_Y, previewX2, previewY2, WidgetTheme.WIDGET_PANEL_BG_SOFT);
         context.fill(PREVIEW_BOX_X, PREVIEW_BOX_Y, previewX2, PREVIEW_BOX_Y + 1, WidgetTheme.WIDGET_ACCENT_LINE);
 
-        context.item(snapshot.previewItem, PREVIEW_BOX_X + 34, PREVIEW_BOX_Y + 18);
+        WidgetUtils.drawItemIcon(context, snapshot.previewItem, PREVIEW_BOX_X + 34, PREVIEW_BOX_Y + 18);
         context.centeredText(mc.font, snapshot.previewLabel, PREVIEW_BOX_X + PREVIEW_BOX_SIZE / 2, PREVIEW_BOX_Y + 44, WidgetTheme.TEXT_SECONDARY);
 
         int nameColor = snapshot.displayName.isBlank() ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_PRIMARY;

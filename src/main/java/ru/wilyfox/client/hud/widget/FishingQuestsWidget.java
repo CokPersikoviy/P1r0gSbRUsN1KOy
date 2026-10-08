@@ -65,7 +65,7 @@ public final class FishingQuestsWidget extends AbstractWidget {
 
         ItemStack icon = new ItemStack(Items.PAPER);
         for (QuestView quest : quests) {
-            context.item(icon, PADDING_X, y);
+            WidgetUtils.drawItemIcon(context, icon, PADDING_X, y);
             int textX = PADDING_X + ICON_SIZE + ICON_GAP;
             for (QuestLine line : quest.lines()) {
                 context.text(mc.font, line.text(), textX, y, line.color());

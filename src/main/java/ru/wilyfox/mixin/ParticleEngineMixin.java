@@ -2,7 +2,6 @@ package ru.wilyfox.mixin;
 
 import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.core.particles.ParticleOptions;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -10,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.fishing.FishingParticleTypes;
 import ru.wilyfox.client.hud.fishing.FishingSpotTracker;
 import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.profiler.ProfilerScopeStack;
@@ -53,12 +52,7 @@ public class ParticleEngineMixin {
     @Inject(method = "createParticle", at = @At("HEAD"))
     private void froghelper$trackFishingParticles(ParticleOptions particleOptions, double x, double y, double z, double xd, double yd, double zd, CallbackInfoReturnable<?> cir) {
         FishingSpotTracker tracker = FishingSpotTracker.getInstance();
-        if (isFishingBubbleParticle(particleOptions)) {
-            tracker.addBubble(x, y, z);
-            return;
-        }
-
-        if (tracker.shouldDebugParticles()) {
+        if (tracker.shouldDebugParticles() && !FishingParticleTypes.isFishingSpot(particleOptions)) {
             logUnknownFishingParticle(tracker.getCurrentFishingLocationId(), particleOptions, x, y, z);
         }
     }
@@ -86,10 +80,4 @@ public class ParticleEngineMixin {
         );
     }
 
-    private boolean isFishingBubbleParticle(ParticleOptions options) {
-        return options.getType() == ParticleTypes.BUBBLE
-                || options.getType() == ParticleTypes.BUBBLE_POP
-                || options.getType() == ParticleTypes.BUBBLE_COLUMN_UP
-                || options.getType() == ParticleTypes.LAVA;
-    }
 }

@@ -81,7 +81,7 @@ public class WandCooldownWidget extends AbstractWidget {
         int x = 0;
         for (WandCooldownEntry entry : entries) {
             if (numericMode) {
-                context.item(entry.stack(), x + (slotWidth - 16) / 2, ITEM_OFFSET);
+                WidgetUtils.drawItemIcon(context, entry.stack(), x + (slotWidth - 16) / 2, ITEM_OFFSET);
 
                 long remainingMillis = Math.max(0L, entry.endsAt() - now);
                 String remaining = formatNumericCooldown(remainingMillis);
@@ -93,7 +93,7 @@ public class WandCooldownWidget extends AbstractWidget {
                         SLOT_SIZE + NUMERIC_TEXT_GAP, textColor, false);
             } else {
                 context.fill(x, SLOT_SIZE - BAR_HEIGHT, x + SLOT_SIZE, SLOT_SIZE, WidgetTheme.BAR_BG);
-                context.item(entry.stack(), x + ITEM_OFFSET, ITEM_OFFSET);
+                WidgetUtils.drawItemIcon(context, entry.stack(), x + ITEM_OFFSET, ITEM_OFFSET);
 
                 int fillWidth = Math.max(0, Math.min(SLOT_SIZE, Math.round(SLOT_SIZE * entry.progress())));
                 if (fillWidth > 0) {

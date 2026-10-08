@@ -2,6 +2,7 @@ package ru.wilyfox.client.protocol;
 
 import ru.wilyfox.boss.BossInfo;
 import ru.wilyfox.utils.BossLevel;
+import ru.wilyfox.utils.BossName;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -10,11 +11,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import static ru.wilyfox.utils.Formatting.stripMinecraftFormatting;
-
 /** Boss type registry retained across server switches for settings screens and stable filtering. */
 public final class BossTypeCatalog {
     private static final Map<String, DwBossType> TYPES = new LinkedHashMap<>();
+    private static long revision;
 
     static {
         seedBuiltInTypes();
@@ -49,6 +49,7 @@ public final class BossTypeCatalog {
             );
             removeSupersededEntries(normalized);
             TYPES.put(id, normalized);
+            revision++;
         });
     }
 
@@ -66,6 +67,11 @@ public final class BossTypeCatalog {
         DwBossType observed = new DwBossType(id, bossName, "", level, 0, 0, false);
         removeSupersededEntries(observed);
         TYPES.put(id, observed);
+        revision++;
+    }
+
+    public static synchronized long revision() {
+        return revision;
     }
 
     public static synchronized List<DwBossType> snapshot() {
@@ -120,6 +126,7 @@ public final class BossTypeCatalog {
     static synchronized void resetForTesting() {
         TYPES.clear();
         seedBuiltInTypes();
+        revision++;
     }
 
     private static void seedBuiltInTypes() {
@@ -144,9 +151,6 @@ public final class BossTypeCatalog {
     }
 
     private static String normalizeName(String name) {
-        if (name == null) {
-            return "";
-        }
-        return stripMinecraftFormatting(name).trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+        return BossName.identityKey(name);
     }
 }

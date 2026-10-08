@@ -29,7 +29,7 @@ public final class HudSurface {
     }
 
     public static boolean nativeRenderer() {
-        return ConfigManager.get().render.nativeRenderer;
+        return ConfigManager.get().render.nativeRenderer || ConfigManager.get().render.lightweightHud;
     }
 
     static boolean shouldUseSmoothGeometry(WidgetChrome chrome, boolean useNative) {

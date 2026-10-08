@@ -7,6 +7,7 @@
   "entrypoints": {
     "fabric-client-gametest": [
       "ru.wilyfox.MigrationClientTest",
+      "ru.wilyfox.client.visuals.VisualsClientTest",
       "ru.wilyfox.HudDragClientTest",
       "ru.wilyfox.HudBlurClientTest",
       "ru.wilyfox.DungeonMapClientTest",
@@ -15,7 +16,13 @@
       "ru.wilyfox.client.highlight.UsefulHighlightClientTest",
       "ru.wilyfox.client.chat.LowHpMessageClientTest",
       "ru.wilyfox.client.hud.widget.FishingQuestsClientTest",
-      "ru.wilyfox.client.profiler.TransitionDiagnosticsClientTest"
+      "ru.wilyfox.client.hud.fishing.FishingParticlesClientTest",
+      "ru.wilyfox.client.profiler.TransitionDiagnosticsClientTest",
+      "ru.wilyfox.client.hud.widget.BossTimerIdentityClientTest",
+      "ru.wilyfox.client.hud.widget.WeakClientHudClientTest",
+      "ru.wilyfox.client.hud.menu.LowHpMessageBuilderClientTest",
+      "ru.wilyfox.boss.BossTrackerMemoryClientTest",
+      "ru.wilyfox.client.profiler.ProfilerCrashSaveClientTest"
     ]
   },
   "depends": {

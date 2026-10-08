@@ -62,6 +62,8 @@ public class HudRenderer {
     private int lastScreenHeight = -1;
     private final Map<Widget, Integer> passiveLayoutWidthCache = new IdentityHashMap<>();
     private final Map<Widget, Integer> passiveLayoutHeightCache = new IdentityHashMap<>();
+    private long nextPassiveLayoutCheck;
+    private static final long PASSIVE_LAYOUT_INTERVAL_NANOS = 100_000_000L;
 
     private Widget draggedWidget = null;
     private int dragOffsetX = 0;
@@ -208,6 +210,7 @@ public class HudRenderer {
 
     public void setEditing(boolean editing) {
         this.editing = editing;
+        nextPassiveLayoutCheck = 0;
 
         if (!editing) {
             draggedWidget = null;
@@ -222,10 +225,12 @@ public class HudRenderer {
 
     public void toggleSettings() {
         this.settingsOpen = !this.settingsOpen;
+        nextPassiveLayoutCheck = 0;
     }
 
     public void setSettings(boolean settings) {
         this.settingsOpen = settings;
+        nextPassiveLayoutCheck = 0;
     }
 
     public boolean isSettingsOpen() {
@@ -238,6 +243,7 @@ public class HudRenderer {
 
     public void registerWidget(Widget widget, ScreenAnchor defaultAnchor) {
         widgets.add(widget);
+        nextPassiveLayoutCheck = 0;
 
         if (widget instanceof AbstractWidget abstractWidget) {
             abstractWidget.setConfigKey(widget.getClass().getSimpleName());
@@ -761,6 +767,9 @@ public class HudRenderer {
     }
 
     private boolean hasPassiveLayoutChanges() {
+        long now = System.nanoTime();
+        if (now < nextPassiveLayoutCheck) return false;
+        nextPassiveLayoutCheck = now + PASSIVE_LAYOUT_INTERVAL_NANOS;
         boolean trackedAny = false;
         for (Widget widget : widgets) {
             if (!requiresPassiveLayoutTracking(widget)) {

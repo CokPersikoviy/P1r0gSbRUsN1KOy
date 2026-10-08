@@ -9,6 +9,45 @@ class HudConfigSanitizerTest {
     private final Gson gson = new Gson();
 
     @Test
+    void migratesOldLowHpSettingsAndRestoresMissingFormatParts() {
+        HudConfig config = gson.fromJson("""
+                {"bossRespawnMessages":{"lowHealthMessage":true,"lowHealthPercent":20,
+                  "lowHealthFormat":{"elements":{"NAME":{"visible":false,"colorCode":"&a"},
+                    "HEALTH":{"colorCode":"&c"},"LEVEL":null,"STAGE":{"colorCode":null}}}}}
+                """, HudConfig.class);
+        config = HudConfigSanitizer.sanitize(config);
+        var format = config.bossRespawnMessages.lowHealthFormat;
+        assertTrue(config.bossRespawnMessages.lowHealthMessage);
+        assertEquals(20, config.bossRespawnMessages.lowHealthPercent);
+        assertFalse(format.element(LowHpMessageElement.NAME).visible);
+        assertEquals("&a", format.element(LowHpMessageElement.NAME).colorCode);
+        assertTrue(format.element(LowHpMessageElement.HEALTH).visible);
+        assertEquals("&b", format.element(LowHpMessageElement.LEVEL).colorCode);
+        assertEquals("&7", format.element(LowHpMessageElement.STAGE).colorCode);
+
+        config.bossRespawnMessages.lowHealthFormat = null;
+        config = HudConfigSanitizer.sanitize(config);
+        assertNotNull(config.bossRespawnMessages.lowHealthFormat);
+        config.bossRespawnMessages.lowHealthFormat.elements = null;
+        var missingElements = config;
+        assertDoesNotThrow(() -> HudConfigSanitizer.sanitize(missingElements));
+        assertEquals(LowHpMessageElement.values().length, config.bossRespawnMessages.lowHealthFormat.elements.size());
+    }
+
+    @Test
+    void savesVisibilityColorsAndIncompleteInputWithoutDiscardingKeystrokes() {
+        var config = new HudConfig();
+        var format = config.bossRespawnMessages.lowHealthFormat;
+        format.element(LowHpMessageElement.SERVER).visible = false;
+        format.element(LowHpMessageElement.NAME).colorCode = "§A";
+        format.element(LowHpMessageElement.STAGE).colorCode = "&";
+        var restored = HudConfigSanitizer.sanitize(gson.fromJson(gson.toJson(config), HudConfig.class));
+        assertFalse(restored.bossRespawnMessages.lowHealthFormat.element(LowHpMessageElement.SERVER).visible);
+        assertEquals("§A", restored.bossRespawnMessages.lowHealthFormat.element(LowHpMessageElement.NAME).colorCode);
+        assertEquals("&", restored.bossRespawnMessages.lowHealthFormat.element(LowHpMessageElement.STAGE).colorCode);
+    }
+
+    @Test
     void removesDeletedPotionWidgetSettingsAndUnhooksOnlyItsDependents() {
         HudConfig config = gson.fromJson("""
                 {"potionRecipe":{"active":true,"visibility":"ALCHEMY"},

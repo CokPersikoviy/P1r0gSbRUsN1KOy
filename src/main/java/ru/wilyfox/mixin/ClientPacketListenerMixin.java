@@ -21,6 +21,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ru.wilyfox.client.alchemy.AlchemyIngredientTracker;
+import ru.wilyfox.client.hud.fishing.FishingSpotTracker;
 import ru.wilyfox.client.chat.ServerEmojiRegistry;
 import ru.wilyfox.client.dungeon.DungeonMapTracker;
 import ru.wilyfox.client.highlight.UsefulWorldHighlightRenderHook;
@@ -101,7 +102,8 @@ public class ClientPacketListenerMixin {
     }
 
     @Inject(method = "handleParticleEvent", at = @At("TAIL"))
-    private void froghelper$trackAlchemyIngredientParticlePacket(ClientboundLevelParticlesPacket packet, CallbackInfo ci) {
+    private void froghelper$trackIngredientAndFishingParticlePacket(ClientboundLevelParticlesPacket packet, CallbackInfo ci) {
+        FishingSpotTracker.getInstance().onParticlePacket(packet);
         if (packet.getParticle().getType() == ParticleTypes.HAPPY_VILLAGER) {
             AlchemyIngredientTracker.getInstance().addParticle(packet.getX(), packet.getY(), packet.getZ());
         }
@@ -109,18 +111,21 @@ public class ClientPacketListenerMixin {
 
     @Inject(method = "handleLogin", at = @At("TAIL"))
     private void froghelper$resetUsefulHighlightOnLogin(ClientboundLoginPacket packet, CallbackInfo ci) {
+        FishingSpotTracker.getInstance().clear();
         ModProfiler.getInstance().recordClientEvent("login", packet.getClass().getSimpleName());
         UsefulWorldHighlightRenderHook.onPlayerTeleport();
     }
 
     @Inject(method = "handleRespawn", at = @At("TAIL"))
     private void froghelper$resetUsefulHighlightOnRespawn(ClientboundRespawnPacket packet, CallbackInfo ci) {
+        FishingSpotTracker.getInstance().clear();
         ModProfiler.getInstance().recordClientEvent("respawn", packet.getClass().getSimpleName());
         UsefulWorldHighlightRenderHook.onPlayerTeleport();
     }
 
     @Inject(method = "handleMovePlayer", at = @At("TAIL"))
     private void froghelper$resetUsefulHighlightOnTeleport(ClientboundPlayerPositionPacket packet, CallbackInfo ci) {
+        FishingSpotTracker.getInstance().clear();
         ModProfiler.getInstance().recordClientEvent("teleport", packet.getClass().getSimpleName());
         UsefulWorldHighlightRenderHook.onPlayerTeleport();
     }

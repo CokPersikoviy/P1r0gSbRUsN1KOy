@@ -1,11 +1,19 @@
 package ru.wilyfox.client.hud.widget;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.world.item.ItemStack;
 import ru.wilyfox.client.hud.config.ConfigManager;
 
 public final class WidgetUtils {
 
     private WidgetUtils() {}
+
+    /** Preserve row spacing while avoiding the item model / picture-in-picture rendering pipeline. */
+    public static void drawItemIcon(GuiGraphicsExtractor context, ItemStack stack, int x, int y) {
+        if (!ConfigManager.get().render.lightweightHud) {
+            context.item(stack, x, y);
+        }
+    }
 
     /**
      * Single source of truth for the "UnClutter" toggle: when off, widgets skip drawing their

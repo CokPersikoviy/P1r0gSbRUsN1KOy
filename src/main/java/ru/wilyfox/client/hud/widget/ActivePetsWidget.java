@@ -67,7 +67,7 @@ public class ActivePetsWidget extends AbstractWidget {
         for (ActivePetInfo pet : pets) {
             ItemStack icon = pet.icon();
             if (!icon.isEmpty()) {
-                context.item(icon, PADDING_X, y);
+                WidgetUtils.drawItemIcon(context, icon, PADDING_X, y);
             }
             context.text(
                     mc.font,
