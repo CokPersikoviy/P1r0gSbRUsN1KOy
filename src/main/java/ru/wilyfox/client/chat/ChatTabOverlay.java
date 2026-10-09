@@ -1,5 +1,6 @@
 package ru.wilyfox.client.chat;
 
+import ru.wilyfox.client.audio.UiSounds;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
@@ -97,6 +98,7 @@ public final class ChatTabOverlay {
 
             if (mouseX >= x && mouseX <= x + tabWidth
                     && mouseY >= y && mouseY <= y + TAB_HEIGHT) {
+                if (ChatTabManager.getInstance().getActiveTab() != tab) UiSounds.click();
                 ChatTabManager.getInstance().setActiveTab(tab);
                 return true;
             }
@@ -108,6 +110,7 @@ public final class ChatTabOverlay {
 
         if (isOverEmojiButton(mouseX, mouseY, emojiButtonX, screenHeight)) {
             emojiMenuOpen = !emojiMenuOpen;
+            UiSounds.openClose();
             return true;
         }
 
@@ -115,6 +118,7 @@ public final class ChatTabOverlay {
             int emojiIndex = getClickedEmojiIndex(mouseX, mouseY, emojiButtonX, this.getScreenWidth(minecraft), screenHeight);
             if (emojiIndex >= 0) {
                 insertEmoji(minecraft, ServerEmojiRegistry.all().get(emojiIndex).symbol());
+                UiSounds.click();
                 return true;
             }
 

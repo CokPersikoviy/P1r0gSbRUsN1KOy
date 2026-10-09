@@ -30,6 +30,8 @@ final class ProtocolState {
     long lastPayloadAt;
     long worldContextRevision;
     long gameLocationRevision;
+    boolean worldRefreshPending;
+    DwGameLocation locationBeforeWorldRefresh;
 
     Map<String, DwBossType> bossTypes = new LinkedHashMap<>();
     Map<String, DwPetType> petTypes = new LinkedHashMap<>();
@@ -75,6 +77,8 @@ final class ProtocolState {
         worldContextRevision++;
         gameLocationRevision++;
         receivedEvoPlusPayload = false;
+        worldRefreshPending = false;
+        locationBeforeWorldRefresh = null;
         lastHandshakeAt = 0L;
         lastPayloadAt = 0L;
         loggedFirstMinerPayload = false;

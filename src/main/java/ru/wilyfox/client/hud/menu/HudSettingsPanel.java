@@ -1,10 +1,14 @@
 package ru.wilyfox.client.hud.menu;
 
+import ru.wilyfox.client.audio.UiSounds;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.config.AutoMessageEntryConfig;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.WidgetChrome;
+import ru.wilyfox.client.hud.config.WidgetCatalog;
+import ru.wilyfox.client.hud.widget.Widget;
+import ru.wilyfox.client.hud.widget.AbstractWidget;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
@@ -17,8 +21,8 @@ public class HudSettingsPanel {
     private int x;
     private int y;
 
-    private final int width = 420;
-    private final int height = 280;
+    private int width = 420;
+    private int height = 280;
 
     private final int sidebarWidth = 120;
     private final int headerHeight = 24;
@@ -27,7 +31,11 @@ public class HudSettingsPanel {
     private final int rowSpacing = 5;
 
     private final Map<SettingsCategory, List<SettingsComponent>> componentsByCategory = new EnumMap<>(SettingsCategory.class);
-    private SettingsCategory activeCategory = SettingsCategory.BOSS_TIMERS;
+    private SettingsCategory activeCategory = SettingsCategory.WIDGET;
+    private Widget settingsWidget;
+    private String settingsLayout;
+    private List<SettingsComponent> widgetComponents = List.of();
+    private Runnable closeWidgetAction;
 
     private boolean initialized = false;
     private int scrollOffset = 0;
@@ -35,26 +43,120 @@ public class HudSettingsPanel {
     private int categoryScrollOffset = 0;
     private int maxCategoryScroll = 0;
 
+    private DragNumberSettingsComponent capturedNumber;
+    private Object hoveredSoundTarget;
+    private Object frameSoundTarget;
     private boolean scrollbarDragging = false;
     private int scrollbarDragOffset = 0;
     private boolean categoryScrollbarDragging = false;
     private int categoryScrollbarDragOffset = 0;
     private final List<Boolean> autoMessageSlotExpanded = new ArrayList<>();
 
+    public boolean isWidgetSettings() { return settingsWidget != null; }
+    public boolean isContextSettings() { return settingsWidget != null || settingsLayout != null; }
+
+    public boolean openWidget(Widget widget, Runnable onClose) {
+        if (!(widget instanceof AbstractWidget placed)) return false;
+        var catalog = WidgetCatalog.find(placed.getConfigKey());
+        if (catalog == null) return false;
+        finishInteraction();
+        settingsWidget = widget;
+        settingsLayout = null;
+        closeWidgetAction = onClose;
+        widgetComponents = new ArrayList<>();
+        widgetComponents.add(new DragNumberSettingsComponent(0, 0, 0, 0, "Scale (%)",
+                () -> Math.round(placed.getScale() * 100), value -> {
+                    placed.setScale(value / 100f);
+                    ConfigManager.captureWidgetLayout(placed);
+                }, 50, 300));
+        widgetComponents.add(new LocationSettingsComponent("Location visibility",
+                () -> ConfigManager.getWidgetLocations(placed.getConfigKey()).locationVisibility,
+                value -> ConfigManager.getWidgetLocations(placed.getConfigKey()).selectVisible(value), "Everywhere"));
+        widgetComponents.add(new LocationSettingsComponent("Location hidden",
+                () -> ConfigManager.getWidgetLocations(placed.getConfigKey()).locationHidden,
+                value -> ConfigManager.getWidgetLocations(placed.getConfigKey()).selectHidden(value), "Nowhere"));
+        widgetComponents.addAll(WidgetSettingsSections.create(catalog));
+        scrollOffset = 0;
+        hoveredSoundTarget = null;
+        return true;
+    }
+
+    public boolean openLayout(String id, Runnable onClose, Runnable onDelete) {
+        if (id == null || id.isEmpty() || !ConfigManager.get().locationLayouts.containsKey(id)) return false;
+        finishInteraction();
+        settingsWidget = null; settingsLayout = id; closeWidgetAction = onClose;
+        widgetComponents = new ArrayList<>();
+        String[] nameDraft = {ConfigManager.get().locationLayouts.get(id).name};
+        widgetComponents.add(new TextInputSettingsComponent(0, 0, 0, 0, "Name",
+                () -> nameDraft[0], value -> nameDraft[0] = value, 48) {
+            private void commitName() {
+                var layout = ConfigManager.get().locationLayouts.get(id);
+                if (layout == null) return;
+                String name = nameDraft[0].strip();
+                if (name.isEmpty()) name = "Layout";
+                if (!layout.name.equals(name)) { layout.name = name; ConfigManager.save(); }
+                nameDraft[0] = name;
+            }
+            @Override public void onClickOutside() { super.onClickOutside(); commitName(); }
+            @Override public boolean keyPressed(int key, int scan, int mods) {
+                boolean handled = super.keyPressed(key, scan, mods);
+                if (handled && (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER || key == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER
+                        || key == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE)) commitName();
+                return handled;
+            }
+        });
+        widgetComponents.add(new LocationSettingsComponent("Location visibility",
+                () -> ConfigManager.get().locationLayouts.get(id).locationVisibility,
+                value -> ConfigManager.get().locationLayouts.get(id).locationVisibility = value, "Inactive"));
+        widgetComponents.add(new StatusSettingsComponent("Placement overrides the main layout", () ->
+                ConfigManager.get().locationLayouts.get(id).locationVisibility.isEmpty() ? "Select locations to activate" :
+                "Used in " + ConfigManager.get().locationLayouts.get(id).locationVisibility.size() + " selected locations"));
+        widgetComponents.add(new ActionSettingsComponent("Delete layout", onDelete));
+        scrollOffset = 0; hoveredSoundTarget = null;
+        return true;
+    }
+
+    public void clearWidget() {
+        finishInteraction();
+        settingsWidget = null;
+        settingsLayout = null;
+        widgetComponents = List.of();
+        closeWidgetAction = null;
+        scrollOffset = 0;
+        hoveredSoundTarget = null;
+    }
+
+    private void closeWidget() {
+        UiSounds.openClose();
+        if (closeWidgetAction != null) closeWidgetAction.run();
+        else clearWidget();
+    }
+
+    private List<SettingsComponent> activeComponents() {
+        return isContextSettings() ? widgetComponents : componentsByCategory.getOrDefault(activeCategory, List.of());
+    }
+
     public void render(GuiGraphicsExtractor context, double mouseX, double mouseY) {
         ensureInitialized();
+        ru.wilyfox.client.audio.UiSounds.update();
 
         Minecraft mc = Minecraft.getInstance();
         int screenWidth = mc.getWindow().getGuiScaledWidth();
         int screenHeight = mc.getWindow().getGuiScaledHeight();
 
+        width = Math.min(isContextSettings() ? 320 : 420, screenWidth - 16);
+        height = Math.min(280, screenHeight - 16);
+
         x = (screenWidth - width) / 2;
         y = (screenHeight - height) / 2;
 
+        frameSoundTarget = null;
         renderPanelBackground(context);
         renderHeader(context);
-        renderSidebar(context, mouseX, mouseY);
+        if (!isContextSettings()) renderSidebar(context, mouseX, mouseY);
         renderContent(context, mouseX, mouseY);
+        if (capturedNumber == null && frameSoundTarget != null && frameSoundTarget != hoveredSoundTarget) UiSounds.hover();
+        hoveredSoundTarget = frameSoundTarget;
     }
 
     private void renderPanelBackground(GuiGraphicsExtractor context) {
@@ -65,6 +167,12 @@ public class HudSettingsPanel {
 
     private void renderHeader(GuiGraphicsExtractor context) {
         Minecraft mc = Minecraft.getInstance();
+
+        if (isContextSettings()) {
+            context.text(mc.font, mc.font.plainSubstrByWidth((settingsWidget != null ? settingsWidget.getDisplayName() : ConfigManager.get().locationLayouts.get(settingsLayout).name), width - 76), x + 10, y + 8, WidgetTheme.TITLE);
+            context.text(mc.font, "< Back", x + width - 48, y + 8, WidgetTheme.TEXT_MUTED);
+            return;
+        }
 
         context.text(mc.font, "FrogHelper", x + 10, y + 8, WidgetTheme.TITLE);
         context.text(mc.font, "Settings", x + 68, y + 8, WidgetTheme.TEXT_SECONDARY);
@@ -96,6 +204,7 @@ public class HudSettingsPanel {
         for (SettingsCategory category : SettingsCategory.values()) {
             boolean hovered = mouseX >= sidebarX + 4 && mouseX <= sidebarX + sidebarWidth - 4
                     && mouseY >= tabY && mouseY <= tabY + 20;
+            if (hovered && mouseY >= listY && mouseY < listY + listHeight) frameSoundTarget = category;
             boolean active = category == activeCategory;
 
             int bg;
@@ -135,7 +244,7 @@ public class HudSettingsPanel {
 
         HudSurface.fillRounded(context, contentX, contentY, contentWidth, contentHeight, 4, WidgetTheme.PANEL_BG_SOFT);
 
-        List<SettingsComponent> activeComponents = componentsByCategory.getOrDefault(activeCategory, List.of());
+        List<SettingsComponent> activeComponents = activeComponents();
         activeComponents = activeComponents.stream()
                 .filter(SettingsComponent::isVisible)
                 .toList();
@@ -158,7 +267,12 @@ public class HudSettingsPanel {
             int componentHeight = component.getPreferredHeight();
             component.setPosition(innerX + componentIndent, innerY);
             component.setSize(innerWidth - componentIndent, componentHeight);
+            if (component instanceof LocationSettingsComponent locations) locations.setViewportBottom(contentY + contentHeight - 2);
             component.render(context, (int) mouseX, (int) mouseY);
+            if (isInsideContent(mouseX, mouseY) && component.isHovered(mouseX, mouseY)
+                    && !(component instanceof BreakLineSettingsComponent) && !(component instanceof StatusSettingsComponent)) {
+                frameSoundTarget = component;
+            }
 
             innerY += componentHeight + rowSpacing;
         }
@@ -169,6 +283,7 @@ public class HudSettingsPanel {
 
         // Tooltip for a hovered component whose label was truncated — after scissor so it isn't clipped.
         for (SettingsComponent component : activeComponents) {
+            if (!isInsideContent(mouseX, mouseY)) break;
             String tooltip = component.getTooltip((int) mouseX, (int) mouseY);
             if (tooltip != null) {
                 context.setTooltipForNextFrame(Minecraft.getInstance().font, net.minecraft.network.chat.Component.literal(tooltip), (int) mouseX, (int) mouseY);
@@ -303,7 +418,7 @@ public class HudSettingsPanel {
             );
 
             autoMessageComponents.add(
-                    new StepperSettingsComponent(
+                    new DragNumberSettingsComponent(
                             0, 0, 0, 0,
                             "Delay s",
                             () -> getAutoMessageEntry(index).delaySeconds,
@@ -364,7 +479,22 @@ public class HudSettingsPanel {
         rebuildAutoMessageComponents();
     }
 
+    public void finishInteraction() {
+        finishNumberDrag();
+        for (SettingsComponent component : activeComponents()) component.onClickOutside();
+    }
+
+    private void finishNumberDrag() {
+        if (capturedNumber != null) {
+            capturedNumber.onClickOutside();
+            capturedNumber = null;
+        }
+        scrollbarDragging = false;
+        categoryScrollbarDragging = false;
+    }
+
     public boolean mousePressed(double mouseX, double mouseY, int button) {
+        finishNumberDrag();
         for (SettingsComponent component : getInteractiveComponents()) {
             if (!component.isHovered(mouseX, mouseY)) {
                 component.onClickOutside();
@@ -372,7 +502,13 @@ public class HudSettingsPanel {
         }
 
         if (!isInside(mouseX, mouseY)) {
+            if (isContextSettings()) { closeWidget(); return true; }
             return false;
+        }
+
+        if (isContextSettings() && button == 0 && mouseY < y + headerHeight && mouseX >= x + width - 56) {
+            closeWidget();
+            return true;
         }
 
         if (handleSidebarClick(mouseX, mouseY, button)) {
@@ -390,6 +526,9 @@ public class HudSettingsPanel {
         if (isInsideContent(mouseX, mouseY)) {
             for (SettingsComponent component : getInteractiveComponents()) {
                 if (component.mouseClicked(mouseX, mouseY, button)) {
+                    if (component instanceof DragNumberSettingsComponent number && number.isDragging()) capturedNumber = number;
+                    else if (component instanceof ToggleSettingsComponent || component instanceof BossBlacklistSettingsComponent) UiSounds.toggle();
+                    else if (!(component instanceof ActionSettingsComponent) && !(component instanceof LocationSettingsComponent)) UiSounds.click();
                     return true;
                 }
             }
@@ -400,6 +539,11 @@ public class HudSettingsPanel {
 
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         boolean handled = false;
+        if (button == 0 && capturedNumber != null) {
+            capturedNumber.mouseReleased(mouseX, mouseY, button);
+            capturedNumber = null;
+            handled = true;
+        }
 
         if (categoryScrollbarDragging && button == 0) {
             categoryScrollbarDragging = false;
@@ -427,6 +571,10 @@ public class HudSettingsPanel {
             }
         }
 
+        if (isContextSettings() && keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            closeWidget();
+            return true;
+        }
         return false;
     }
 
@@ -441,6 +589,7 @@ public class HudSettingsPanel {
     }
 
     public boolean mouseDragged(double mouseX, double mouseY, int button) {
+        if (button == 0 && capturedNumber != null) return capturedNumber.mouseDragged(mouseX, mouseY, button, 0, 0);
         if (button == 0 && categoryScrollbarDragging) {
             updateCategoryScrollFromScrollbar(mouseY);
             return true;
@@ -461,23 +610,31 @@ public class HudSettingsPanel {
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollY) {
+        if (capturedNumber != null) return true;
         if (isInsideSidebar(mouseX, mouseY)) {
             if (maxCategoryScroll <= 0) {
                 return true;
             }
 
+            int previous = categoryScrollOffset;
             categoryScrollOffset -= (int) (scrollY * 12);
             clampCategoryScroll();
+            if (previous != categoryScrollOffset) UiSounds.scroll();
             return true;
         }
 
         if (isInsideContent(mouseX, mouseY)) {
+            for (SettingsComponent component : getInteractiveComponents()) {
+                if (component instanceof LocationSettingsComponent locations && locations.mouseScrolled(mouseX, mouseY, scrollY)) return true;
+            }
             if (maxScroll <= 0) {
                 return true;
             }
 
+            int previous = scrollOffset;
             scrollOffset -= (int) (scrollY * 12);
             clampScroll();
+            if (previous != scrollOffset) UiSounds.scroll();
             return true;
         }
 
@@ -485,7 +642,7 @@ public class HudSettingsPanel {
     }
 
     private boolean handleSidebarClick(double mouseX, double mouseY, int button) {
-        if (button != 0) {
+        if (isContextSettings() || button != 0) {
             return false;
         }
 
@@ -500,6 +657,7 @@ public class HudSettingsPanel {
                     && mouseY >= tabY && mouseY <= tabY + 20;
 
             if (hovered && tabY + 20 >= visibleTop && tabY <= visibleBottom) {
+                if (activeCategory != category) UiSounds.click();
                 activeCategory = category;
                 scrollOffset = 0;
                 scrollbarDragging = false;
@@ -658,7 +816,7 @@ public class HudSettingsPanel {
         int contentY = getContentY();
         int contentHeight = getContentHeight();
 
-        return componentsByCategory.getOrDefault(activeCategory, List.of()).stream()
+        return activeComponents().stream()
                 .filter(SettingsComponent::isVisible)
                 .filter(component ->
                         component.getY() + component.getHeight() >= contentY + 1 &&
@@ -683,6 +841,7 @@ public class HudSettingsPanel {
     }
 
     private boolean isInsideSidebar(double mouseX, double mouseY) {
+        if (isContextSettings()) return false;
         int sidebarX = x + 8;
         int sidebarY = getSidebarY();
         int sidebarHeight = getSidebarHeight();
@@ -706,6 +865,7 @@ public class HudSettingsPanel {
     }
 
     private boolean isOverCategoryScrollbar(double mouseX, double mouseY) {
+        if (isContextSettings()) return false;
         int sidebarX = x + 8;
         int sidebarY = getSidebarY();
         int sidebarHeight = getSidebarHeight();
@@ -761,7 +921,7 @@ public class HudSettingsPanel {
     }
 
     private int getContentX() {
-        return x + sidebarWidth + 20;
+        return x + (isContextSettings() ? 8 : sidebarWidth + 20);
     }
 
     private int getContentY() {
@@ -769,7 +929,7 @@ public class HudSettingsPanel {
     }
 
     private int getContentWidth() {
-        return width - sidebarWidth - 28;
+        return width - (isContextSettings() ? 16 : sidebarWidth + 28);
     }
 
     private int getContentHeight() {

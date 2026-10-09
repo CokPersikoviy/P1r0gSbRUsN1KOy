@@ -1,8 +1,8 @@
 package ru.wilyfox.client.hud.config;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonIOException;
+import com.google.gson.JsonParser;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import ru.wilyfox.client.hud.widget.AbstractWidget;
@@ -14,14 +14,23 @@ import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.*;
+import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
 import static ru.wilyfox.client.debug.DebugLogger.error;
 
 public class ConfigManager {
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Gson GSON = HudConfigCodec.createGson();
     private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("froghelper.json");
     private static HudConfig CONFIG = load();
+    private static String editorLayout;
+    private static long layoutRevision;
+    private static long cachedRevision = -1;
+    private static String cachedLocation;
+    private static HudConfig cachedConfig;
+    private static Set<String> cachedWidgets = Set.of();
+    private static Set<String> cachedVisibleWidgets = Set.of();
 
     static {
         // Loading must finish before WidgetTheme reads CONFIG, including on a same-size restart.
@@ -44,7 +53,38 @@ public class ConfigManager {
     }
 
     public static synchronized WidgetLayoutConfig getWidgetLayout(String key) {
-        return CONFIG.widgetLayouts.get(key);
+        return HudLayoutResolver.placement(CONFIG, key, editorLayout, DiamondWorldProtocolClient.getCurrentGameLocation());
+    }
+
+    public static String getEditorLayout() { return editorLayout; }
+    public static long getLayoutRevision() { return layoutRevision; }
+    public static void layoutChanged() { layoutRevision++; }
+    public static void setEditorLayout(String id) {
+        editorLayout = id == null ? null : CONFIG.locationLayouts.containsKey(id) ? id : HudLayoutResolver.MAIN;
+        layoutChanged();
+    }
+    public static Set<String> getActiveWidgetKeys() {
+        String location = DiamondWorldProtocolClient.getCurrentGameLocation();
+        if (editorLayout != null) return HudLayoutResolver.widgets(CONFIG, editorLayout, location);
+        if (cachedConfig != CONFIG || cachedRevision != layoutRevision || !Objects.equals(cachedLocation, location)) {
+            cachedWidgets = HudLayoutResolver.widgets(CONFIG, null, location);
+            var visible = new LinkedHashSet<String>();
+            for (String key : cachedWidgets) {
+                var rule = CONFIG.widgetLocations.get(key);
+                if (rule == null || rule.isVisible(location)) visible.add(key);
+            }
+            cachedVisibleWidgets = visible;
+            cachedConfig = CONFIG; cachedRevision = layoutRevision; cachedLocation = location;
+        }
+        return cachedWidgets;
+    }
+    public static boolean isWidgetInCurrentLayout(String key) {
+        if (!getActiveWidgetKeys().contains(key)) return false;
+        if (editorLayout != null) return true; // Preview the selected layout even outside its locations.
+        return cachedVisibleWidgets.contains(key);
+    }
+    public static WidgetLocationConfig getWidgetLocations(String key) {
+        return CONFIG.widgetLocations.computeIfAbsent(key, ignored -> new WidgetLocationConfig());
     }
 
     public static synchronized Integer getLastWindowWidth() {
@@ -70,6 +110,13 @@ public class ConfigManager {
     }
 
     public static synchronized void saveWidgetLayout(AbstractWidget widget) {
+        if (widget == null || widget.getConfigKey() == null || widget.getConfigKey().isBlank()) return;
+        captureWidgetLayout(widget);
+        save();
+    }
+
+    /** Update the in-memory layout while dragging a setting, without a file write per pixel. */
+    public static synchronized void captureWidgetLayout(AbstractWidget widget) {
         if (widget == null || widget.getConfigKey() == null || widget.getConfigKey().isBlank()) {
             return;
         }
@@ -77,7 +124,6 @@ public class ConfigManager {
         updateWidgetLayout(widget,
                 Minecraft.getInstance().getWindow().getGuiScaledWidth(),
                 Minecraft.getInstance().getWindow().getGuiScaledHeight());
-        save();
     }
 
     public static synchronized void saveWidgetLayouts(Iterable<? extends Widget> widgets) {
@@ -98,7 +144,8 @@ public class ConfigManager {
     }
 
     private static void updateWidgetLayout(AbstractWidget widget, int screenW, int screenH) {
-        WidgetLayoutConfig layout = CONFIG.widgetLayouts.computeIfAbsent(widget.getConfigKey(), ignored -> new WidgetLayoutConfig());
+        WidgetLayoutConfig layout = HudLayoutResolver.placementStorage(CONFIG, widget.getConfigKey(), editorLayout,
+                DiamondWorldProtocolClient.getCurrentGameLocation()).computeIfAbsent(widget.getConfigKey(), ignored -> new WidgetLayoutConfig());
         layout.x = widget.getStartX();
         layout.y = widget.getStartY();
         // Persist the resolution-independent fraction (source of truth for free widgets on resize).
@@ -111,7 +158,8 @@ public class ConfigManager {
         layout.snapTarget = widget.getSnapTargetKey();
         layout.snapOwnCorner = widget.getSnapOwnCorner();
         layout.snapTargetCorner = widget.getSnapTargetCorner();
-        layout.hiddenInGameplay = widget.isHiddenInGameplay();
+        // Legacy hiding is replaced by membership of mainLayout.
+        layout.hiddenInGameplay = null;
     }
 
     private static double clampFraction(double value) {
@@ -124,7 +172,7 @@ public class ConfigManager {
         }
 
         try (Reader reader = Files.newBufferedReader(CONFIG_PATH)) {
-            return HudConfigSanitizer.sanitize(GSON.fromJson(reader, HudConfig.class));
+            return HudConfigCodec.decode(GSON, JsonParser.parseReader(reader));
         } catch (Exception exception) {
             error(LOGGER, "Failed to load FrogHelper config from {}", CONFIG_PATH, exception);
             return HudConfigSanitizer.sanitize(new HudConfig());

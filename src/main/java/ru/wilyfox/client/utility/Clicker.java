@@ -21,6 +21,7 @@ public final class Clicker {
             try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("tick/Clicker")) {
                 while (KeyBinds.AUTO_ATTACK.consumeClick()) {
                     autoAttackEnabled = !autoAttackEnabled;
+                    ru.wilyfox.client.audio.UiSounds.toggle();
                     info(LOGGER, "Auto {}: {}", getActionName(), autoAttackEnabled);
                 }
 

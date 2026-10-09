@@ -14,6 +14,9 @@ import ru.wilyfox.client.quickaccess.QuickAccessScreen;
 
 public final class TransitionDiagnosticsClientTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
+        boolean originalDebug = context.computeOnClient(client -> ru.wilyfox.client.hud.config.ConfigManager.get().render.debug);
+        context.runOnClient(client -> ru.wilyfox.client.hud.config.ConfigManager.get().render.debug = true);
+        context.waitTicks(2);
         try (var world = context.worldBuilder().create()) {
             context.runOnClient(client -> {
                 for (int i = 0; i < 3; i++) {
@@ -52,6 +55,9 @@ public final class TransitionDiagnosticsClientTest implements FabricClientGameTe
                     }
                 }
             });
+        } finally {
+            context.runOnClient(client -> ru.wilyfox.client.hud.config.ConfigManager.get().render.debug = originalDebug);
+            context.waitTicks(2);
         }
     }
 
@@ -108,7 +114,9 @@ public final class TransitionDiagnosticsClientTest implements FabricClientGameTe
         try {
             var method = ModProfiler.class.getDeclaredMethod("snapshotLocked", ProfilerDiagnostics.FullDiagnostics.class);
             method.setAccessible(true);
-            return (ModProfiler.ReportSnapshot) method.invoke(profiler, new Object[]{null});
+            synchronized (profiler) {
+                return (ModProfiler.ReportSnapshot) method.invoke(profiler, new Object[]{null});
+            }
         } catch (ReflectiveOperationException exception) { throw new AssertionError(exception); }
     }
 

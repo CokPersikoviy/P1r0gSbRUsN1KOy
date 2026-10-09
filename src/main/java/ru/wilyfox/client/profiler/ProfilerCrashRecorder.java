@@ -40,6 +40,7 @@ final class ProfilerCrashRecorder {
     private final List<CompletableFuture<Void>> flushes = new ArrayList<>();
     private final AtomicReference<Supplier<String>> checkpoint = new AtomicReference<>();
     private final AtomicBoolean immediateQueued = new AtomicBoolean();
+    private final AtomicBoolean forceJfrDump = new AtomicBoolean();
     private final AtomicBoolean finishing = new AtomicBoolean();
     private final CompletableFuture<Void> finished = new CompletableFuture<>();
     private final Thread shutdownHook;
@@ -92,6 +93,11 @@ final class ProfilerCrashRecorder {
         if (!finishing.get()) checkpoint.set(markdown); // Only the newest snapshot can wait for I/O.
     }
 
+    CompletableFuture<Void> flushJfrAsync() {
+        forceJfrDump.set(true);
+        return flushAsync();
+    }
+
     CompletableFuture<Void> flushAsync() {
         var result = new CompletableFuture<Void>();
         synchronized (pending) {
@@ -107,12 +113,14 @@ final class ProfilerCrashRecorder {
     }
 
     CompletableFuture<Void> finish() {
+        boolean request;
         synchronized (pending) {
-            if (finishing.compareAndSet(false, true)) {
+            request = finishing.compareAndSet(false, true);
+            if (request) {
                 pending.addLast(new Entry(System.currentTimeMillis(), "session/stop", Map.of()));
             }
         }
-        requestSave();
+        if (request) requestSave();
         return finished;
     }
 
@@ -127,10 +135,14 @@ final class ProfilerCrashRecorder {
     }
 
     private void saveSafely() {
+        // Already queued saves can run after shutdown; the final save has closed their files.
+        if (finished.isDone()) return;
         List<CompletableFuture<Void>> acknowledgements;
         boolean finalSave;
+        boolean dumpJfr;
         synchronized (pending) {
             finalSave = finishing.get();
+            dumpJfr = forceJfrDump.getAndSet(false);
             acknowledgements = List.copyOf(flushes);
             flushes.clear();
         }
@@ -157,7 +169,7 @@ final class ProfilerCrashRecorder {
             }
             startJfr();
             long now = System.nanoTime();
-            if (recording != null && (finalSave || lastJfrDump == 0 || now - lastJfrDump >= JFR_INTERVAL_NANOS)) {
+            if (recording != null && (finalSave || dumpJfr || lastJfrDump == 0 || now - lastJfrDump >= JFR_INTERVAL_NANOS)) {
                 try {
                     replaceFile(directory.resolve("profile.jfr"), recording::dump);
                     lastJfrDump = System.nanoTime();
@@ -234,8 +246,8 @@ final class ProfilerCrashRecorder {
         if (!recordJfr || jfrAttempted || finishing.get()) return;
         jfrAttempted = true;
         try {
-            recording = new Recording(Configuration.getConfiguration("profile"));
-            recording.setName("FrogHelper crash profile");
+            recording = new Recording(Configuration.getConfiguration("default"));
+            recording.setName("FrogHelper background profile");
             recording.setMaxSize(32 * 1024 * 1024);
             recording.setMaxAge(Duration.ofMinutes(2));
             recording.setToDisk(true);

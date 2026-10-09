@@ -152,6 +152,8 @@ final class HudConfigSanitizer {
         sanitized.playerHealthBars.hardAccentThresholdPercent = Math.max(0, Math.min(100, sanitized.playerHealthBars.hardAccentThresholdPercent));
         sanitized.playerHealthBars.accentStrengthPercent = Math.max(0, Math.min(100, sanitized.playerHealthBars.accentStrengthPercent));
 
+        WidgetCatalog.sanitize(sanitized);
+        HudLayoutResolver.sanitize(sanitized);
         return sanitized;
     }
 

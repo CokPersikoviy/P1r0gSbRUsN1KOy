@@ -3,7 +3,6 @@ package ru.wilyfox.client.hud.widget;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.utility.BlockBreakCounter;
 
@@ -14,7 +13,7 @@ public class BlocksPerSecondWidget extends AbstractWidget {
 
     @Override
     public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
-        if (!ConfigManager.get().blocksPerSecondWidget.active) {
+        if (!isInLayout()) {
             return;
         }
 
@@ -86,7 +85,7 @@ public class BlocksPerSecondWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().blocksPerSecondWidget.active;
+        return isInLayout();
     }
 
     @Override

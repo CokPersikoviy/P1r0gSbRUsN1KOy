@@ -1,5 +1,6 @@
 package ru.wilyfox.client.clan;
 
+import ru.wilyfox.client.audio.UiSoundScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
@@ -9,7 +10,7 @@ import ru.wilyfox.client.hud.config.WidgetChrome;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
-public final class ClanSiegeMapScreen extends Screen {
+public final class ClanSiegeMapScreen extends UiSoundScreen {
     public ClanSiegeMapScreen() {
         super(Component.literal("Clan Siege Map"));
     }

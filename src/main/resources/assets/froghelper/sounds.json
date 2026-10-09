@@ -1,0 +1,90 @@
+{
+  "ui.boss_respawn": {
+    "sounds": [
+      {
+        "name": "froghelper:ui/boss_respawn",
+        "preload": true
+      }
+    ]
+  },
+  "ui.click": {
+    "sounds": [
+      {
+        "name": "froghelper:ui/click",
+        "preload": true
+      }
+    ]
+  },
+  "ui.discovery": {
+    "sounds": [
+      {
+        "name": "froghelper:ui/discovery",
+        "preload": true
+      }
+    ]
+  },
+  "ui.warning": {
+    "sounds": [
+      {
+        "name": "froghelper:ui/warning",
+        "preload": true
+      }
+    ]
+  },
+  "ui.scroll": {
+    "sounds": [
+      {
+        "name": "froghelper:ui/scroll",
+        "preload": true
+      }
+    ]
+  },
+  "ui.pop_up": {
+    "sounds": [
+      {
+        "name": "froghelper:ui/pop_up",
+        "preload": true
+      }
+    ]
+  },
+  "ui.private_message": {
+    "sounds": [
+      {
+        "name": "froghelper:ui/private_message",
+        "preload": true
+      }
+    ]
+  },
+  "ui.ready": {
+    "sounds": [
+      {
+        "name": "froghelper:ui/ready",
+        "preload": true
+      }
+    ]
+  },
+  "ui.success": {
+    "sounds": [
+      {
+        "name": "froghelper:ui/success",
+        "preload": true
+      }
+    ]
+  },
+  "ui.toggle": {
+    "sounds": [
+      {
+        "name": "froghelper:ui/toggle",
+        "preload": true
+      }
+    ]
+  },
+  "ui.open_close": {
+    "sounds": [
+      {
+        "name": "froghelper:ui/open_close",
+        "preload": true
+      }
+    ]
+  }
+}

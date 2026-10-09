@@ -127,6 +127,7 @@ public class Client {
 
     public void init() {
         ModProfiler.getInstance().registerDiagnostics();
+        ru.wilyfox.client.profiler.AutomaticDiagnostics.register();
         SodiumBrushableBlockEntityCulling.registerIfAvailable();
         ru.wilyfox.client.command.FhCommands.register();
         new ClientEntityEventHandler(this.bossTracker).register();

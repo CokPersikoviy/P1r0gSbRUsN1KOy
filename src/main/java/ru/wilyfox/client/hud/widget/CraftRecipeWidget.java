@@ -27,7 +27,7 @@ public class CraftRecipeWidget extends AbstractWidget {
 
     @Override
     public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
-        if (!ConfigManager.get().craftRecipe.active) {
+        if (!isInLayout()) {
             return;
         }
 
@@ -88,7 +88,7 @@ public class CraftRecipeWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().craftRecipe.active && (CraftRecipeTracker.getInstance().hasRecipe() || isEditorPreview());
+        return isInLayout() && (CraftRecipeTracker.getInstance().hasRecipe() || isEditorPreview());
     }
 
     @Override

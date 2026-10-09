@@ -7,7 +7,6 @@ import ru.wilyfox.client.effect.ActiveEffectKind;
 import ru.wilyfox.client.effect.ActiveEffectStore;
 import ru.wilyfox.client.effect.ActiveEffectStore.Entry;
 import ru.wilyfox.client.hud.HudEditingScreen;
-import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.internal.HudFrameClock;
 import ru.wilyfox.client.hud.layer.HudLayer;
 
@@ -103,7 +102,7 @@ public final class ActiveEffectsWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().activeEffects.active && (store.hasActiveEntries() || isEditorPreview());
+        return isInLayout() && (store.hasActiveEntries() || isEditorPreview());
     }
 
     @Override

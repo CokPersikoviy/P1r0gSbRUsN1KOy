@@ -33,6 +33,8 @@ public class ActionSettingsComponent extends SettingsComponent {
             return false;
         }
 
+        // Play before the action: opening another screen can then use its own opening cue.
+        ru.wilyfox.client.audio.UiSounds.click();
         action.run();
         return true;
     }

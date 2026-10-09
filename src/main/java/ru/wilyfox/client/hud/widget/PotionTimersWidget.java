@@ -102,7 +102,7 @@ public class PotionTimersWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().potionTimers.active && (store.hasCooldownEntries(graceMillis()) || isEditorPreview());
+        return isInLayout() && (store.hasCooldownEntries(graceMillis()) || isEditorPreview());
     }
 
     @Override

@@ -3,17 +3,9 @@ package ru.wilyfox.client.hud.menu;
 import net.minecraft.client.Minecraft;
 import ru.wilyfox.client.chat.LowHpMessageFormatter;
 import ru.wilyfox.client.discord.DiscordRpcService;
-import ru.wilyfox.client.hud.config.BossTimerSourceMode;
-import ru.wilyfox.client.hud.config.BossWidgetConfig;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.LowHpMessageElement;
-import ru.wilyfox.client.hud.config.FishingNibblesSort;
-import ru.wilyfox.client.hud.config.FishingQuestDescriptionMode;
-import ru.wilyfox.client.hud.config.FishingQuestTypeFilter;
-import ru.wilyfox.client.hud.config.FishingWidgetVisibility;
 import ru.wilyfox.client.hud.config.ThemePreset;
-import ru.wilyfox.client.hud.widget.WidgetTheme;
-import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import ru.wilyfox.client.quickaccess.QuickAccessScreen;
 
 import java.util.List;
@@ -66,7 +58,7 @@ final class HudSettingsFeatureSections {
                 )
         );
         componentsByCategory.get(SettingsCategory.ALCHEMY).add(
-                new StepperSettingsComponent(
+                new DragNumberSettingsComponent(
                         0, 0, 0, 0,
                         "Alert lead (ms)",
                         () -> ConfigManager.get().alchemy.recipeActionLeadMillis,
@@ -121,132 +113,6 @@ final class HudSettingsFeatureSections {
 
         rebuildAutoMessageComponents.run();
 
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new ToggleSettingsComponent(
-                        0, 0, 0, 0,
-                        "Active",
-                        () -> ConfigManager.get().bossWidget.active,
-                        value -> ConfigManager.get().bossWidget.active = value
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new ToggleSettingsComponent(
-                        0, 0, 0, 0,
-                        "Keep Spawned Until Killed",
-                        () -> ConfigManager.get().bossWidget.showSpawnedUntilKilled,
-                        value -> ConfigManager.get().bossWidget.showSpawnedUntilKilled = value
-                )
-        );
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new SliderSettingsComponent(
-                        0, 0, 0, 0,
-                        "Keep After Spawn (s)",
-                        () -> ConfigManager.get().bossWidget.postSpawnShowSeconds,
-                        value -> ConfigManager.get().bossWidget.postSpawnShowSeconds = value,
-                        0, 600
-                ).withVisibility(() -> !ConfigManager.get().bossWidget.showSpawnedUntilKilled)
-        );
-
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new CycleSettingsComponent<>(
-                        0, 0, 0, 0,
-                        "Timer source",
-                        () -> ConfigManager.get().bossWidget.sourceMode,
-                        value -> ConfigManager.get().bossWidget.sourceMode = value,
-                        BossTimerSourceMode.values(),
-                        BossTimerSourceMode::getTitle
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new StepperSettingsComponent(
-                        0, 0, 0, 0,
-                        "Max bosses",
-                        () -> ConfigManager.get().bossWidget.maxBosses,
-                        value -> ConfigManager.get().bossWidget.maxBosses = value,
-                        1, 50, 1
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new StepperSettingsComponent(
-                        0, 0, 0, 0,
-                        "Min level",
-                        () -> ConfigManager.get().bossWidget.minLevel,
-                        value -> ConfigManager.get().bossWidget.minLevel = value,
-                        15, HudSettingsFeatureSections::bossLevelCeiling, 5
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new StepperSettingsComponent(
-                        0, 0, 0, 0,
-                        "Max level",
-                        () -> ConfigManager.get().bossWidget.maxLevel,
-                        value -> ConfigManager.get().bossWidget.maxLevel = value,
-                        15, HudSettingsFeatureSections::bossLevelCeiling, 5
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new ToggleSettingsComponent(
-                        0, 0, 0, 0,
-                        "Show name",
-                        () -> ConfigManager.get().bossWidget.showName,
-                        value -> ConfigManager.get().bossWidget.showName = value
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new ToggleSettingsComponent(
-                        0, 0, 0, 0,
-                        "Show icons",
-                        () -> ConfigManager.get().bossWidget.showIcons,
-                        value -> ConfigManager.get().bossWidget.showIcons = value
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new ToggleSettingsComponent(
-                        0, 0, 0, 0,
-                        "Show level",
-                        () -> ConfigManager.get().bossWidget.showLevel,
-                        value -> ConfigManager.get().bossWidget.showLevel = value
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new ToggleSettingsComponent(
-                        0, 0, 0, 0,
-                        "Show timer",
-                        () -> ConfigManager.get().bossWidget.showTimer,
-                        value -> ConfigManager.get().bossWidget.showTimer = value
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new BossBlacklistSettingsComponent()
-        );
-
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new ToggleSettingsComponent(
-                        0, 0, 0, 0,
-                        "Show collectibles",
-                        () -> ConfigManager.get().bossWidget.showCollectibles,
-                        value -> ConfigManager.get().bossWidget.showCollectibles = value
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.BOSS_TIMERS).add(
-                new ToggleSettingsComponent(
-                        0, 0, 0, 0,
-                        "Full alignment",
-                        () -> ConfigManager.get().bossWidget.fullAligment,
-                        value -> ConfigManager.get().bossWidget.fullAligment = value
-                )
-        );
-
         componentsByCategory.get(SettingsCategory.BOSS_RESPAWN_MESSAGES).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
@@ -265,7 +131,7 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.BOSS_RESPAWN_MESSAGES).add(
-                new StepperSettingsComponent(
+                new DragNumberSettingsComponent(
                         0, 0, 0, 0,
                         "Pre-respawn seconds",
                         () -> ConfigManager.get().bossRespawnMessages.preRespawnSeconds,
@@ -326,7 +192,7 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.LOW_HP_MESSAGES).add(
-                new StepperSettingsComponent(
+                new DragNumberSettingsComponent(
                         0, 0, 0, 0,
                         "Low HP percent",
                         () -> ConfigManager.get().bossRespawnMessages.lowHealthPercent,
@@ -336,7 +202,7 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.LOW_HP_MESSAGES).add(
-                new StepperSettingsComponent(
+                new DragNumberSettingsComponent(
                         0, 0, 0, 0,
                         "Low HP cooldown",
                         () -> ConfigManager.get().bossRespawnMessages.lowHealthCooldownSeconds,
@@ -386,7 +252,7 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.PLAYER_HEALTH_BARS).add(
-                new SliderSettingsComponent(
+                new DragNumberSettingsComponent(
                         0, 0, 0, 0,
                         "Offset",
                         () -> ConfigManager.get().playerHealthBars.verticalOffset,
@@ -396,7 +262,7 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.PLAYER_HEALTH_BARS).add(
-                new SliderSettingsComponent(
+                new DragNumberSettingsComponent(
                         0, 0, 0, 0,
                         "Opacity %",
                         () -> ConfigManager.get().playerHealthBars.opacityPercent,
@@ -415,7 +281,7 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.PLAYER_HEALTH_BARS).add(
-                new SliderSettingsComponent(
+                new DragNumberSettingsComponent(
                         0, 0, 0, 0,
                         "Bar size %",
                         () -> ConfigManager.get().playerHealthBars.sizePercent,
@@ -425,7 +291,7 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.PLAYER_HEALTH_BARS).add(
-                new SliderSettingsComponent(
+                new DragNumberSettingsComponent(
                         0, 0, 0, 0,
                         "Hard accent threshold %",
                         () -> ConfigManager.get().playerHealthBars.hardAccentThresholdPercent,
@@ -435,7 +301,7 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.PLAYER_HEALTH_BARS).add(
-                new SliderSettingsComponent(
+                new DragNumberSettingsComponent(
                         0, 0, 0, 0,
                         "Accent strength %",
                         () -> ConfigManager.get().playerHealthBars.accentStrengthPercent,
@@ -445,7 +311,7 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.CLICKER).add(
-                new SliderSettingsComponent(
+                new DragNumberSettingsComponent(
                         0, 0, 0, 0,
                         "CPS",
                         () -> ConfigManager.get().clicker.cps,
@@ -482,56 +348,6 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.FISHING).add(
-                new ToggleSettingsComponent(
-                        0, 0, 0, 0,
-                        "Show fishing nibbles widget",
-                        () -> ConfigManager.get().fishing.showFishingNibblesWidget,
-                        value -> ConfigManager.get().fishing.showFishingNibblesWidget = value
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.FISHING).add(
-                new CycleSettingsComponent<>(0, 0, 0, 0, "Nibbles visibility",
-                        () -> ConfigManager.get().fishing.nibblesVisibility,
-                        value -> ConfigManager.get().fishing.nibblesVisibility = value,
-                        FishingWidgetVisibility.values(), FishingWidgetVisibility::displayName)
-        );
-
-        componentsByCategory.get(SettingsCategory.FISHING).add(
-                new CycleSettingsComponent<>(0, 0, 0, 0, "Nibbles sorting",
-                        () -> ConfigManager.get().fishing.nibblesSort,
-                        value -> ConfigManager.get().fishing.nibblesSort = value,
-                        FishingNibblesSort.values(), FishingNibblesSort::displayName)
-        );
-
-        componentsByCategory.get(SettingsCategory.FISHING).add(
-                new ToggleSettingsComponent(0, 0, 0, 0, "Show fishing quests widget",
-                        () -> ConfigManager.get().fishing.showFishingQuestsWidget,
-                        value -> ConfigManager.get().fishing.showFishingQuestsWidget = value)
-        );
-
-        componentsByCategory.get(SettingsCategory.FISHING).add(
-                new CycleSettingsComponent<>(0, 0, 0, 0, "Quests visibility",
-                        () -> ConfigManager.get().fishing.questsVisibility,
-                        value -> ConfigManager.get().fishing.questsVisibility = value,
-                        FishingWidgetVisibility.values(), FishingWidgetVisibility::displayName)
-        );
-
-        componentsByCategory.get(SettingsCategory.FISHING).add(
-                new CycleSettingsComponent<>(0, 0, 0, 0, "Quest dimension",
-                        () -> ConfigManager.get().fishing.questsTypeFilter,
-                        value -> ConfigManager.get().fishing.questsTypeFilter = value,
-                        FishingQuestTypeFilter.values(), FishingQuestTypeFilter::displayName)
-        );
-
-        componentsByCategory.get(SettingsCategory.FISHING).add(
-                new CycleSettingsComponent<>(0, 0, 0, 0, "Quest descriptions",
-                        () -> ConfigManager.get().fishing.questsDescription,
-                        value -> ConfigManager.get().fishing.questsDescription = value,
-                        FishingQuestDescriptionMode.values(), FishingQuestDescriptionMode::displayName)
-        );
-
-        componentsByCategory.get(SettingsCategory.FISHING).add(
                 new ToggleSettingsComponent(0, 0, 0, 0, "Higher nibble notification",
                         () -> ConfigManager.get().fishing.higherBitingNotification,
                         value -> ConfigManager.get().fishing.higherBitingNotification = value)
@@ -547,7 +363,7 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.FISHING).add(
-                new SliderSettingsComponent(
+                new DragNumberSettingsComponent(
                         0, 0, 0, 0,
                         "AutoFish delay",
                         () -> ConfigManager.get().fishing.autoFishDelayTicks,
@@ -607,55 +423,6 @@ final class HudSettingsFeatureSections {
                             ConfigManager.get().theme.hardAccentGreen = green(color);
                             ConfigManager.get().theme.hardAccentBlue = blue(color);
                         }
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.POP_UPS).add(
-                new ToggleSettingsComponent(
-                        0, 0, 0, 0,
-                        "Active",
-                        () -> ConfigManager.get().popUps.active,
-                        value -> ConfigManager.get().popUps.active = value
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.POP_UPS).add(
-                new StepperSettingsComponent(
-                        0, 0, 0, 0,
-                        "Visible at once",
-                        () -> ConfigManager.get().popUps.maxVisible,
-                        value -> ConfigManager.get().popUps.maxVisible = value,
-                        1, 6, 1
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.POP_UPS).add(
-                new StepperSettingsComponent(
-                        0, 0, 0, 0,
-                        "Hold ms",
-                        () -> ConfigManager.get().popUps.holdMillis,
-                        value -> ConfigManager.get().popUps.holdMillis = value,
-                        500, 10000, 100
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.POP_UPS).add(
-                new StepperSettingsComponent(
-                        0, 0, 0, 0,
-                        "Fade-in ms",
-                        () -> ConfigManager.get().popUps.fadeInMillis,
-                        value -> ConfigManager.get().popUps.fadeInMillis = value,
-                        0, 3000, 20
-                )
-        );
-
-        componentsByCategory.get(SettingsCategory.POP_UPS).add(
-                new StepperSettingsComponent(
-                        0, 0, 0, 0,
-                        "Fade-out ms",
-                        () -> ConfigManager.get().popUps.fadeOutMillis,
-                        value -> ConfigManager.get().popUps.fadeOutMillis = value,
-                        0, 3000, 20
                 )
         );
 
@@ -881,10 +648,6 @@ final class HudSettingsFeatureSections {
                         value -> ConfigManager.get().discordRpc.active = value
                 )
         );
-    }
-
-    private static int bossLevelCeiling() {
-        return Math.max(BossWidgetConfig.MAX_LEVEL_CEILING, DiamondWorldProtocolClient.getHighestKnownBossLevel());
     }
 
     private static int rgb(int red, int green, int blue) {

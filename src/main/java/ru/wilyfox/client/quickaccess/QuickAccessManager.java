@@ -49,6 +49,7 @@ public final class QuickAccessManager {
         if (resolved == null || resolved.isBlank()) {
             if (QuickAccessCommandResolver.requiresTarget(hovered)) {
                 QuickAccessCommandResolver.showMissingTargetFeedback();
+                ru.wilyfox.client.audio.UiSounds.play(ru.wilyfox.client.audio.UiSound.WARNING);
             }
             return;
         }
@@ -57,6 +58,7 @@ public final class QuickAccessManager {
             // Explicit player actions follow the same path as typing a command; automated chat
             // and its server-reported message cooldown must not delay a teleport/menu action.
             client.player.connection.sendCommand(resolved);
+            ru.wilyfox.client.audio.UiSounds.click();
         }
     }
 

@@ -1,5 +1,6 @@
 package ru.wilyfox.client.hud.menu;
 
+import ru.wilyfox.client.audio.UiSounds;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.lwjgl.glfw.GLFW;
@@ -404,7 +405,9 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
 
     private void applyColor(int color, boolean refreshHsv) {
         int rgb = color & 0xFFFFFF;
+        boolean changed = currentColor() != rgb;
         setter.accept(rgb);
+        if (changed && dragTarget != DragTarget.NONE) UiSounds.scroll();
         lastColor = rgb;
         hexDraft = formatHex(rgb);
         cursorPosition = hexDraft.length();
@@ -444,6 +447,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
             applyColor(parsed, true);
             saveIfDirty();
         } else {
+            UiSounds.play(ru.wilyfox.client.audio.UiSound.WARNING);
             revertHexDraft();
         }
         hexFocused = false;

@@ -19,12 +19,14 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class FishingQuestsClientTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
+        boolean wasAdded = context.computeOnClient(client -> ConfigManager.get().mainLayout.widgets.contains("FishingQuestsWidget"));
         AtomicReference<FishingConfig> original = new AtomicReference<>();
         try (var world = context.worldBuilder().create()) {
             context.runOnClient(client -> {
                 original.set(ConfigManager.get().fishing);
                 var config = new FishingConfig();
-                config.showFishingQuestsWidget = true;
+                ConfigManager.get().mainLayout.widgets.add("FishingQuestsWidget");
+                ConfigManager.layoutChanged();
                 config.questsVisibility = FishingWidgetVisibility.FISHING_WARP;
                 config.questsDescription = FishingQuestDescriptionMode.ALWAYS;
                 ConfigManager.get().fishing = config;
@@ -83,6 +85,8 @@ public final class FishingQuestsClientTest implements FabricClientGameTest {
         } finally {
             context.runOnClient(client -> {
                 if (original.get() != null) ConfigManager.get().fishing = original.get();
+                if (!wasAdded) ConfigManager.get().mainLayout.widgets.remove("FishingQuestsWidget");
+                ConfigManager.layoutChanged();
                 SocialProtocolFixture.clearQuests();
                 SocialProtocolFixture.clear();
             });

@@ -1,5 +1,6 @@
 package ru.wilyfox.client.moduser;
 
+import ru.wilyfox.client.audio.UiSoundScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
@@ -15,7 +16,7 @@ import ru.wilyfox.client.profiler.ModProfiler;
 import java.util.List;
 
 /** Displays players currently online with FrogHelper in this game region. */
-public class SocialScreen extends Screen {
+public class SocialScreen extends UiSoundScreen {
     private static final int PANEL_WIDTH = 264;
     private static final int PANEL_PADDING = 14;
     private static final int HEADER_HEIGHT = 38;
@@ -43,6 +44,7 @@ public class SocialScreen extends Screen {
 
     @Override
     protected void init() {
+        super.init();
         layout();
     }
 
@@ -62,6 +64,7 @@ public class SocialScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        ru.wilyfox.client.audio.UiSounds.update();
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("ui/SocialScreen/render")) {
             layout();
             Minecraft minecraft = Minecraft.getInstance();
@@ -112,8 +115,10 @@ public class SocialScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        int previous = scroll;
         scroll -= (int) Math.signum(scrollY);
         clampScroll(PresenceStore.knownCount());
+        if (previous != scroll) ru.wilyfox.client.audio.UiSounds.scroll();
         return true;
     }
 

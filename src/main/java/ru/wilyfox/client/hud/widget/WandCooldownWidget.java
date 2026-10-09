@@ -51,7 +51,7 @@ public class WandCooldownWidget extends AbstractWidget {
 
     @Override
     public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
-        if (!ConfigManager.get().wandCooldown.active) {
+        if (!isInLayout()) {
             return;
         }
 
@@ -110,7 +110,7 @@ public class WandCooldownWidget extends AbstractWidget {
     @Override
     public boolean isVisible() {
         boolean numericMode = ConfigManager.get().wandCooldown.numericCooldown;
-        return ConfigManager.get().wandCooldown.active
+        return isInLayout()
                 && (tracker.hasActiveEntries(numericMode) || isEditorPreview());
     }
 

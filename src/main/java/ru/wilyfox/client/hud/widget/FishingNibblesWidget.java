@@ -30,7 +30,7 @@ public final class FishingNibblesWidget extends AbstractWidget {
 
     @Override
     public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
-        if (!ConfigManager.get().fishing.showFishingNibblesWidget) {
+        if (!isInLayout()) {
             return;
         }
 
@@ -75,7 +75,7 @@ public final class FishingNibblesWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().fishing.showFishingNibblesWidget
+        return isInLayout()
                 && (isEditorPreview() || (matchesVisibility(ConfigManager.get().fishing.nibblesVisibility)
                 && DiamondWorldProtocolClient.hasFishingNibbles()));
     }

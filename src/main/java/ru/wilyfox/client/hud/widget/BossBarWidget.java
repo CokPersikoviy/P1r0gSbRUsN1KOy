@@ -65,7 +65,7 @@ public class BossBarWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().bossBar.active && (hasRenderedBossBar() || isEditorPreview());
+        return isInLayout() && (hasRenderedBossBar() || isEditorPreview());
     }
 
     @Override

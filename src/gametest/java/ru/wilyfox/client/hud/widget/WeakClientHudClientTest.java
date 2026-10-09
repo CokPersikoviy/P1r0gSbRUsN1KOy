@@ -23,6 +23,9 @@ public final class WeakClientHudClientTest implements FabricClientGameTest {
         try (var world = context.worldBuilder().create()) {
             context.runOnClient(client -> {
                 var original = ConfigManager.get().bossWidget;
+                boolean wasAdded = ConfigManager.get().mainLayout.widgets.contains("BossHudWidget");
+                ConfigManager.get().mainLayout.widgets.add("BossHudWidget");
+                ConfigManager.layoutChanged();
                 var render = ConfigManager.get().render;
                 boolean oldLight = render.lightweightHud;
                 boolean oldNative = render.nativeRenderer;
@@ -98,6 +101,8 @@ public final class WeakClientHudClientTest implements FabricClientGameTest {
                     expect(((Map<?, ?>) field(widget, "resolvedIcons")).isEmpty(), "Clearing timers retained resolved icons");
                 } finally {
                     ConfigManager.get().bossWidget = original;
+                    if (!wasAdded) ConfigManager.get().mainLayout.widgets.remove("BossHudWidget");
+                    ConfigManager.layoutChanged();
                     render.lightweightHud = oldLight;
                     render.nativeRenderer = oldNative;
                     render.widgetChrome = oldChrome;

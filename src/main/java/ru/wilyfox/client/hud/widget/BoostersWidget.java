@@ -58,7 +58,7 @@ public final class BoostersWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().boosters.active && (store.hasAnyActive() || isEditorPreview());
+        return isInLayout() && (store.hasAnyActive() || isEditorPreview());
     }
 
     @Override

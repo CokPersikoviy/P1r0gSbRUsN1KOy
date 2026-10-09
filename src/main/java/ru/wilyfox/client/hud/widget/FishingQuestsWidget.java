@@ -78,7 +78,7 @@ public final class FishingQuestsWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().fishing.showFishingQuestsWidget
+        return isInLayout()
                 && (isEditorPreview() || matchesVisibility(ConfigManager.get().fishing.questsVisibility));
     }
 

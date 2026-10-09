@@ -6,6 +6,31 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class PopUpManagerTest {
     @Test
+    void soundIsPublishedOnceAndNeverReplayedByRenderingOrMeasurement() {
+        var sounds = new java.util.ArrayList<PopUpRequest>();
+        var manager = new PopUpManager(() -> 1_000L, sounds::add);
+        var request = PopUpRequest.of("test.find", "Find", "", PopUpSeverity.INFO);
+        manager.publish(request);
+        for (int i = 0; i < 20; i++) manager.getVisibleNotifications(1);
+        manager.diagnosticNotificationCount();
+        assertEquals(java.util.List.of(request), sounds);
+    }
+
+    @Test
+    void disabledNotificationDoesNotProduceSound() {
+        var config = ru.wilyfox.client.hud.config.ConfigManager.get().popUps;
+        boolean previous = config.privateMessageEvent;
+        var sounds = new java.util.ArrayList<PopUpRequest>();
+        var manager = new PopUpManager(() -> 1_000L, sounds::add);
+        try {
+            config.privateMessageEvent = false;
+            manager.publish(PopUpRequest.of(PopUpSource.PRIVATE_MESSAGE, "Private", "", PopUpSeverity.INFO));
+            assertEquals(0, sounds.size());
+            assertEquals(0, manager.diagnosticNotificationCount());
+        } finally { config.privateMessageEvent = previous; }
+    }
+
+    @Test
     void notificationsWaitingForASlotDoNotExpireBeforeBeingDisplayed() {
         var time = new java.util.concurrent.atomic.AtomicLong(1_000L);
         var manager = new PopUpManager(time::get);

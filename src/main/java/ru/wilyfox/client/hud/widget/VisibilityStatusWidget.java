@@ -60,7 +60,7 @@ public class VisibilityStatusWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().visibilityStatus.active || isEditorPreview();
+        return isInLayout();
     }
 
     @Override

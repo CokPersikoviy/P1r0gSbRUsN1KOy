@@ -5,7 +5,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.item.ItemStack;
 import ru.wilyfox.client.hud.HudEditingScreen;
-import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.miner.ActiveMinerInfo;
 import ru.wilyfox.client.miner.ActiveMinersStore;
@@ -83,7 +82,7 @@ public class ActiveMinersWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().activeMiners.active && (!store.isEmpty() || isEditorPreview());
+        return isInLayout() && (!store.isEmpty() || isEditorPreview());
     }
 
     @Override

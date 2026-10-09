@@ -1,11 +1,12 @@
 package ru.wilyfox.client.hud;
 
+import ru.wilyfox.client.audio.UiSoundScreen;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
-public class HudEditingScreen extends Screen {
+public class HudEditingScreen extends UiSoundScreen {
     private final HudRenderer hudRenderer;
 
     public HudEditingScreen(HudRenderer hudRenderer) {

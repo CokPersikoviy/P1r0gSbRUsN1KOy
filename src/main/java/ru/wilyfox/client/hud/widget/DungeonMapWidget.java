@@ -25,7 +25,7 @@ public final class DungeonMapWidget extends AbstractWidget {
 
     @Override
     public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
-        if (!ConfigManager.get().dungeonMap.active) {
+        if (!isInLayout()) {
             return;
         }
 
@@ -81,7 +81,7 @@ public final class DungeonMapWidget extends AbstractWidget {
     @Override
     public boolean isVisible() {
         Minecraft minecraft = Minecraft.getInstance();
-        return ConfigManager.get().dungeonMap.active
+        return isInLayout()
                 && (canRenderLiveMap(minecraft) || ClanSiegeMapRenderer.canRender(minecraft) || isEditorPreview());
     }
 

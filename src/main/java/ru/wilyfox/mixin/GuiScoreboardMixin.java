@@ -1,6 +1,5 @@
 package ru.wilyfox.mixin;
 
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.Hud;
@@ -12,7 +11,6 @@ import net.minecraft.world.scores.Objective;
 import net.minecraft.world.scores.PlayerScoreEntry;
 import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.scores.Scoreboard;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.gen.Invoker;
@@ -20,7 +18,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ru.wilyfox.bridge.ScoreboardSidebarAccessor;
-import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.WidgetCatalog;
 import ru.wilyfox.utils.Formatting;
 
 import java.util.Comparator;
@@ -51,7 +49,7 @@ public abstract class GuiScoreboardMixin implements ScoreboardSidebarAccessor {
     private void froghelper$cancelVanillaScoreboard(GuiGraphicsExtractor guiGraphics, net.minecraft.client.DeltaTracker tickCounter, CallbackInfo ci) {
         froghelper$logBoosterLines();
 
-        if (ConfigManager.get().scoreboard.active) {
+        if (WidgetCatalog.SCOREBOARD.isAdded()) {
             ci.cancel();
         }
     }

@@ -1,5 +1,7 @@
 package ru.wilyfox.client.quickaccess;
 
+import ru.wilyfox.client.audio.UiSounds;
+import ru.wilyfox.client.audio.UiSoundScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -26,7 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class QuickAccessScreen extends Screen {
+public class QuickAccessScreen extends UiSoundScreen {
     private static final int SECTION_GAP = 14;
     private static final int ITEM_SIZE = 42;
     private static final int ITEM_GAP = 6;
@@ -45,6 +47,7 @@ public class QuickAccessScreen extends Screen {
     private final List<SectionLayout> sectionLayouts = new ArrayList<>();
 
     private QuickAccessItemConfig hoveredItem;
+    private QuickAccessItemConfig soundHoveredItem;
     private int selectedSection = 0;
     private int selectedItem = -1;
     private int dragSection = -1;
@@ -83,6 +86,7 @@ public class QuickAccessScreen extends Screen {
 
     @Override
     protected void init() {
+        super.init();
         ensureConfigState();
         clampSelection();
         recalculatePanels();
@@ -121,6 +125,7 @@ public class QuickAccessScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("ui/QuickAccessScreen/render")) {
+            UiSounds.update();
             hoveredItem = null;
             dragMouseX = mouseX;
             dragMouseY = mouseY;
@@ -137,6 +142,8 @@ public class QuickAccessScreen extends Screen {
             );
             HudBlur.beginFrame(graphics); // capture the screen for the frosted panels' blur backdrop
             renderSelectorPanel(graphics, mouseX, mouseY);
+            if (hoveredItem != null && hoveredItem != soundHoveredItem) UiSounds.hover();
+            soundHoveredItem = hoveredItem;
 
             if (isEditorMode()) {
                 renderEditorPanel(graphics);
@@ -157,6 +164,7 @@ public class QuickAccessScreen extends Screen {
         if (button == 0) {
             ItemLayout clickedItem = findItemLayout(mouseX, mouseY);
             if (clickedItem != null) {
+                UiSounds.click();
                 selectedSection = clickedItem.sectionIndex();
                 selectedItem = clickedItem.itemIndex();
 
@@ -172,6 +180,7 @@ public class QuickAccessScreen extends Screen {
             if (isEditorMode()) {
                 SectionLayout clickedSection = findSectionLayout(mouseX, mouseY);
                 if (clickedSection != null) {
+                    UiSounds.click();
                     selectedSection = clickedSection.sectionIndex();
                     selectedItem = -1;
                     rebuildEditorWidgets();
@@ -732,6 +741,9 @@ public class QuickAccessScreen extends Screen {
         }
 
         @Override
+        public void playDownSound(net.minecraft.client.sounds.SoundManager manager) { UiSounds.click(); }
+
+        @Override
         public void onClick(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
             double mouseX = event.x(), mouseY = event.y();
             onPress.run();
@@ -778,6 +790,9 @@ public class QuickAccessScreen extends Screen {
                 graphics.fill(cursorX, getY() + 4, cursorX + 1, getY() + height - 4, WidgetTheme.TITLE);
             }
         }
+
+        @Override
+        public void playDownSound(net.minecraft.client.sounds.SoundManager manager) { UiSounds.click(); }
 
         @Override
         public void onClick(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {

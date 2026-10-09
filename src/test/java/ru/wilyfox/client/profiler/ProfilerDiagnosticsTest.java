@@ -27,15 +27,35 @@ class ProfilerDiagnosticsTest {
     }
 
     @Test
-    void sessionResetKeepsLongRunningProtocolCounters() {
+    void sessionResetKeepsLongRunningProtocolCounters() throws ReflectiveOperationException {
         ModProfiler profiler = ModProfiler.getInstance();
-        ModProfiler.LifetimeView before = profiler.lifetimeSnapshot();
+        var debug = ModProfiler.class.getDeclaredField("debugRecording");
+        debug.setAccessible(true);
+        boolean previous = debug.getBoolean(profiler);
+        try {
+            debug.setBoolean(profiler, true);
+            ModProfiler.LifetimeView before = profiler.lifetimeSnapshot();
+            profiler.recordProtocolPayloadReceived(37);
+            profiler.reset();
+            ModProfiler.LifetimeView after = profiler.lifetimeSnapshot();
+            assertEquals(before.protocolPayloadCount() + 1, after.protocolPayloadCount());
+            assertEquals(before.protocolPayloadBytes() + 37, after.protocolPayloadBytes());
+        } finally { debug.setBoolean(profiler, previous); }
+    }
 
-        profiler.recordProtocolPayloadReceived(37);
-        profiler.reset();
-
-        ModProfiler.LifetimeView after = profiler.lifetimeSnapshot();
-        assertEquals(before.protocolPayloadCount() + 1, after.protocolPayloadCount());
-        assertEquals(before.protocolPayloadBytes() + 37, after.protocolPayloadBytes());
+    @Test
+    void disabledDiagnosticsIgnoreProtocolTrafficAndEvents() throws ReflectiveOperationException {
+        ModProfiler profiler = ModProfiler.getInstance();
+        var debug = ModProfiler.class.getDeclaredField("debugRecording");
+        debug.setAccessible(true);
+        boolean previous = debug.getBoolean(profiler);
+        try {
+            debug.setBoolean(profiler, false);
+            assertTrue(!profiler.isEnabled());
+            ModProfiler.LifetimeView before = profiler.lifetimeSnapshot();
+            profiler.recordProtocolPayloadReceived(37);
+            profiler.recordClientEvent("disabled-test", "ignored");
+            assertEquals(before, profiler.lifetimeSnapshot());
+        } finally { debug.setBoolean(profiler, previous); }
     }
 }

@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.function.LongSupplier;
+import java.util.function.Consumer;
+import ru.wilyfox.client.audio.UiSounds;
 import java.util.regex.Pattern;
 
 public final class PopUpManager {
@@ -21,13 +23,19 @@ public final class PopUpManager {
     private final Deque<PopUpNotification> notifications = new ArrayDeque<>();
     private final Deque<PopUpNotification> pending = new ArrayDeque<>();
     private final LongSupplier clock;
+    private final Consumer<PopUpRequest> sound;
 
     private PopUpManager() {
-        this(System::currentTimeMillis);
+        this(System::currentTimeMillis, UiSounds::notification);
     }
 
     PopUpManager(LongSupplier clock) {
+        this(clock, ignored -> {});
+    }
+
+    PopUpManager(LongSupplier clock, Consumer<PopUpRequest> sound) {
         this.clock = clock;
+        this.sound = sound;
     }
 
     public static PopUpManager getInstance() {
@@ -64,6 +72,8 @@ public final class PopUpManager {
             if (!pending.isEmpty()) pending.removeFirst();
             else notifications.removeLast();
         }
+        // Publish once per event, independently of widget rendering, animation or measurement.
+        sound.accept(request);
     }
 
     public synchronized List<PopUpNotification> getVisibleNotifications(int limit) {

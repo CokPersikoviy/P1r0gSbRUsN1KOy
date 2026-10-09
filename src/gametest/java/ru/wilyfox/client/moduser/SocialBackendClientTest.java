@@ -128,6 +128,23 @@ public final class SocialBackendClientTest implements FabricClientGameTest {
             if (moved.get("creates").getAsInt() != 1 || !field(moved, "Timestamp").equals(field(joined, "Timestamp"))) {
                 throw new AssertionError("Mirror transitions must update the same embed and preserve login time");
             }
+            // Exercise the real bearer/file upload path, then retry the identical ZIP.
+            Path diagnostic = Files.createTempFile("fh-diagnostic-integration-",".zip");
+            try {
+                try (var zip = new java.util.zip.ZipOutputStream(Files.newOutputStream(diagnostic))) {
+                    String manifest = new Gson().toJson(java.util.Map.of("version",1,"kind","crash","modVersion",version,
+                            "minecraftVersion","26.2","createdAtMs",System.currentTimeMillis(),"source","minecraft","sourceHash","a".repeat(64)));
+                    zip.putNextEntry(new java.util.zip.ZipEntry("manifest.json")); zip.write(manifest.getBytes(StandardCharsets.UTF_8)); zip.closeEntry();
+                    zip.putNextEntry(new java.util.zip.ZipEntry("crash.txt")); zip.write("Integration crash stack".getBytes(StandardCharsets.UTF_8)); zip.closeEntry();
+                }
+                String digest = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(diagnostic)));
+                var first = BackendSocialClient.uploadDiagnostic(diagnostic,digest).get(10,java.util.concurrent.TimeUnit.SECONDS);
+                var repeated = BackendSocialClient.uploadDiagnostic(diagnostic,digest).get(10,java.util.concurrent.TimeUnit.SECONDS);
+                if (first.status()!=202 || repeated.status()!=200) throw new AssertionError("Diagnostic acceptance/deduplication failed");
+                JsonObject delivered = await(context,backend,"/fixture/status",data -> data.get("diagnosticAttachments").getAsInt()==1);
+                if (delivered.get("diagnosticCreates").getAsInt()!=1 || !delivered.get("diagnosticDigest").getAsString().equals(digest))
+                    throw new AssertionError("Diagnostic webhook did not receive the exact archive once");
+            } finally { Files.deleteIfExists(diagnostic); }
             context.runOnClient(client -> SocialProtocolFixture.token(null));
             await(context, backend, "/fixture/status?logout=1", data -> !field(data, "Logout timestamp").isEmpty());
             context.runOnClient(client -> {

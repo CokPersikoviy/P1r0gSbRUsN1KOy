@@ -6,7 +6,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.boss.BossDamageInfo;
 import ru.wilyfox.client.boss.BossDamageStore;
 import ru.wilyfox.client.hud.HudEditingScreen;
-import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
 
 import java.text.DecimalFormat;
@@ -78,7 +77,7 @@ public class BossDamageWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().bossDamage.active && (store.hasActiveEntry() || isEditorPreview());
+        return isInLayout() && (store.hasActiveEntry() || isEditorPreview());
     }
 
     @Override

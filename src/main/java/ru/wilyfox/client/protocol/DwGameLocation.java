@@ -103,6 +103,14 @@ public record DwGameLocation(String id) {
         return id.toLowerCase(Locale.ROOT);
     }
 
+    public static Set<String> knownIds() {
+        var ids = new java.util.TreeSet<>(LOCATION_NAMES.keySet());
+        ids.addAll(FISHING_SPOT_IDS);
+        DUNGEON_NAMES.keySet().forEach(id -> ids.add("dungeon_" + id));
+        PROCEDURAL_DUNGEON_NAMES.keySet().forEach(id -> ids.add("procedural_dungeon_" + id));
+        return java.util.Collections.unmodifiableSet(ids);
+    }
+
     public boolean isEliteShaft() {
         return normalizedId().startsWith("shaft_elite");
     }

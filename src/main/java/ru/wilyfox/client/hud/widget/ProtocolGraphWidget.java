@@ -4,8 +4,8 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
-import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
+import ru.wilyfox.client.hud.internal.HudFrameClock;
 import ru.wilyfox.client.protocol.ProtocolGraphTelemetry;
 import ru.wilyfox.client.protocol.ProtocolGraphTelemetry.GraphEdgeSnapshot;
 import ru.wilyfox.client.protocol.ProtocolGraphTelemetry.GraphNodeKind;
@@ -31,8 +31,12 @@ public final class ProtocolGraphWidget extends AbstractWidget {
     private static final int BASE_WIDTH = 760;
     private static final int NODE_RADIUS = 4;
     private static final int NODE_RING_RADIUS = 6;
-    private static final int EDGE_THICKNESS = 1;
     private static final int NODE_MIN_VERTICAL_GAP = 22;
+
+    private long cachedFrame = Long.MIN_VALUE;
+    private GraphSnapshot cachedSnapshot;
+    private Layout cachedLayout;
+    private int cachedHeight;
 
     public ProtocolGraphWidget(int x, int y, HudLayer layer) {
         super(x, y, layer);
@@ -45,10 +49,11 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        GraphSnapshot snapshot = ProtocolGraphTelemetry.getInstance().snapshot();
-        Layout layout = buildLayout(snapshot);
+        GraphSnapshot snapshot = frameSnapshot();
+        if (cachedLayout == null) cachedLayout = buildLayout(snapshot);
+        Layout layout = cachedLayout;
         int panelWidth = getBaseWidth();
-        int panelHeight = getBaseHeight(snapshot);
+        int panelHeight = cachedHeight;
         double mouseGuiX = MouseUtils.getMouseX();
         double mouseGuiY = MouseUtils.getMouseY();
         double localMouseX = (mouseGuiX - startX) / scale;
@@ -61,8 +66,10 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         HudSurface.drawPanel(context, panelWidth, panelHeight);
 
         renderHeader(context, mc, snapshot, panelWidth);
-        renderEdges(context, snapshot, layout);
-        renderNodes(context, mc, snapshot, layout);
+        var geometry = new ProtocolGraphRenderState.Builder();
+        renderEdges(geometry, snapshot, layout);
+        renderNodes(geometry, snapshot, layout);
+        geometry.submit(context);
         renderFooter(context, mc, snapshot, panelHeight);
 
         context.pose().popMatrix();
@@ -80,12 +87,24 @@ public final class ProtocolGraphWidget extends AbstractWidget {
 
     @Override
     public int getHeight() {
-        return Math.round(getBaseHeight(ProtocolGraphTelemetry.getInstance().snapshot()) * getScale());
+        frameSnapshot();
+        return Math.round(cachedHeight * getScale());
+    }
+
+    private GraphSnapshot frameSnapshot() {
+        long frame = HudFrameClock.current();
+        if (cachedSnapshot == null || cachedFrame != frame) {
+            cachedSnapshot = ProtocolGraphTelemetry.getInstance().snapshot();
+            cachedHeight = getBaseHeight(cachedSnapshot);
+            cachedLayout = null;
+            cachedFrame = frame;
+        }
+        return cachedSnapshot;
     }
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().protocolGraphWidget.active;
+        return isInLayout();
     }
 
     @Override
@@ -126,7 +145,7 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         context.text(mc.font, text, PADDING_X, panelHeight - FOOTER_HEIGHT + 4, WidgetTheme.TEXT_SECONDARY);
     }
 
-    private void renderEdges(GuiGraphicsExtractor context, GraphSnapshot snapshot, Layout layout) {
+    private void renderEdges(ProtocolGraphRenderState.Builder geometry, GraphSnapshot snapshot, Layout layout) {
         Map<String, PositionedNode> visibleNodes = layout.nodesById();
 
         for (GraphEdgeSnapshot edge : snapshot.edges()) {
@@ -137,18 +156,18 @@ public final class ProtocolGraphWidget extends AbstractWidget {
             }
 
             int color = edgeColor(edge, snapshot.capturedAt());
-            drawEdge(context, from.dotX(), from.dotY(), to.dotX(), to.dotY(), color, edge, snapshot.capturedAt());
+            drawEdge(geometry, from.dotX(), from.dotY(), to.dotX(), to.dotY(), color, edge, snapshot.capturedAt());
         }
     }
 
-    private void renderNodes(GuiGraphicsExtractor context, Minecraft mc, GraphSnapshot snapshot, Layout layout) {
+    private void renderNodes(ProtocolGraphRenderState.Builder geometry, GraphSnapshot snapshot, Layout layout) {
         for (PositionedNode node : layout.nodes()) {
             GraphNodeSnapshot snapshotNode = node.node();
             int dotColor = nodeColor(snapshotNode, snapshot.capturedAt());
             int ringColor = ringColor(snapshotNode, snapshot.capturedAt());
 
-            fillCircle(context, node.dotX(), node.dotY(), NODE_RING_RADIUS, ringColor);
-            fillCircle(context, node.dotX(), node.dotY(), NODE_RADIUS, dotColor);
+            geometry.circle(node.dotX(), node.dotY(), NODE_RING_RADIUS, ringColor);
+            geometry.circle(node.dotX(), node.dotY(), NODE_RADIUS, dotColor);
         }
     }
 
@@ -260,8 +279,8 @@ public final class ProtocolGraphWidget extends AbstractWidget {
         return restored;
     }
 
-    private void drawEdge(GuiGraphicsExtractor context, int x1, int y1, int x2, int y2, int color, GraphEdgeSnapshot edge, long now) {
-        drawSegment(context, x1, y1, x2, y2, color);
+    private void drawEdge(ProtocolGraphRenderState.Builder geometry, int x1, int y1, int x2, int y2, int color, GraphEdgeSnapshot edge, long now) {
+        geometry.line(x1, y1, x2, y2, color);
 
         for (long pulseStartedAt : edge.pulseStartedAt()) {
             if (!shouldRenderPulse(pulseStartedAt, now)) {
@@ -272,34 +291,7 @@ public final class ProtocolGraphWidget extends AbstractWidget {
             int pulseX = lerp(x1, x2, progress);
             int pulseY = lerp(y1, y2, progress);
             int pulseColor = WidgetTheme.withAlpha(WidgetTheme.TITLE, pulseAlpha(pulseStartedAt, now));
-            fillCircle(context, pulseX, pulseY, 2, pulseColor);
-        }
-    }
-
-    private void drawSegment(GuiGraphicsExtractor context, int x1, int y1, int x2, int y2, int color) {
-        int dx = x2 - x1;
-        int dy = y2 - y1;
-        int steps = Math.max(Math.abs(dx), Math.abs(dy));
-        if (steps <= 0) {
-            fillCircle(context, x1, y1, EDGE_THICKNESS, color);
-            return;
-        }
-
-        for (int step = 0; step <= steps; step++) {
-            double t = step / (double) steps;
-            int x = x1 + (int) Math.round(dx * t);
-            int y = y1 + (int) Math.round(dy * t);
-            fillCircle(context, x, y, EDGE_THICKNESS, color);
-        }
-    }
-
-    private void fillCircle(GuiGraphicsExtractor context, int centerX, int centerY, int radius, int color) {
-        for (int dy = -radius; dy <= radius; dy++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                if (dx * dx + dy * dy <= radius * radius) {
-                    context.fill(centerX + dx, centerY + dy, centerX + dx + 1, centerY + dy + 1, color);
-                }
-            }
+            geometry.circle(pulseX, pulseY, 2, pulseColor);
         }
     }
 

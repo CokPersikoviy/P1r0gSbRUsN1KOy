@@ -37,6 +37,10 @@ public final class DiamondWorldProtocolClient {
         ProtocolTransport.init(STATE, ROUTER);
     }
 
+    public static void onWorldRespawn() {
+        ProtocolTransport.onRespawn(STATE, net.minecraft.client.Minecraft.getInstance());
+    }
+
     public static void bindBossRepository(BossRepository repository) {
         STATE.bossRepository = repository;
     }

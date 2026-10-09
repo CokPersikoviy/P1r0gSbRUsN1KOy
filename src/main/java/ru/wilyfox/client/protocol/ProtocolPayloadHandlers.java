@@ -354,6 +354,8 @@ final class ProtocolPayloadHandlers {
     static boolean handleStatisticInfo(ProtocolState state, byte[] data) {
         try {
             DwStatisticInfoPacket packet = DwStatisticInfoDecoder.decode(data);
+            // Location must not wait for (or be discarded by) unrelated pets/miners JSON.
+            updateGameLocation(state, packet);
             java.util.Optional<List<ActivePetInfo>> activePetsUpdate = ProtocolPayloadSupport.extractActivePets(state, packet);
             List<ActivePetInfo> activePets = activePetsUpdate.orElseGet(List::of);
             java.util.Optional<List<ActiveMinerInfo>> activeMinersUpdate = ProtocolPayloadSupport.extractActiveMiners(state, packet);
@@ -361,7 +363,6 @@ final class ProtocolPayloadHandlers {
             String keysPreview = isEnabled() ? packet.values().keySet().stream()
                     .sorted()
                     .collect(Collectors.joining(", ")) : "";
-            updateGameLocation(state, packet);
             Integer currentBlocks = packet.values().containsKey("blocks")
                     ? ProtocolPayloadSupport.getInt(packet.values(), "blocks")
                     : null;
@@ -421,9 +422,12 @@ final class ProtocolPayloadHandlers {
 
         DwGameLocation location = ProtocolPayloadSupport.parseGameLocation(value);
         if (location != null) {
-            state.currentGameLocation = location;
-            state.worldContextRevision++;
+            // Freshness is separate from a transition: highlights use this receipt revision.
             state.gameLocationRevision++;
+            if (!location.equals(state.currentGameLocation)) {
+                state.currentGameLocation = location;
+                state.worldContextRevision++;
+            }
         }
     }
 

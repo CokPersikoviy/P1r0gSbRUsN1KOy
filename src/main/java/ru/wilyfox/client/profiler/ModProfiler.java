@@ -13,6 +13,7 @@ import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ClientboundTabListPacket;
 import ru.wilyfox.client.chat.ChatTabManager;
+import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.utils.AtomicFileWriter;
 
 import java.io.IOException;
@@ -34,6 +35,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.ToLongFunction;
 
 import static ru.wilyfox.FrogHelper.MOD_ID;
@@ -69,6 +71,14 @@ public final class ModProfiler {
     private final TransitionPacketTracker transitionPackets = new TransitionPacketTracker();
     private long lastSlowTransitionLogNanos;
     private volatile boolean enabled;
+    private volatile boolean debugRecording;
+    private boolean manualRecording;
+    private boolean automaticRecording;
+    private boolean automaticOwnsRecorder;
+    private long automaticStartedAt;
+    private SessionContext automaticContext;
+    private final Map<String, SectionStats> automaticSections = new LinkedHashMap<>();
+    private final Map<String, CounterStats> automaticCounters = new LinkedHashMap<>();
     private long sessionStartedAt;
     private long sessionStoppedAt;
     private long lastClientHeartbeatNanos;
@@ -102,7 +112,7 @@ public final class ModProfiler {
         ClientTickEvents.START_CLIENT_TICK.register(this::heartbeat);
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             synchronized (this) {
-                lifetimeJoinCount++;
+                if (isCollectingDiagnostics()) lifetimeJoinCount++;
             }
             recordTimelineEvent("connection/join", handler.getLocalGameProfile().name());
             observeDimension(client, true);
@@ -110,7 +120,7 @@ public final class ModProfiler {
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             transitionPackets.clear();
             synchronized (this) {
-                lifetimeDisconnectCount++;
+                if (isCollectingDiagnostics()) lifetimeDisconnectCount++;
             }
             recordTimelineEvent("connection/disconnect", currentDimension(client));
             synchronized (this) {
@@ -125,6 +135,13 @@ public final class ModProfiler {
     }
 
     public synchronized void start() {
+        manualRecording = true;
+        if (automaticRecording) automaticOwnsRecorder = false;
+        if (enabled) return;
+        beginRecording();
+    }
+
+    private void beginRecording() {
         if (crashRecorder != null) crashRecorder.finish();
         enabled = true;
         sessionStartedAt = System.currentTimeMillis();
@@ -132,6 +149,7 @@ public final class ModProfiler {
         lastClientHeartbeatNanos = System.nanoTime();
         lastClientHeartbeatAtMs = sessionStartedAt;
         lastProtocolPayloadAtMs = 0L;
+        lastPersistentSampleAtMs = 0L;
         activeStall = null;
         try {
             var environment = Map.of(
@@ -153,6 +171,74 @@ public final class ModProfiler {
     }
 
     public synchronized void stop() {
+        manualRecording = false;
+        if (automaticRecording) return;
+        endRecording();
+    }
+
+    /** Starts the existing recorder on the client thread; never resets an active manual session. */
+    synchronized void startAutomaticCapture(int fps) {
+        if (automaticRecording) return;
+        automaticOwnsRecorder = !enabled;
+        if (!enabled) { reset(); beginRecording(); }
+        automaticContext = SessionContext.capture();
+        automaticStartedAt = System.currentTimeMillis();
+        automaticSections.clear(); automaticCounters.clear();
+        automaticRecording = true;
+        lastPersistentSampleAtMs = 0;
+        recordTimelineEventLocked("profiler/automatic-start", "fps=" + fps);
+    }
+
+    record AutomaticCapture(Path directory, String markdown, long startedAtMs, long finishedAtMs, boolean ownsDirectory) {}
+
+    /** Can finish on the timer thread even if the render thread is frozen. Uses cached client context. */
+    synchronized CompletableFuture<AutomaticCapture> finishAutomaticCapture() {
+        if (!automaticRecording) return CompletableFuture.failedFuture(new IllegalStateException("No automatic capture"));
+        long stopped = System.currentTimeMillis();
+        recordTimelineEventLocked("profiler/automatic-stop", "15 second capture completed");
+        automaticRecording = false;
+        if (!manualRecording) {
+            enabled = false; sessionStoppedAt = stopped;
+            if (activeStall != null) { activeStall.recoveredAtMs = stopped; activeStall = null; }
+            if (!debugRecording) transitionPackets.clear();
+        }
+        var snapshot = snapshotLocked(null, automaticContext);
+        var sections = sectionViews(automaticSections);
+        var window = new ReportSnapshot(enabled, automaticStartedAt, stopped, stopped - automaticStartedAt,
+                stopped, automaticSections.values().stream().mapToLong(s -> s.totalNanos).sum(), sections,
+                counterViews(automaticCounters), List.of(),
+                snapshot.samples().stream().filter(s -> s.endedAtMs() >= automaticStartedAt).toList(),
+                automaticContext, snapshot.runtimeDiagnostics(), snapshot.stalls().stream().filter(s -> s.detectedAtMs() >= automaticStartedAt).toList(),
+                snapshot.timeline().stream().filter(e -> e.timestampMs() >= automaticStartedAt).toList(),
+                snapshot.persistentSamples().stream().filter(s -> s.capturedAtMs() >= automaticStartedAt).toList(), null,
+                snapshot.lifetimeTimeline().stream().filter(e -> e.timestampMs() >= automaticStartedAt).toList(), snapshot.lifetime(), null);
+        var recorder = crashRecorder;
+        if (recorder == null) return CompletableFuture.failedFuture(new IOException("Automatic recorder unavailable"));
+        if (!manualRecording) recorder.checkpoint(() -> buildMarkdownReport(snapshot));
+        long started = automaticStartedAt;
+        boolean owns = automaticOwnsRecorder;
+        return (manualRecording ? recorder.flushJfrAsync() : recorder.finish()).thenApply(ignored ->
+                new AutomaticCapture(recorder.directory(), buildMarkdownReport(window), started, stopped, owns));
+    }
+
+    /** Debug only retains minimal samples and connection events in memory. */
+    private synchronized void syncDebugRecording(boolean requested) {
+        if (requested == debugRecording) return;
+        if (requested) {
+            debugRecording = true;
+            lastPersistentSampleAtMs = 0L;
+            if (!enabled) observedDimension = "";
+            recordTimelineEvent("profiler/debug-enabled", "minimal samples in memory only");
+        } else {
+            recordTimelineEvent("profiler/debug-disabled", "Debug disabled");
+            debugRecording = false;
+            if (!enabled) transitionPackets.clear();
+        }
+    }
+
+    private boolean isCollectingDiagnostics() { return enabled || debugRecording; }
+
+    private void endRecording() {
         long now = System.currentTimeMillis();
         if (activeStall != null) {
             activeStall.recoveredAtMs = now;
@@ -199,6 +285,7 @@ public final class ModProfiler {
     }
 
     public void recordNetworkPacket(String direction, Packet<?> packet) {
+        if (!isCollectingDiagnostics()) return;
         if ("clientbound".equals(direction) && (packet instanceof ClientboundLoginPacket
                 || packet instanceof ClientboundRespawnPacket || packet instanceof ClientboundPlayerPositionPacket
                 || packet instanceof ClientboundTabListPacket)) {
@@ -215,6 +302,7 @@ public final class ModProfiler {
 
     /** Called only on the client thread, after Netty receipt and before the vanilla handler. */
     public Scope transitionPacketScope(Packet<?> packet) {
+        if (!isCollectingDiagnostics()) return NOOP_SCOPE;
         long started = System.nanoTime();
         long queued = transitionPackets.begin(packet, started);
         return () -> {
@@ -244,6 +332,7 @@ public final class ModProfiler {
     }
 
     public synchronized void recordProtocolPayloadReceived(int payloadBytes) {
+        if (!isCollectingDiagnostics()) return;
         lifetimeProtocolPayloadCount++;
         lifetimeProtocolPayloadBytes += Math.max(0, payloadBytes);
         if (!enabled) {
@@ -261,6 +350,7 @@ public final class ModProfiler {
     }
 
     private void heartbeat(Minecraft minecraft) {
+        syncDebugRecording(ConfigManager.get().render.debug);
         long nowNanos = System.nanoTime();
         long nowMs = System.currentTimeMillis();
         boolean capturePersistentSample;
@@ -276,8 +366,8 @@ public final class ModProfiler {
             }
             lastClientHeartbeatNanos = nowNanos;
             lastClientHeartbeatAtMs = nowMs;
-            capturePersistentSample = lastPersistentSampleAtMs <= 0L
-                    || nowMs - lastPersistentSampleAtMs >= PERSISTENT_SAMPLE_INTERVAL_MS;
+            capturePersistentSample = isCollectingDiagnostics() && (lastPersistentSampleAtMs <= 0L
+                    || nowMs - lastPersistentSampleAtMs >= (automaticRecording ? 1_000L : PERSISTENT_SAMPLE_INTERVAL_MS));
             if (capturePersistentSample) {
                 lastPersistentSampleAtMs = nowMs;
             }
@@ -294,7 +384,7 @@ public final class ModProfiler {
     private void capturePersistentSample(Minecraft minecraft) {
         ProfilerDiagnostics.DiagnosticSample sample;
         try {
-            sample = ProfilerDiagnostics.captureSample(minecraft);
+            sample = ProfilerDiagnostics.captureSample(minecraft, false);
         } catch (Throwable ignored) {
             return;
         }
@@ -308,6 +398,7 @@ public final class ModProfiler {
     }
 
     private void observeDimension(Minecraft minecraft, boolean force) {
+        if (!isCollectingDiagnostics()) return;
         String dimension = currentDimension(minecraft);
         synchronized (this) {
             if (!force && dimension.equals(observedDimension)) {
@@ -449,6 +540,7 @@ public final class ModProfiler {
 
     private void recordTimelineEvent(String event, String detail) {
         synchronized (this) {
+            if (!isCollectingDiagnostics()) return;
             recordLifetimeTimelineEventLocked(event, detail);
             if (enabled) {
                 recordSessionTimelineEventLocked(event, detail);
@@ -473,6 +565,7 @@ public final class ModProfiler {
     }
 
     private void recordLifetimeTimelineEventLocked(String event, String detail) {
+        if (!isCollectingDiagnostics()) return;
         TimelineEvent entry = new TimelineEvent(
                 System.currentTimeMillis(),
                 safeTimelineValue(event),
@@ -539,6 +632,10 @@ public final class ModProfiler {
         stats.events++;
         stats.total += delta;
         stats.maxDelta = Math.max(stats.maxDelta, delta);
+        if (automaticRecording) {
+            CounterStats automatic = automaticCounters.computeIfAbsent(counter, ignored -> new CounterStats());
+            automatic.events++; automatic.total += delta; automatic.maxDelta = Math.max(automatic.maxDelta, delta);
+        }
     }
 
     public List<String> buildReportLines() {
@@ -601,6 +698,7 @@ public final class ModProfiler {
 
     public synchronized String buildStatusLine() {
         return "Profiler " + (enabled ? "enabled" : "disabled")
+                + ", mode=" + (automaticRecording ? "automatic" : debugRecording ? (manualRecording ? "debug-memory+manual" : "debug-memory") : manualRecording ? "manual" : "off")
                 + ", sections=" + statsBySection.size()
                 + ", counters=" + countersByName.size()
                 + ", stalls=" + stallCaptures.size()
@@ -610,6 +708,7 @@ public final class ModProfiler {
     }
 
     public String crashSaveStatus() {
+        if (!enabled) return "Disk recording off" + (debugRecording ? "; Debug samples stay in memory" : "");
         var recorder = crashRecorder;
         return recorder == null ? "Automatic save has not started" : recorder.status();
     }
@@ -675,22 +774,13 @@ public final class ModProfiler {
     }
 
     private ReportSnapshot snapshotLocked(ProfilerDiagnostics.FullDiagnostics fullDiagnostics) {
-        long measuredNanos = statsBySection.values().stream().mapToLong(stat -> stat.totalNanos).sum();
-        List<SectionView> sections = new ArrayList<>(statsBySection.size());
-        for (Map.Entry<String, SectionStats> entry : statsBySection.entrySet()) {
-            SectionStats stat = entry.getValue();
-            long avgNanos = stat.calls <= 0L ? 0L : stat.totalNanos / stat.calls;
-            long avgSelfNanos = stat.calls <= 0L ? 0L : stat.selfNanos / stat.calls;
-            double sharePercent = measuredNanos <= 0L ? 0.0 : stat.totalNanos * 100.0 / measuredNanos;
-            sections.add(new SectionView(entry.getKey(), stat.calls, stat.totalNanos, stat.selfNanos, avgNanos, avgSelfNanos, stat.maxNanos, sharePercent));
-        }
+        return snapshotLocked(fullDiagnostics, SessionContext.capture());
+    }
 
-        List<CounterView> counters = new ArrayList<>(countersByName.size());
-        for (Map.Entry<String, CounterStats> entry : countersByName.entrySet()) {
-            CounterStats stat = entry.getValue();
-            double avg = stat.events <= 0L ? 0.0 : (double) stat.total / stat.events;
-            counters.add(new CounterView(entry.getKey(), stat.events, stat.total, stat.maxDelta, avg));
-        }
+    private ReportSnapshot snapshotLocked(ProfilerDiagnostics.FullDiagnostics fullDiagnostics, SessionContext context) {
+        long measuredNanos = statsBySection.values().stream().mapToLong(stat -> stat.totalNanos).sum();
+        List<SectionView> sections = sectionViews(statsBySection);
+        List<CounterView> counters = counterViews(countersByName);
 
         List<CallTreeNodeView> callTreeRoots = new ArrayList<>(rootNodes.size());
         for (Map.Entry<String, CallTreeNodeStats> entry : rootNodes.entrySet()) {
@@ -730,7 +820,7 @@ public final class ModProfiler {
                 counters,
                 callTreeRoots,
                 samples,
-                SessionContext.capture(),
+                context,
                 RuntimeDiagnostics.capture(),
                 stalls,
                 timeline,
@@ -740,6 +830,27 @@ public final class ModProfiler {
                 lifetimeSnapshot(),
                 null
         );
+    }
+
+    private static List<SectionView> sectionViews(Map<String, SectionStats> source) {
+        long measured = source.values().stream().mapToLong(s -> s.totalNanos).sum();
+        List<SectionView> result = new ArrayList<>(source.size());
+        for (var entry : source.entrySet()) {
+            var s = entry.getValue();
+            result.add(new SectionView(entry.getKey(), s.calls, s.totalNanos, s.selfNanos,
+                    s.calls == 0 ? 0 : s.totalNanos / s.calls, s.calls == 0 ? 0 : s.selfNanos / s.calls,
+                    s.maxNanos, measured == 0 ? 0 : s.totalNanos * 100.0 / measured));
+        }
+        return result;
+    }
+
+    private static List<CounterView> counterViews(Map<String, CounterStats> source) {
+        List<CounterView> result = new ArrayList<>(source.size());
+        for (var entry : source.entrySet()) {
+            var s = entry.getValue();
+            result.add(new CounterView(entry.getKey(), s.events, s.total, s.maxDelta, s.events == 0 ? 0 : (double)s.total / s.events));
+        }
+        return result;
     }
 
     synchronized LifetimeView lifetimeSnapshot() {
@@ -780,6 +891,11 @@ public final class ModProfiler {
         stats.totalNanos += elapsedNanos;
         stats.selfNanos += selfNanos;
         stats.maxNanos = Math.max(stats.maxNanos, elapsedNanos);
+        if (automaticRecording) {
+            SectionStats automatic = automaticSections.computeIfAbsent(section, ignored -> new SectionStats());
+            automatic.calls++; automatic.totalNanos += elapsedNanos; automatic.selfNanos += selfNanos;
+            automatic.maxNanos = Math.max(automatic.maxNanos, elapsedNanos);
+        }
 
         Map<String, CallTreeNodeStats> targetMap = callTreeChildren(parentScope);
         CallTreeNodeStats node = targetMap.computeIfAbsent(section, ignored -> new CallTreeNodeStats());
@@ -1155,7 +1271,7 @@ public final class ModProfiler {
 
     private void appendLongRunningDiagnostics(StringBuilder markdown, ReportSnapshot snapshot) {
         markdown.append("## Long-Running Diagnostics\n\n");
-        markdown.append("> Recorded continuously from client startup. `/fhprof reset` and `/fhprof start` do not clear this data.\n\n");
+        markdown.append("> Minimal samples are collected while Debug or manual profiling is enabled. `/fhprof reset` and `/fhprof start` do not clear this history. World object types are not scanned in the background.\n\n");
 
         LifetimeView lifetime = snapshot.lifetime();
         markdown.append("| Lifetime Event | Value |\n");

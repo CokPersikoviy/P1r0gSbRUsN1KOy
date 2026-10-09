@@ -99,7 +99,7 @@ public final class ComboProgressWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().comboProgress.active && (store.getSnapshot().available() || isEditorPreview());
+        return isInLayout() && (store.getSnapshot().available() || isEditorPreview());
     }
 
     @Override

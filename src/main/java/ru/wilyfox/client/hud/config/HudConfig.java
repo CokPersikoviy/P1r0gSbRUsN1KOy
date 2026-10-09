@@ -45,5 +45,8 @@ public class HudConfig {
     public DiscordRpcConfig discordRpc = new DiscordRpcConfig();
     public QuickAccessConfig quickAccess = new QuickAccessConfig();
     public ThemeConfig theme = new ThemeConfig();
+    public MainWidgetLayoutConfig mainLayout = new MainWidgetLayoutConfig();
     public Map<String, WidgetLayoutConfig> widgetLayouts = new LinkedHashMap<>();
+    public Map<String, LocationWidgetLayoutConfig> locationLayouts = new LinkedHashMap<>();
+    public Map<String, WidgetLocationConfig> widgetLocations = new LinkedHashMap<>();
 }

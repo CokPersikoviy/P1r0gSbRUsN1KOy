@@ -1,5 +1,6 @@
 package ru.wilyfox.client.quickaccess;
 
+import ru.wilyfox.client.audio.UiSoundScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -15,7 +16,7 @@ import ru.wilyfox.client.profiler.ModProfiler;
 
 import java.util.List;
 
-public class QuickAccessEditorScreen extends Screen {
+public class QuickAccessEditorScreen extends UiSoundScreen {
     private static final int PANEL_WIDTH = 520;
     private static final int PANEL_HEIGHT = 300;
     private static final int LIST_WIDTH = 180;
@@ -43,6 +44,7 @@ public class QuickAccessEditorScreen extends Screen {
 
     @Override
     protected void init() {
+        super.init();
         ensureConfigState();
         clampSelection();
 

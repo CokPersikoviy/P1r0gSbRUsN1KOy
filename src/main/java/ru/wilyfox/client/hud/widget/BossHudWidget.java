@@ -271,7 +271,7 @@ public class BossHudWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().bossWidget.active && (!getVisibleBosses().isEmpty() || isEditorPreview());
+        return isInLayout() && (!getVisibleBosses().isEmpty() || isEditorPreview());
     }
 
     @Override

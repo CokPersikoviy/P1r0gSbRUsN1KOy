@@ -85,7 +85,7 @@ public final class SellerCooldownWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().sellerCooldown.active && (!getVisibleEntries().isEmpty() || isEditorPreview());
+        return isInLayout() && (!getVisibleEntries().isEmpty() || isEditorPreview());
     }
 
     @Override

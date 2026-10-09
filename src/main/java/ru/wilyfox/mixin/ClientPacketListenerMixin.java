@@ -118,6 +118,7 @@ public class ClientPacketListenerMixin {
 
     @Inject(method = "handleRespawn", at = @At("TAIL"))
     private void froghelper$resetUsefulHighlightOnRespawn(ClientboundRespawnPacket packet, CallbackInfo ci) {
+        DiamondWorldProtocolClient.onWorldRespawn();
         FishingSpotTracker.getInstance().clear();
         ModProfiler.getInstance().recordClientEvent("respawn", packet.getClass().getSimpleName());
         UsefulWorldHighlightRenderHook.onPlayerTeleport();

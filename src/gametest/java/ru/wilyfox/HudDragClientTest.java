@@ -36,8 +36,10 @@ public final class HudDragClientTest implements FabricClientGameTest {
             renderer.setEditing(true);
             HudEditingScreen screen = new HudEditingScreen(renderer);
             client.gui.setScreen(screen);
+            int panelWidth = Math.min(198, Math.max(146, screen.width / 3));
+            screen.mouseClicked(mouse(8 + panelWidth - 15, 18, 0), false);
 
-            int startX = screen.width / 3;
+            int startX = Math.max(110, screen.width / 3);
             int startY = screen.height / 3;
             dragged.setStartX(startX);
             dragged.setStartY(startY);

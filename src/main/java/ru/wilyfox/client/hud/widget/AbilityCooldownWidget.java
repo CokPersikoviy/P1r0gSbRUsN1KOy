@@ -6,7 +6,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.ability.AbilityCooldownStore;
 import ru.wilyfox.client.ability.AbilityCooldownStore.Entry;
 import ru.wilyfox.client.hud.HudEditingScreen;
-import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.internal.HudFrameClock;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.utils.Formatting;
@@ -101,7 +100,7 @@ public class AbilityCooldownWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().abilityCooldown.active && (store.hasActiveEntries() || isEditorPreview());
+        return isInLayout() && (store.hasActiveEntries() || isEditorPreview());
     }
 
     @Override

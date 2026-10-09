@@ -13,7 +13,11 @@ import ru.wilyfox.client.hud.internal.GuiElementSubmitter;
 import java.util.function.Function;
 
 @Mixin(GuiGraphicsExtractor.class)
-public abstract class GuiGraphicsExtractorMixin implements GuiElementSubmitter {
+public abstract class GuiGraphicsExtractorMixin implements GuiElementSubmitter, ru.wilyfox.client.hud.internal.WidgetGuiState {
+    @Shadow @org.spongepowered.asm.mixin.Final
+    private net.minecraft.client.renderer.state.gui.GuiRenderState guiRenderState;
+
+    @Override public net.minecraft.client.renderer.state.gui.GuiRenderState froghelper$guiState() { return guiRenderState; }
     @Unique
     private Function<ColoredRectangleRenderState, GuiElementRenderState> froghelper$pendingElementFactory;
 

@@ -12,10 +12,10 @@ final class HudSettingsVisualsSection {
         items.add(new BreakLineSettingsComponent("Screen"));
         items.add(new CycleSettingsComponent<>(0, 0, 0, 0, "Aspect ratio", () -> ConfigManager.get().visuals.aspectRatio,
                 value -> ConfigManager.get().visuals.aspectRatio = value, AspectRatioPreset.values(), value -> value.title));
-        items.add(new StepperSettingsComponent(0, 0, 0, 0, "Custom width", () -> ConfigManager.get().visuals.aspectWidth,
+        items.add(new DragNumberSettingsComponent(0, 0, 0, 0, "Custom width", () -> ConfigManager.get().visuals.aspectWidth,
                 value -> ConfigManager.get().visuals.aspectWidth = value, 1, 8192, 10)
                 .withVisibility(() -> ConfigManager.get().visuals.aspectRatio == AspectRatioPreset.CUSTOM));
-        items.add(new StepperSettingsComponent(0, 0, 0, 0, "Custom height", () -> ConfigManager.get().visuals.aspectHeight,
+        items.add(new DragNumberSettingsComponent(0, 0, 0, 0, "Custom height", () -> ConfigManager.get().visuals.aspectHeight,
                 value -> ConfigManager.get().visuals.aspectHeight = value, 1, 8192, 10)
                 .withVisibility(() -> ConfigManager.get().visuals.aspectRatio == AspectRatioPreset.CUSTOM));
         items.add(toggle("Stretch hand too", () -> ConfigManager.get().visuals.stretchHand,
@@ -27,7 +27,7 @@ final class HudSettingsVisualsSection {
         items.add(new ColorPickerSettingsComponent("Outline color", () -> ConfigManager.get().visuals.blockOutlineColor,
                 value -> ConfigManager.get().visuals.blockOutlineColor = value)
                 .withVisibility(() -> ConfigManager.get().visuals.blockOutline));
-        items.add(new SliderSettingsComponent(0, 0, 0, 0, "Line width (px)", () -> ConfigManager.get().visuals.blockOutlineWidth,
+        items.add(new DragNumberSettingsComponent(0, 0, 0, 0, "Line width (px)", () -> ConfigManager.get().visuals.blockOutlineWidth,
                 value -> ConfigManager.get().visuals.blockOutlineWidth = value, 1, 8)
                 .withVisibility(() -> ConfigManager.get().visuals.blockOutline));
         items.add(new BreakLineSettingsComponent("Sky / fog"));

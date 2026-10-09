@@ -35,6 +35,40 @@ class ProfilerCrashRecorderTest {
     }
 
     @Test
+    void queuedSavesAfterFinalCheckpointDoNotTouchClosedFiles() throws Exception {
+        var errors = new CopyOnWriteArrayList<String>();
+        var recorder = new ProfilerCrashRecorder(temporary, Map.of(), false, errors::add);
+        var field = ProfilerCrashRecorder.class.getDeclaredField("writer");
+        field.setAccessible(true);
+        var writer = (ScheduledExecutorService) field.get(recorder);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        try {
+            recorder.flushAsync().get(10, TimeUnit.SECONDS);
+            writer.execute(() -> {
+                entered.countDown();
+                try { release.await(10, TimeUnit.SECONDS); }
+                catch (InterruptedException failure) { Thread.currentThread().interrupt(); }
+            });
+            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            // Make the periodic save due before finish queues its immediate save.
+            Thread.sleep(1_100);
+            recorder.checkpoint(() -> "# Final checkpoint");
+            var finish = recorder.finish();
+            assertSame(finish, recorder.finish());
+            release.countDown();
+            finish.get(10, TimeUnit.SECONDS);
+            assertTrue(writer.awaitTermination(10, TimeUnit.SECONDS));
+            assertTrue(errors.isEmpty(), errors::toString);
+            assertTrue(Files.readString(recorder.directory().resolve("report.md")).contains("# Final checkpoint"));
+            assertEquals(1L, kinds(recorder.directory()).stream().filter("session/stop"::equals).count());
+        } finally {
+            release.countDown();
+            recorder.finish().get(10, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
     void failedReplacementLeavesPreviousCompleteFile() throws Exception {
         Path report = temporary.resolve("report.md");
         Files.writeString(report, "previous complete file");

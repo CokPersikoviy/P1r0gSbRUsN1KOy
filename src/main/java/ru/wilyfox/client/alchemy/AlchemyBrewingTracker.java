@@ -4,7 +4,6 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.LerpingBossEvent;
-import net.minecraft.sounds.SoundEvents;
 import ru.wilyfox.bridge.BossHealthOverlayAccessor;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.popup.PopUpManager;
@@ -77,7 +76,7 @@ public final class AlchemyBrewingTracker {
                 continue;
             }
             if (time >= action.timingSeconds() - delaySeconds && time <= action.timingSeconds()) {
-                announce(minecraft, action);
+                announce(action);
                 announcedTimings.add(action.timingSeconds());
                 break;
             }
@@ -103,7 +102,7 @@ public final class AlchemyBrewingTracker {
         return null;
     }
 
-    private static void announce(Minecraft minecraft, PotionRecipeTracker.RecipeAction action) {
+    private static void announce(PotionRecipeTracker.RecipeAction action) {
         PopUpManager.getInstance().publish(PopUpRequest.of(
                 PopUpSource.ALCHEMY_ACTION,
                 "\u0410\u043b\u0445\u0438\u043c\u0438\u044f",
@@ -111,11 +110,6 @@ public final class AlchemyBrewingTracker {
                 PopUpSeverity.WARNING
         ));
 
-        if (ConfigManager.get().alchemy.recipeActionSound) {
-            for (int i = 0; i < 5; i++) {
-                minecraft.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
-            }
-        }
     }
 
     private static void reset() {

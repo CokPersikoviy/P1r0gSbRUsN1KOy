@@ -13,6 +13,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HudSettingsSectionsTest {
     @Test
+    void widgetMembershipIsNotExposedAsSettingsToggles() {
+        Map<SettingsCategory, List<SettingsComponent>> sections = new EnumMap<>(SettingsCategory.class);
+        for (SettingsCategory category : SettingsCategory.values()) sections.put(category, new ArrayList<>());
+        HudSettingsFeatureSections.populate(sections, () -> { });
+        HudSettingsCoreSections.populate(sections);
+        for (SettingsCategory category : List.of(SettingsCategory.POP_UPS)) {
+            assertFalse(sections.get(category).stream().anyMatch(item -> item.label.equals("Active")));
+        }
+        assertFalse(sections.get(SettingsCategory.FISHING).stream().anyMatch(item -> item.label.contains("widget")));
+        assertFalse(sections.get(SettingsCategory.WIDGET).stream().filter(item -> item instanceof ToggleSettingsComponent)
+                .anyMatch(item -> item.label.endsWith("Widget") || item.label.endsWith("as Widget")));
+        assertTrue(sections.get(SettingsCategory.WIDGET).stream().anyMatch(item -> item.label.equals("Edit Main Layout")));
+    }
+
+    @Test
     void staticSectionsPopulateEveryNonDynamicCategory() {
         Map<SettingsCategory, List<SettingsComponent>> sections = new EnumMap<>(SettingsCategory.class);
         for (SettingsCategory category : SettingsCategory.values()) {

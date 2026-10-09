@@ -24,6 +24,9 @@ public final class HudBlur {
 
     private HudBlur() {}
 
+    /** Replayed frosted panels still sample this frame's world, using the same shared target. */
+    public static void requestSnapshotCapture() { if (available && blurred != null && !HudSurface.nativeRenderer()) requested = true; }
+
     public static void beginFrame(GuiGraphicsExtractor context) {
         if (HudSurface.nativeRenderer()) {
             if (blurred != null || pool != null) close();
@@ -98,6 +101,7 @@ public final class HudBlur {
     }
 
     public static void close() {
+        ru.wilyfox.client.hud.internal.WidgetLayoutAnimation.invalidateResources();
         if (blurred != null) blurred.destroyBuffers();
         if (pool != null) pool.close();
         blurred = null;

@@ -58,7 +58,8 @@ public final class ProfilerDebugCommand {
             }
             case "stop" -> {
                 profiler.stop();
-                showLocalMessage("Profiler stopped.");
+                showLocalMessage(profiler.isEnabled() ? "Manual profiling stopped; automatic capture continues." : ru.wilyfox.client.hud.config.ConfigManager.get().render.debug
+                        ? "Profiler stopped; Debug memory sampling continues." : "Profiler stopped.");
             }
             case "reset" -> {
                 profiler.reset();

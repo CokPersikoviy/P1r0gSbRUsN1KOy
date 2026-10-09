@@ -7,11 +7,15 @@ import net.fabricmc.loader.api.FabricLoader;
 import ru.wilyfox.FrogHelper;
 import ru.wilyfox.client.protocol.CurrentServerInfo;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
+import ru.wilyfox.client.profiler.ModProfiler;
 
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Path;
+import java.io.IOException;
 import java.net.http.WebSocket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -37,15 +41,18 @@ public final class BackendSocialClient {
     private CompletableFuture<?> request;
     private long retryAt;
     private long requestStartedAt;
-    private long expiresAt;
+    private volatile long expiresAt;
+    private volatile String accessToken;
     private long lastFrameAt;
     private int failures;
     private volatile int bufferedCharacters;
     private static final String MOD_VERSION = FabricLoader.getInstance().getModContainer(FrogHelper.MOD_ID)
             .map(mod -> mod.getMetadata().getVersion().getFriendlyString()).orElse("Unknown");
     private SocialWire.SessionUpdate sentMetadata;
+    private String sentLocationId;
     private CompletableFuture<WebSocket> metadataRequest;
     private long nextMetadataAt;
+    private long nextMetadataSendAt;
 
     private static BackendSocialClient DEFAULT = new BackendSocialClient(SocialWire.BACKEND);
     private final URI backend;
@@ -70,6 +77,29 @@ public final class BackendSocialClient {
     }
 
     public static String statusText() { return DEFAULT.status; }
+    public static boolean diagnosticAuthorizationReady() {
+        return DEFAULT.accessToken != null && DEFAULT.expiresAt > System.currentTimeMillis() + 10_000;
+    }
+    public record DiagnosticUploadResult(int status, long retryAfterMillis) {}
+    public static CompletableFuture<DiagnosticUploadResult> uploadDiagnostic(Path archive, String digest) {
+        var client = DEFAULT;
+        String bearer = client.accessToken;
+        if (bearer == null || client.expiresAt <= System.currentTimeMillis() + 5_000)
+            return CompletableFuture.completedFuture(new DiagnosticUploadResult(401, 30_000));
+        try {
+            long attempt = client.generation;
+            var request = HttpRequest.newBuilder(client.backend.resolve("/v1/diagnostics/" + digest))
+                    .timeout(Duration.ofSeconds(95)).header("Content-Type", "application/zip")
+                    .header("Authorization", "Bearer " + bearer).POST(HttpRequest.BodyPublishers.ofFile(archive)).build();
+            return HTTP.sendAsync(request, HttpResponse.BodyHandlers.discarding()).thenApply(response -> {
+                long retry = 30_000;
+                try { retry = Math.max(retry, Math.min(3_600, Long.parseLong(response.headers().firstValue("Retry-After").orElse("0"))) * 1_000); }
+                catch (NumberFormatException ignored) { }
+                if (response.statusCode() == 401) Minecraft.getInstance().execute(() -> client.failed(attempt, false));
+                return new DiagnosticUploadResult(response.statusCode(), retry);
+            });
+        } catch (IOException failure) { return CompletableFuture.failedFuture(new IOException("Cannot read diagnostic archive")); }
+    }
     public static DebugSnapshot diagnosticSnapshot() {
         return new DebugSnapshot(DEFAULT.bufferedCharacters, DEFAULT.socket == null ? 0 : 1, DEFAULT.request == null ? 0 : 1);
     }
@@ -118,6 +148,8 @@ public final class BackendSocialClient {
         socket = null;
         request = null;
         token = null;
+        accessToken = null;
+        expiresAt = 0;
         scope = null;
         rejectedToken = null;
         failures = 0;
@@ -126,7 +158,9 @@ public final class BackendSocialClient {
         if (metadataRequest != null) metadataRequest.cancel(true);
         metadataRequest = null;
         sentMetadata = null;
+        sentLocationId = null;
         nextMetadataAt = 0;
+        nextMetadataSendAt = 0;
         rosterUpdates.set(null);
         PresenceStore.clear();
     }
@@ -169,6 +203,7 @@ public final class BackendSocialClient {
                 Minecraft.getInstance().execute(() -> {
                     if (attempt != generation) return;
                     expiresAt = session.expiresAt() * 1_000;
+                    accessToken = session.accessToken();
                     URI uri = URI.create(("https".equals(backend.getScheme()) ? "wss://" : "ws://") + backend.getAuthority() + "/v1/presence?scope="
                             + URLEncoder.encode(expectedScope, StandardCharsets.UTF_8));
                     requestStartedAt = System.currentTimeMillis();
@@ -190,9 +225,12 @@ public final class BackendSocialClient {
     }
 
     private void sendMetadata(long now) {
-        if (now < nextMetadataAt || metadataRequest != null && !metadataRequest.isDone()) return;
-        nextMetadataAt = now + 2_000;
+        // The authenticated backend accepts at most one metadata frame per second.
+        if (now < nextMetadataSendAt || metadataRequest != null && !metadataRequest.isDone()) return;
         String locationId = DiamondWorldProtocolClient.getCurrentGameLocation();
+        boolean progressDue = now >= nextMetadataAt;
+        if (!progressDue && sentMetadata != null && Objects.equals(locationId, sentLocationId)) return;
+        if (progressDue) nextMetadataAt = now + 2_000;
         String location = locationId == null || locationId.isBlank() ? "Waiting for location"
                 : DiamondWorldProtocolClient.getGameLocationDisplayName(locationId);
         if (location == null || location.isBlank()) location = locationId;
@@ -201,10 +239,23 @@ public final class BackendSocialClient {
         }
         var metadata = new SocialWire.SessionUpdate(1, "session.update", MOD_VERSION,
                 Math.clamp(DiamondWorldProtocolClient.getCurrentLevel(), 0, 1_000_000), location);
-        if (metadata.equals(sentMetadata)) return;
+        if (metadata.equals(sentMetadata)) {
+            sentLocationId = locationId;
+            return;
+        }
+        // Transitions bypass the progress interval, within the backend's frame limit.
+        boolean locationChanged = sentMetadata == null || !location.equals(sentMetadata.location());
+        if (!locationChanged && !progressDue) {
+            sentLocationId = locationId;
+            return;
+        }
+        nextMetadataAt = now + 2_000;
+        nextMetadataSendAt = now + 1_100;
         long attempt = generation;
         metadataRequest = socket.sendText(SocialWire.JSON.toJson(metadata), true);
         sentMetadata = metadata;
+        sentLocationId = locationId;
+        if (locationChanged) ModProfiler.getInstance().recordClientEvent("social-location-request", locationId);
         metadataRequest.whenComplete((ws, failure) -> {
             if (failure != null) Minecraft.getInstance().execute(() -> failed(attempt, false));
         });

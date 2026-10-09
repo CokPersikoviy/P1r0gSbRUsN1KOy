@@ -68,7 +68,7 @@ public class ScoreboardWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().scoreboard.active && (hasRenderedScoreboard() || isEditorPreview());
+        return isInLayout() && (hasRenderedScoreboard() || isEditorPreview());
     }
 
     @Override

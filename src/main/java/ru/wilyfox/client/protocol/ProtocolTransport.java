@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
 import ru.wilyfox.client.profiler.ModProfiler;
@@ -19,6 +20,7 @@ final class ProtocolTransport {
     private static final long HANDSHAKE_REFRESH_INTERVAL_MS = 120_000L;
     private static final long STALE_PROTOCOL_TIMEOUT_MS = 20_000L;
     private static final long STALE_HANDSHAKE_RETRY_INTERVAL_MS = 10_000L;
+    private static final long WORLD_REFRESH_MIN_INTERVAL_MS = 1_000L;
 
     private ProtocolTransport() {
     }
@@ -34,16 +36,11 @@ final class ProtocolTransport {
         PayloadTypeRegistry.clientboundPlay().register(DwEvoPlusPayload.TYPE, DwEvoPlusPayload.STREAM_CODEC);
 
         ClientPlayNetworking.registerGlobalReceiver(DwEvoPlusPayload.TYPE, (payload, context) -> {
-            ModProfiler.getInstance().recordProtocolPayloadReceived(payload.data().length);
-            byte[] data = payload.data().clone();
-            context.client().execute(() -> {
-                state.receivedEvoPlusPayload = true;
-                state.lastPayloadAt = System.currentTimeMillis();
-                router.route(state, data);
-            });
+            receivePayload(context.client(), state, router, payload.data());
         });
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> reset(state));
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> onJoin(state, client, sender));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("tick/ProtocolTransport")) {
@@ -52,14 +49,75 @@ final class ProtocolTransport {
                 }
 
                 long now = System.currentTimeMillis();
+                if (shouldRefreshWorld(state, now)) {
+                    sendHandshake(null, "respawn");
+                    state.worldRefreshPending = false;
+                    state.locationBeforeWorldRefresh = null;
+                    state.lastHandshakeAt = now;
+                    return;
+                }
                 if (!shouldSendHandshake(state, now)) {
                     return;
                 }
 
-                sendHandshake();
+                sendHandshake(null, "retry");
                 state.lastHandshakeAt = now;
             }
         });
+    }
+
+    static void onJoin(ProtocolState state, Minecraft client, PacketSender sender) {
+        if (!isDiamondWorldConnection(client)) return;
+        // A new play session needs its own handshake even when the previous one was healthy.
+        state.receivedEvoPlusPayload = false;
+        state.lastPayloadAt = 0L;
+        state.worldRefreshPending = false;
+        state.locationBeforeWorldRefresh = null;
+        sendHandshake(sender, "join");
+        state.lastHandshakeAt = System.currentTimeMillis();
+    }
+
+    static void onRespawn(ProtocolState state, Minecraft client) {
+        if (!isDiamondWorldConnection(client) || state.worldRefreshPending) return;
+        // Proxies can switch worlds via Respawn without a new Fabric JOIN. Coalesce
+        // their paired respawns and skip the request if fresh location arrives first.
+        state.worldRefreshPending = true;
+        state.locationBeforeWorldRefresh = state.currentGameLocation;
+        ModProfiler.getInstance().recordClientEvent("protocol-world-refresh", "respawn");
+    }
+
+    static boolean shouldRefreshWorld(ProtocolState state, long now) {
+        if (!state.worldRefreshPending) return false;
+        if (!java.util.Objects.equals(state.currentGameLocation, state.locationBeforeWorldRefresh)) {
+            state.worldRefreshPending = false;
+            state.locationBeforeWorldRefresh = null;
+            return false;
+        }
+        return now - state.lastHandshakeAt >= WORLD_REFRESH_MIN_INTERVAL_MS;
+    }
+
+    /** Fabric play receivers already run on the client thread, inside the packet task. */
+    static void receivePayload(Minecraft client, ProtocolState state, ProtocolRouter router, byte[] data) {
+        ModProfiler.getInstance().recordProtocolPayloadReceived(data.length);
+        if (client.isSameThread()) {
+            applyPayload(state, router, data);
+        } else {
+            // Preserve ownership for callers outside Fabric's play receiver contract.
+            byte[] owned = data.clone();
+            client.execute(() -> applyPayload(state, router, owned));
+        }
+    }
+
+    private static void applyPayload(ProtocolState state, ProtocolRouter router, byte[] data) {
+        String oldLocation = state.currentGameLocation != null ? state.currentGameLocation.id() : null;
+        state.receivedEvoPlusPayload = true;
+        state.lastPayloadAt = System.currentTimeMillis();
+        router.route(state, data);
+        String newLocation = state.currentGameLocation != null ? state.currentGameLocation.id() : null;
+        if (!java.util.Objects.equals(oldLocation, newLocation)) {
+            info(LOGGER, "DW protocol: location changed {} -> {}", oldLocation, newLocation);
+            ModProfiler.getInstance().recordClientEvent("location-changed", newLocation);
+        }
     }
 
     private static void reset(ProtocolState state) {
@@ -135,11 +193,14 @@ final class ProtocolTransport {
                 && now - state.lastHandshakeAt >= STALE_HANDSHAKE_RETRY_INTERVAL_MS;
     }
 
-    private static void sendHandshake() {
+    private static void sendHandshake(PacketSender sender, String reason) {
         ModProfiler.getInstance().recordProtocolHandshake("start");
+        ModProfiler.getInstance().recordClientEvent("protocol-handshake-reason", reason);
         String fingerprint = DwHandshakeFingerprint.generate();
         info(LOGGER, "DW protocol: sending handshake on channel dw:handshake, fingerprint={}", fingerprint);
-        ClientPlayNetworking.send(new DwHandshakePayload(fingerprint));
+        var payload = new DwHandshakePayload(fingerprint);
+        if (sender != null) sender.sendPacket(payload);
+        else ClientPlayNetworking.send(payload);
         ModProfiler.getInstance().recordProtocolHandshake("sent");
     }
 }

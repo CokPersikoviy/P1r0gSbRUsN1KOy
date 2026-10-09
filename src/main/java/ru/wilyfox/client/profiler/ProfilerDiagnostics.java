@@ -59,6 +59,11 @@ final class ProfilerDiagnostics {
     }
 
     static DiagnosticSample captureSample(Minecraft minecraft) {
+        return captureSample(minecraft, true);
+    }
+
+    /** Background samples use existing counts, without walking entities or looking up chunks. */
+    static DiagnosticSample captureSample(Minecraft minecraft, boolean scanWorld) {
         long captureStartedNanos = System.nanoTime();
         long capturedAtMs = System.currentTimeMillis();
         MemoryUsage heap = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
@@ -109,7 +114,7 @@ final class ProfilerDiagnostics {
         ThreadMXBean threads = ManagementFactory.getThreadMXBean();
         ClassLoadingMXBean classes = ManagementFactory.getClassLoadingMXBean();
         CpuSnapshot cpu = captureCpu();
-        WorldSnapshot world = captureWorld(minecraft);
+        WorldSnapshot world = captureWorld(minecraft, scanWorld);
         FrogHelperSnapshot frogHelper = captureFrogHelper();
 
         return new DiagnosticSample(
@@ -220,7 +225,7 @@ final class ProfilerDiagnostics {
         );
     }
 
-    private static WorldSnapshot captureWorld(Minecraft minecraft) {
+    private static WorldSnapshot captureWorld(Minecraft minecraft, boolean scanWorld) {
         if (minecraft == null) {
             return WorldSnapshot.empty();
         }
@@ -247,16 +252,18 @@ final class ProfilerDiagnostics {
             loadedChunks = level.getChunkSource().getLoadedChunksCount();
             entities = level.getEntityCount();
 
-            Map<String, Integer> entityCounts = new HashMap<>();
-            for (Entity entity : level.entitiesForRendering()) {
-                String key = String.valueOf(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()));
-                entityCounts.merge(key, 1, Integer::sum);
-            }
-            entityTypes = topCounts(entityCounts);
+            if (scanWorld) {
+                Map<String, Integer> entityCounts = new HashMap<>();
+                for (Entity entity : level.entitiesForRendering()) {
+                    String key = String.valueOf(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()));
+                    entityCounts.merge(key, 1, Integer::sum);
+                }
+                entityTypes = topCounts(entityCounts);
 
-            Map<String, Integer> blockEntityCounts = new HashMap<>();
-            blockEntities = scanBlockEntities(level, renderDistance, blockEntityCounts);
-            blockEntityTypes = topCounts(blockEntityCounts);
+                Map<String, Integer> blockEntityCounts = new HashMap<>();
+                blockEntities = scanBlockEntities(level, renderDistance, blockEntityCounts);
+                blockEntityTypes = topCounts(blockEntityCounts);
+            }
         }
 
         try {

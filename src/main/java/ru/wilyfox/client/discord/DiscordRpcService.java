@@ -60,6 +60,7 @@ public final class DiscordRpcService {
     private static String lastPresenceSignature = "";
     private static boolean registered;
     private static boolean autoRequested;
+    private static final DiscordPresenceRefreshPolicy REFRESH_POLICY = new DiscordPresenceRefreshPolicy();
     private static volatile String status = "Stopped";
     private static volatile Mode mode = Mode.NONE;
 
@@ -109,9 +110,8 @@ public final class DiscordRpcService {
 
                 long now = System.currentTimeMillis();
                 long intervalMs = Math.max(1L, config.updateIntervalSeconds) * 1000L;
-                if (mode == Mode.AUTO && now - lastAutoUpdateAt < intervalMs) {
-                    return;
-                }
+                long contextRevision = DiamondWorldProtocolClient.getWorldContextRevision();
+                if (!REFRESH_POLICY.shouldUpdate(now, intervalMs, contextRevision, lastAutoUpdateAt)) return;
 
                 PresenceData presence = buildAutoPresence(client, config);
                 if (presence == null) {
@@ -119,7 +119,11 @@ public final class DiscordRpcService {
                     return;
                 }
 
+                if (REFRESH_POLICY.contextChanged(contextRevision)) {
+                    ModProfiler.getInstance().recordClientEvent("discord-context-request", DiamondWorldProtocolClient.getCurrentGameLocation());
+                }
                 autoRequested = true;
+                REFRESH_POLICY.requested(now, contextRevision);
                 AUTO_UPDATES.update(presence);
             }
         });
@@ -130,6 +134,7 @@ public final class DiscordRpcService {
     }
 
     private static void stopAuto() {
+        REFRESH_POLICY.reset();
         if (autoRequested) {
             autoRequested = false;
             AUTO_UPDATES.stop();

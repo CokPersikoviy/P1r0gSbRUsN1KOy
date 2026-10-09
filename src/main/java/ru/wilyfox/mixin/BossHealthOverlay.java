@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import ru.wilyfox.bridge.BossHealthOverlayAccessor;
-import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.WidgetCatalog;
 
 import java.util.Map;
 import java.util.UUID;
@@ -30,7 +30,7 @@ public abstract class BossHealthOverlay implements BossHealthOverlayAccessor {
 
     @Inject(method = "extractRenderState", at = @At("HEAD"), cancellable = true)
     private void froghelper$cancelVanillaRender(GuiGraphicsExtractor guiGraphics, CallbackInfo ci) {
-        if (ConfigManager.get().bossBar.active) {
+        if (WidgetCatalog.BOSS_BAR.isAdded()) {
             ci.cancel();
         }
     }

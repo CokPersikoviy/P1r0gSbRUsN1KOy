@@ -4,8 +4,6 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.chat.ChatDispatchQueue;
-import ru.wilyfox.client.hud.HudEditingScreen;
-import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
 
 public class OutgoingChatQueueWidget extends AbstractWidget {
@@ -71,7 +69,7 @@ public class OutgoingChatQueueWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().outgoingChatQueue.active || Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
+        return isInLayout();
     }
 
     @Override

@@ -2,6 +2,8 @@ package ru.wilyfox.client.hud.widget;
 
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.hud.indicators.ScreenAnchor;
+import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.WidgetCatalog;
 
 public abstract class AbstractWidget implements Widget {
     protected int startX;
@@ -16,7 +18,6 @@ public abstract class AbstractWidget implements Widget {
     protected String snapTargetKey;
     protected WidgetCorner snapOwnCorner;
     protected WidgetCorner snapTargetCorner;
-    protected boolean hiddenInGameplay;
 
     protected AbstractWidget(int x, int y, HudLayer l) {
         this.startX = x;
@@ -54,7 +55,12 @@ public abstract class AbstractWidget implements Widget {
 
     @Override
     public boolean isVisible() {
-        return visible;
+        return visible && isInLayout();
+    }
+
+    protected final boolean isInLayout() {
+        String key = configKey != null ? configKey : getClass().getSimpleName();
+        return WidgetCatalog.find(key) == null || ConfigManager.isWidgetInCurrentLayout(key);
     }
 
     @Override
@@ -128,11 +134,4 @@ public abstract class AbstractWidget implements Widget {
         this.snapTargetCorner = null;
     }
 
-    public boolean isHiddenInGameplay() {
-        return hiddenInGameplay;
-    }
-
-    public void setHiddenInGameplay(boolean hiddenInGameplay) {
-        this.hiddenInGameplay = hiddenInGameplay;
-    }
 }

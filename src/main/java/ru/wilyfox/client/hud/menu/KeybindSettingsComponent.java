@@ -1,5 +1,6 @@
 package ru.wilyfox.client.hud.menu;
 
+import ru.wilyfox.client.audio.UiSounds;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -88,6 +89,9 @@ public class KeybindSettingsComponent extends SettingsComponent {
         if (keyCode != GLFW.GLFW_KEY_ESCAPE) { // Esc cancels without changing the bind
             setter.accept(keyCode);
             ConfigManager.save();
+            UiSounds.play(ru.wilyfox.client.audio.UiSound.SUCCESS);
+        } else {
+            UiSounds.click();
         }
         listening = false;
         return true;

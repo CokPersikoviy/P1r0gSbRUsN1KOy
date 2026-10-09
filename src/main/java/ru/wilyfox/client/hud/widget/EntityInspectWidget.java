@@ -18,7 +18,7 @@ import net.minecraft.world.level.block.NoteBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
-import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.layer.HudLayer;
 
 import java.util.ArrayList;
@@ -47,13 +47,13 @@ public final class EntityInspectWidget extends AbstractWidget {
 
     @Override
     public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
-        if (!ConfigManager.get().entityInspect.active) {
+        if (!isInLayout()) {
             return;
         }
 
         Minecraft mc = Minecraft.getInstance();
         InspectSnapshot snapshot = buildSnapshot(mc);
-        if (snapshot == null) {
+        if (snapshot == null && !(mc.gui.screen() instanceof HudEditingScreen)) {
             return;
         }
 
@@ -61,15 +61,21 @@ public final class EntityInspectWidget extends AbstractWidget {
         context.pose().translate(startX, startY);
         context.pose().scale(scale, scale);
 
-        renderCard(context, mc, snapshot);
+        if (snapshot != null) renderCard(context, mc, snapshot);
+        else {
+            HudSurface.drawPanel(context, CARD_WIDTH, CARD_HEIGHT);
+            context.text(mc.font, "Entity Inspect", 8, 6, WidgetTheme.TITLE);
+            context.text(mc.font, "No target selected", 8, HEADER_HEIGHT + 4, WidgetTheme.TEXT_MUTED);
+        }
 
         context.pose().popMatrix();
     }
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().entityInspect.active
-                && (Minecraft.getInstance().crosshairPickEntity != null || isTargetingBlock(Minecraft.getInstance()));
+        return isInLayout()
+                && (Minecraft.getInstance().crosshairPickEntity != null || isTargetingBlock(Minecraft.getInstance())
+                    || Minecraft.getInstance().gui.screen() instanceof HudEditingScreen);
     }
 
     @Override

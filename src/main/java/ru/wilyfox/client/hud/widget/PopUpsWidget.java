@@ -9,7 +9,6 @@ import ru.wilyfox.client.hud.config.WidgetChrome;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.popup.PopUpManager;
 import ru.wilyfox.client.popup.PopUpNotification;
-import ru.wilyfox.client.popup.PopUpRequest;
 import ru.wilyfox.client.popup.PopUpSeverity;
 
 import java.util.List;
@@ -88,7 +87,7 @@ public final class PopUpsWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().popUps.active || Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
+        return isInLayout();
     }
 
     @Override

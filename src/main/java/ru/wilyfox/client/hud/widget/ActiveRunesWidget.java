@@ -4,7 +4,6 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.HudEditingScreen;
-import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.rune.ActiveRunesStore;
 import ru.wilyfox.client.rune.RuneSetCooldownStore;
@@ -85,7 +84,7 @@ public class ActiveRunesWidget extends AbstractWidget {
 
     @Override
     public boolean isVisible() {
-        return ConfigManager.get().activeRunes.active && (!store.isEmpty() || isEditorPreview());
+        return isInLayout() && (!store.isEmpty() || isEditorPreview());
     }
 
     @Override
