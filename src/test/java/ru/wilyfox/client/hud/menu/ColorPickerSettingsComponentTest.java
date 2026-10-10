@@ -32,4 +32,11 @@ class ColorPickerSettingsComponentTest {
                 hsv.value()
         ));
     }
+    @Test void argbModePreservesTransparentAndOpaquePrefixes() {
+        assertEquals(0xFF123456, ColorPickerSettingsComponent.parseHex("#FF123456", true));
+        assertEquals(0x00123456, ColorPickerSettingsComponent.parseHex("#00123456", true));
+        assertEquals(0xAABBCCDD, ColorPickerSettingsComponent.parseHex("aabbccdd", true));
+        assertNull(ColorPickerSettingsComponent.parseHex("#123456", true));
+        assertNull(ColorPickerSettingsComponent.parseHex("#FF123456"));
+    }
 }

@@ -123,8 +123,10 @@ public final class AutoBossAnnouncer {
                     && remaining > 0L
                     && remaining <= config.preRespawnSeconds * 1000L
                     && !announcedRespawns.containsKey(bossKey)) {
+                var message = LowHpMessageFormatter.formatRespawn(config.lowHealthFormat,
+                        boss.getName(), boss.getLevel(), "возродится через " + formatDuration(remaining));
                 publishMessage(
-                        formatBossLabel(boss.getName(), boss.getLevel()) + " возродится через " + formatDuration(remaining),
+                        message.component(), message.clanText(),
                         config.preRespawnMessage,
                         config.preRespawnClanMessage
                 );
@@ -135,8 +137,10 @@ public final class AutoBossAnnouncer {
                     && remaining <= 0L
                     && remaining >= -SPAWN_ANNOUNCE_WINDOW_MS
                     && !announcedSpawns.containsKey(bossKey)) {
+                var message = LowHpMessageFormatter.formatRespawn(config.lowHealthFormat,
+                        boss.getName(), boss.getLevel(), "возродился");
                 publishMessage(
-                        formatBossLabel(boss.getName(), boss.getLevel()) + " возродился",
+                        message.component(), message.clanText(),
                         config.spawnMessage,
                         config.spawnClanMessage
                 );

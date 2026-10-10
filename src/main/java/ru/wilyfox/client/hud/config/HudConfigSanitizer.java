@@ -153,7 +153,47 @@ final class HudConfigSanitizer {
         sanitized.playerHealthBars.accentStrengthPercent = Math.max(0, Math.min(100, sanitized.playerHealthBars.accentStrengthPercent));
 
         WidgetCatalog.sanitize(sanitized);
+        if (sanitized.chatWidgets == null) sanitized.chatWidgets = new java.util.LinkedHashMap<>();
+        sanitized.chatWidgets.entrySet().removeIf(entry -> WidgetCatalog.find(entry.getKey()) == null
+                || WidgetCatalog.find(entry.getKey()).chatChannel() == null);
+        int customTabs = 0;
+        var tabIterator = sanitized.chatWidgets.entrySet().iterator();
+        while (tabIterator.hasNext()) {
+            var entry = tabIterator.next();
+            if (!WidgetCatalog.isCustomChatKey(entry.getKey())) continue;
+            if (++customTabs > 12) { tabIterator.remove(); continue; }
+            if (entry.getValue() == null) entry.setValue(new ChatWidgetConfig(ru.wilyfox.client.chat.ChatTab.ALL));
+            entry.getValue().sanitize(ru.wilyfox.client.chat.ChatTab.ALL);
+        }
+        for (var widget : WidgetCatalog.values()) {
+            if (widget.chatChannel() == null) continue;
+            var settings = sanitized.chatWidgets.computeIfAbsent(widget.key(), ignored -> new ChatWidgetConfig(widget.chatChannel()));
+            if (widget == WidgetCatalog.CHAT_ALL || widget == WidgetCatalog.CHAT_FH) {
+                settings.channel = widget.chatChannel();
+                settings.title = widget.chatChannel().getTitle(); settings.textFilter = ""; settings.deleted = false; settings.detached = false;
+                settings.width = 280; settings.rows = 10; settings.showTitle = true;
+            }
+            settings.sanitize(widget.chatChannel());
+            if (settings.deleted) settings.detached = false;
+        }
+        var order = new java.util.LinkedHashSet<String>();
+        order.add(WidgetCatalog.CHAT_ALL.key()); order.add(WidgetCatalog.CHAT_FH.key());
+        if (sanitized.chatTabOrder != null) for (String key : sanitized.chatTabOrder) {
+            var settings = sanitized.chatWidgets.get(key);
+            if (settings != null && !settings.deleted) order.add(key);
+        }
+        for (var widget : WidgetCatalog.values()) if (widget.chatChannel() != null && !sanitized.chatWidgets.get(widget.key()).deleted)
+            order.add(widget.key());
+        for (var entry : sanitized.chatWidgets.entrySet()) if (!entry.getValue().deleted) order.add(entry.getKey());
+        sanitized.chatTabOrder = new java.util.ArrayList<>(order);
         HudLayoutResolver.sanitize(sanitized);
+        for (var entry : sanitized.chatWidgets.entrySet()) if (entry.getValue().deleted
+                || entry.getKey().equals(WidgetCatalog.CHAT_ALL.key()) || entry.getKey().equals(WidgetCatalog.CHAT_FH.key())) {
+            String key = entry.getKey();
+            sanitized.mainLayout.widgets.remove(key);
+            sanitized.widgetLayouts.remove(key); sanitized.widgetLocations.remove(key);
+            for (var layout : sanitized.locationLayouts.values()) { layout.widgets.remove(key); layout.placements.remove(key); }
+        }
         return sanitized;
     }
 

@@ -10,6 +10,24 @@ import static ru.wilyfox.client.hud.config.LowHpMessageElement.*;
 
 class LowHpMessageFormatterTest {
     @Test
+    void respawnUsesIdentityColorsInBothChatsEvenWhenLowHpFieldsAreHidden() {
+        var config = new LowHpMessageFormatConfig();
+        config.element(NAME).colorCode = "§A";
+        config.element(LEVEL).colorCode = "&d";
+        config.element(NAME).visible = false;
+        config.element(LEVEL).visible = false;
+        for (String announcement : new String[]{"возродился", "возродится через 30с"}) {
+            var message = LowHpMessageFormatter.formatRespawn(config, "§cКригер", 15, announcement);
+            assertEquals("Кригер [15] " + announcement, message.component().getString());
+            assertEquals("&aКригер&f &d[15]&7 " + announcement + "&r", message.clanText());
+            var parts = message.component().getSiblings();
+            assertEquals(0x55FF55, parts.getFirst().getStyle().getColor().getValue());
+            assertEquals(0xFF55FF, parts.get(2).getStyle().getColor().getValue());
+            assertEquals(0xAAAAAA, parts.getLast().getStyle().getColor().getValue());
+        }
+    }
+
+    @Test
     void formatsReadableMessageAndKeepsColorCodesOutOfLocalText() {
         var message = LowHpMessageFormatter.preview(new LowHpMessageFormatConfig());
         assertEquals("[PE1.2] Бессмертный Легион [130] [Прок] — 125❤ (20%) [Стадия 2/4]", message.plainText());

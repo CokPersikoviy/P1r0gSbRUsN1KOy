@@ -2,7 +2,7 @@ package ru.wilyfox.client.hud.config;
 
 import java.util.*;
 
-/** Pure layout selection. A widget keeps its identity; later matching layouts override placement. */
+/** Select one location layout, with the main layout as fallback. Widget identities remain shared. */
 public final class HudLayoutResolver {
     public static final String MAIN = "";
     private HudLayoutResolver() {}
@@ -11,23 +11,23 @@ public final class HudLayoutResolver {
             var selected = config.locationLayouts.get(editorLayout);
             return selected == null ? config.mainLayout.widgets : selected.widgets;
         }
-        var result = new LinkedHashSet<>(config.mainLayout.widgets);
-        for (var layout : config.locationLayouts.values()) if (layout.matches(location)) result.addAll(layout.widgets);
-        return result;
+        var selected = runtimeLayout(config, location);
+        var widgets = new LinkedHashSet<String>();
+        if (selected == null || selected.inheritMainLayout) widgets.addAll(config.mainLayout.widgets);
+        if (selected != null) widgets.addAll(selected.widgets);
+        return widgets;
     }
     public static WidgetLayoutConfig placement(HudConfig config, String key, String editorLayout, String location) {
         if (editorLayout != null) {
             var selected = config.locationLayouts.get(editorLayout);
             return selected == null ? config.widgetLayouts.get(key) : selected.placements.get(key);
         }
-        var result = config.widgetLayouts.get(key);
-        for (var layout : config.locationLayouts.values()) {
-            if (layout.widgets.contains(key) && layout.matches(location)) {
-                var replacement = layout.placements.get(key);
-                if (replacement != null) result = replacement;
-            }
+        var selected = runtimeLayout(config, location);
+        if (selected != null && selected.widgets.contains(key)) {
+            var placement = selected.placements.get(key);
+            if (placement != null) return placement;
         }
-        return result;
+        return config.widgetLayouts.get(key);
     }
 
     public static Map<String, WidgetLayoutConfig> placementStorage(HudConfig config, String key, String editorLayout, String location) {
@@ -35,9 +35,13 @@ public final class HudLayoutResolver {
             var selected = config.locationLayouts.get(editorLayout);
             return selected == null ? config.widgetLayouts : selected.placements;
         }
-        var result = config.widgetLayouts;
-        for (var layout : config.locationLayouts.values()) if (layout.widgets.contains(key) && layout.matches(location)) result = layout.placements;
-        return result;
+        var selected = runtimeLayout(config, location);
+        return selected != null && selected.widgets.contains(key) ? selected.placements : config.widgetLayouts;
+    }
+    private static LocationWidgetLayoutConfig runtimeLayout(HudConfig config, String location) {
+        LocationWidgetLayoutConfig selected = null;
+        for (var layout : config.locationLayouts.values()) if (layout.matches(location)) selected = layout;
+        return selected;
     }
     public static void sanitize(HudConfig config) {
         if (config.locationLayouts == null) config.locationLayouts = new LinkedHashMap<>();

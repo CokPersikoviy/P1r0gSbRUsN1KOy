@@ -45,6 +45,11 @@ public final class AutomaticProfilerClientTest implements FabricClientGameTest {
                 context.runOnClient(client -> service.considerCapture(8,false,0));
                 expect(!profiler.isEnabled(),"Inactive window triggered automatic recording");
                 context.runOnClient(client -> service.considerCapture(8,true,0));
+                expect(!profiler.isEnabled(),"A single low FPS sample triggered recording");
+                context.runOnClient(client -> service.considerCapture(8,true,4_999));
+                expect(!profiler.isEnabled(),"Recording started before five seconds of low FPS");
+                context.runOnClient(client -> service.considerCapture(8,true,5_000));
+                expect(profiler.isEnabled(),"Five seconds of low FPS did not trigger recording");
                 raw = recorder(profiler).directory();
                 long deadline = System.nanoTime()+TimeUnit.SECONDS.toNanos(25);
                 var activeField = AutomaticDiagnostics.class.getDeclaredField("capturing"); activeField.setAccessible(true);

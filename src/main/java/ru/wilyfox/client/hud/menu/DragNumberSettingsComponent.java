@@ -21,6 +21,11 @@ public final class DragNumberSettingsComponent extends SettingsComponent {
     private boolean dragging;
     private boolean dirty;
     private boolean labelTruncated;
+    private java.util.function.IntFunction<String> formatter = Integer::toString;
+
+    public DragNumberSettingsComponent withFormatter(java.util.function.IntFunction<String> formatter) {
+        this.formatter = java.util.Objects.requireNonNull(formatter); return this;
+    }
 
     public DragNumberSettingsComponent(int x, int y, int width, int height, String label,
                                        IntSupplier getter, IntConsumer setter, int min, int max) {
@@ -67,7 +72,7 @@ public final class DragNumberSettingsComponent extends SettingsComponent {
                 valueHovered || dragging ? WidgetTheme.PANEL_BG : WidgetTheme.BAR_BG);
         if (valueHovered || dragging) context.fill(valueX() + 3, y + height - 4,
                 valueX() + valueWidth() - 3, y + height - 3, WidgetTheme.ACCENT_LINE);
-        context.centeredText(font, Integer.toString(getter.getAsInt()), valueX() + valueWidth() / 2, textY,
+        context.centeredText(font, formatter.apply(getter.getAsInt()), valueX() + valueWidth() / 2, textY,
                 dragging ? WidgetTheme.TITLE : WidgetTheme.TEXT_SOFT);
     }
 

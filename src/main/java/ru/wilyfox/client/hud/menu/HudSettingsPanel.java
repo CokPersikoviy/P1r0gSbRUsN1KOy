@@ -59,6 +59,7 @@ public class HudSettingsPanel {
         if (!(widget instanceof AbstractWidget placed)) return false;
         var catalog = WidgetCatalog.find(placed.getConfigKey());
         if (catalog == null) return false;
+        if (catalog.chatChannel() != null && !ru.wilyfox.client.chat.ChatDock.canEdit(placed.getConfigKey())) return false;
         finishInteraction();
         settingsWidget = widget;
         settingsLayout = null;
@@ -75,7 +76,10 @@ public class HudSettingsPanel {
         widgetComponents.add(new LocationSettingsComponent("Location hidden",
                 () -> ConfigManager.getWidgetLocations(placed.getConfigKey()).locationHidden,
                 value -> ConfigManager.getWidgetLocations(placed.getConfigKey()).selectHidden(value), "Nowhere"));
-        widgetComponents.addAll(WidgetSettingsSections.create(catalog));
+        widgetComponents.addAll(WidgetSettingsSections.create(catalog, placed.getConfigKey()));
+        if (catalog.chatChannel() != null) widgetComponents.add(new ActionSettingsComponent("Delete tab", () -> {
+            ru.wilyfox.client.chat.ChatDock.delete(placed.getConfigKey()); closeWidget();
+        }));
         scrollOffset = 0;
         hoveredSoundTarget = null;
         return true;
@@ -105,10 +109,16 @@ public class HudSettingsPanel {
                 return handled;
             }
         });
+        widgetComponents.add(new ToggleSettingsComponent(0, 0, 0, 0, "Include Main Layout widgets",
+                () -> ConfigManager.get().locationLayouts.get(id).inheritMainLayout,
+                value -> {
+                    ConfigManager.get().locationLayouts.get(id).inheritMainLayout = value;
+                    ConfigManager.layoutChanged();
+                }));
         widgetComponents.add(new LocationSettingsComponent("Location visibility",
                 () -> ConfigManager.get().locationLayouts.get(id).locationVisibility,
                 value -> ConfigManager.get().locationLayouts.get(id).locationVisibility = value, "Inactive"));
-        widgetComponents.add(new StatusSettingsComponent("Placement overrides the main layout", () ->
+        widgetComponents.add(new StatusSettingsComponent("Layout visibility", () ->
                 ConfigManager.get().locationLayouts.get(id).locationVisibility.isEmpty() ? "Select locations to activate" :
                 "Used in " + ConfigManager.get().locationLayouts.get(id).locationVisibility.size() + " selected locations"));
         widgetComponents.add(new ActionSettingsComponent("Delete layout", onDelete));

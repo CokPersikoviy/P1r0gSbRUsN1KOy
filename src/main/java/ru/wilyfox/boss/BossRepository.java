@@ -19,16 +19,19 @@ import java.util.function.LongSupplier;
 public class BossRepository {
     private final Map<String, BossInfo> worldBosses = new LinkedHashMap<>();
     private final Map<String, BossInfo> protocolBosses = new LinkedHashMap<>();
+    private final Map<String, BossInfo> sharedBosses = new LinkedHashMap<>();
     private final Map<String, Integer> protocolLevelsByName = new LinkedHashMap<>();
     private final Map<String, ItemStack> discoveredBossIcons = new LinkedHashMap<>();
     private final LongSupplier clock;
     private final LongSupplier spawnGraceSupplier;
     private SourceStamp worldStamp;
     private SourceStamp protocolStamp;
+    private SourceStamp sharedStamp;
     private List<BossInfo> worldView = List.of();
     private List<BossInfo> protocolView = List.of();
     private List<BossInfo> mergedView = List.of();
     private long iconRevision;
+    private long sharedCleanupAt;
 
     public BossRepository() {
         this(System::currentTimeMillis, BossRepository::configuredSpawnGraceMs);
@@ -65,6 +68,7 @@ public class BossRepository {
 
     public void clearProtocol() {
         protocolBosses.clear();
+        sharedBosses.clear();
         protocolLevelsByName.clear();
         discoveredBossIcons.clear();
         iconRevision++;
@@ -91,14 +95,21 @@ public class BossRepository {
 
     private void ensureViews() {
         cleanupProtocol();
+        if (!sharedBosses.isEmpty()) {
+            long now = clock.getAsLong();
+            if (now >= sharedCleanupAt) {
+                sharedBosses.entrySet().removeIf(entry -> entry.getValue().getRespawnAt() <= now);
+                sharedCleanupAt = now + 1_000;
+            }
+        }
         if (worldStamp != null && worldStamp.matches(worldBosses)
-                && protocolStamp.matches(protocolBosses)) return;
-        worldView = sorted(worldBosses.values());
-        protocolView = sorted(deduplicateByName(protocolBosses.values()));
+                && protocolStamp.matches(protocolBosses) && sharedStamp != null && sharedStamp.matches(sharedBosses)) return;
+        worldView = sorted(withShared(worldBosses.values()));
+        protocolView = sorted(withShared(deduplicateByName(protocolBosses.values())));
         Map<String, BossInfo> merged = new LinkedHashMap<>();
         Set<Integer> protocolLevels = new HashSet<>();
 
-        for (BossInfo boss : protocolView) {
+        for (BossInfo boss : deduplicateByName(protocolBosses.values())) {
             merged.put(boss.getIdentityKey(), boss);
             if (boss.getLevel() > 0) {
                 protocolLevels.add(boss.getLevel());
@@ -114,9 +125,29 @@ public class BossRepository {
             merged.putIfAbsent(nameKey, boss);
         }
 
+        for (BossInfo boss : sharedBosses.values()) merged.putIfAbsent(boss.getIdentityKey(), boss);
         mergedView = sorted(merged.values());
         worldStamp = new SourceStamp(worldBosses);
         protocolStamp = new SourceStamp(protocolBosses);
+        sharedStamp = new SourceStamp(sharedBosses);
+    }
+
+    /** Social timers fill missing entries; direct world/server observations retain priority. */
+    public int importShared(Collection<BossInfo> bosses) {
+        long now = clock.getAsLong(); int added = 0;
+        sharedCleanupAt = 0;
+        for (BossInfo boss : bosses) {
+            if (boss.getRespawnAt() <= now) continue;
+            if (!sharedBosses.containsKey(boss.getIdentityKey()) && sharedBosses.size() >= 512) continue;
+            sharedBosses.put(boss.getIdentityKey(), boss); added++;
+        }
+        return added;
+    }
+    private Collection<BossInfo> withShared(Collection<BossInfo> source) {
+        var combined = new LinkedHashMap<String, BossInfo>();
+        for (BossInfo boss : source) combined.put(boss.getIdentityKey(), boss);
+        sharedBosses.forEach(combined::putIfAbsent);
+        return combined.values();
     }
 
     private static List<BossInfo> sorted(Collection<BossInfo> source) {

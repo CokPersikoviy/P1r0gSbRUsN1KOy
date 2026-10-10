@@ -53,6 +53,13 @@ public final class BackendSocialClient {
     private CompletableFuture<WebSocket> metadataRequest;
     private long nextMetadataAt;
     private long nextMetadataSendAt;
+    private boolean timerSharing;
+    private boolean chatSharing;
+    private final BackendChatClient chat;
+    private CompletableFuture<?> timerPublish, timerDownload;
+    private CompletableFuture<net.minecraft.network.chat.Component> timerResult;
+    private SocialWire.TimerUpload sentTimers;
+    private long nextTimersAt, lastTimersSentAt, nextTimerRequestAt;
 
     private static BackendSocialClient DEFAULT = new BackendSocialClient(SocialWire.BACKEND);
     private final URI backend;
@@ -67,6 +74,7 @@ public final class BackendSocialClient {
             throw new IllegalArgumentException("Backend must use HTTPS");
         }
         this.backend = backend;
+        this.chat = new BackendChatClient(backend, HTTP);
     }
 
     public static void init() {
@@ -104,7 +112,9 @@ public final class BackendSocialClient {
         return new DebugSnapshot(DEFAULT.bufferedCharacters, DEFAULT.socket == null ? 0 : 1, DEFAULT.request == null ? 0 : 1);
     }
     public record DebugSnapshot(int bufferedCharacters, int connected, int requestPending) {}
-    private record PendingRoster(long generation, List<String> names, long receivedAt) {}
+    private record PendingRoster(long generation, List<SocialWire.Player> players, boolean timerSharing, boolean chatSharing, long receivedAt) {}
+    public static void sendChat(String text) { DEFAULT.chat.send(text, DEFAULT.accessToken); }
+    public static void requestOlderChat() { DEFAULT.chat.older(); }
 
     void tick(Minecraft client) {
         CurrentServerInfo server = DiamondWorldProtocolClient.getCurrentServerInfo();
@@ -124,10 +134,12 @@ public final class BackendSocialClient {
         }
         PendingRoster roster = rosterUpdates.getAndSet(null);
         if (roster != null && roster.generation() == generation) {
-            PresenceStore.replace(roster.names());
+            PresenceStore.replacePlayers(roster.players());
+            timerSharing = roster.timerSharing();
+            chatSharing = roster.chatSharing();
             lastFrameAt = roster.receivedAt();
             failures = 0;
-            status = roster.names().isEmpty() ? "social.froghelper.empty" : "social.froghelper.online";
+            status = roster.players().isEmpty() ? "social.froghelper.empty" : "social.froghelper.online";
         }
         long now = System.currentTimeMillis();
         if (socket != null && (now >= expiresAt - 20_000 || now - lastFrameAt > 90_000)) {
@@ -135,6 +147,8 @@ public final class BackendSocialClient {
         }
         if (request != null && now - requestStartedAt > 15_000) failed(generation, false);
         if (socket != null) sendMetadata(now);
+        if (socket != null && timerSharing) publishTimers(now);
+        chat.tick(socket != null && chatSharing, accessToken, client.player.getGameProfile().name());
         if (now >= retryAt) rejectedToken = null;
         if (socket == null && request == null && now >= retryAt && !Objects.equals(token, rejectedToken)) {
             login(client.player.getGameProfile().name());
@@ -161,6 +175,13 @@ public final class BackendSocialClient {
         sentLocationId = null;
         nextMetadataAt = 0;
         nextMetadataSendAt = 0;
+        timerSharing = false;
+        chatSharing = false; chat.reset();
+        if (timerPublish != null) timerPublish.cancel(true);
+        if (timerDownload != null) timerDownload.cancel(true);
+        if (timerResult != null) timerResult.complete(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.cancelled"));
+        timerPublish = timerDownload = null; timerResult = null; sentTimers = null;
+        nextTimersAt = lastTimersSentAt = nextTimerRequestAt = 0;
         rosterUpdates.set(null);
         PresenceStore.clear();
     }
@@ -205,7 +226,7 @@ public final class BackendSocialClient {
                     expiresAt = session.expiresAt() * 1_000;
                     accessToken = session.accessToken();
                     URI uri = URI.create(("https".equals(backend.getScheme()) ? "wss://" : "ws://") + backend.getAuthority() + "/v1/presence?scope="
-                            + URLEncoder.encode(expectedScope, StandardCharsets.UTF_8));
+                            + URLEncoder.encode(expectedScope, StandardCharsets.UTF_8) + "&chat=1");
                     requestStartedAt = System.currentTimeMillis();
                     var opening = HTTP.newWebSocketBuilder().connectTimeout(Duration.ofSeconds(10))
                             .header("Authorization", "Bearer " + session.accessToken())
@@ -261,7 +282,75 @@ public final class BackendSocialClient {
         });
     }
 
+    private void publishTimers(long now) {
+        if (now < nextTimersAt || timerPublish != null && !timerPublish.isDone() || accessToken == null) return;
+        nextTimersAt = now + 5_000;
+        var snapshot = SocialTimerService.snapshot(scope, now);
+        if (snapshot.equals(sentTimers) && now - lastTimersSentAt < 30_000) return;
+        String body = SocialWire.JSON.toJson(snapshot);
+        if (body.getBytes(StandardCharsets.UTF_8).length > SocialWire.MAX_MESSAGE_SIZE) return;
+        long attempt = generation;
+        var upload = HttpRequest.newBuilder(backend.resolve("/v1/timers")).timeout(Duration.ofSeconds(8))
+                .header("Authorization", "Bearer " + accessToken).header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(body)).build();
+        timerPublish = HTTP.sendAsync(upload, HttpResponse.BodyHandlers.discarding()).whenComplete((response, failure) ->
+                Minecraft.getInstance().execute(() -> {
+                    if (attempt != generation) return;
+                    if (failure == null && response.statusCode() == 204) { sentTimers = snapshot; lastTimersSentAt = now; }
+                    else if (failure == null && response.statusCode() == 401) failed(attempt, false);
+                }));
+    }
+
+    static String timerUnavailable(SocialWire.Player player) {
+        var client = DEFAULT;
+        if (!client.timerSharing) return "social.froghelper.timers.backend_old";
+        if (player == null || player.timerCount() == null) return "social.froghelper.timers.unavailable";
+        if (player.name().equalsIgnoreCase(Minecraft.getInstance().player == null ? "" : Minecraft.getInstance().player.getGameProfile().name()))
+            return "social.froghelper.timers.self";
+        if (player.timerCount() == 0) return "social.froghelper.timers.empty";
+        if (client.socket == null || client.accessToken == null) return "social.froghelper.unavailable";
+        return null;
+    }
+
+    public static CompletableFuture<net.minecraft.network.chat.Component> requestTimers(String name) {
+        var client = DEFAULT;
+        var player = PresenceStore.player(name);
+        String unavailable = timerUnavailable(player);
+        if (unavailable != null) return CompletableFuture.completedFuture(net.minecraft.network.chat.Component.translatable(unavailable));
+        long now = System.currentTimeMillis();
+        if (now < client.nextTimerRequestAt || client.timerDownload != null && !client.timerDownload.isDone())
+            return CompletableFuture.completedFuture(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.busy"));
+        client.nextTimerRequestAt = now + 1_100;
+        long attempt = client.generation;
+        String expectedScope = player.scope();
+        var result = new CompletableFuture<net.minecraft.network.chat.Component>();
+        client.timerResult = result;
+        var download = HttpRequest.newBuilder(client.backend.resolve("/v1/timers/" + player.id()))
+                .timeout(Duration.ofSeconds(8)).header("Authorization", "Bearer " + client.accessToken).GET().build();
+        client.timerDownload = HTTP.sendAsync(download, ignored -> new LimitedBodySubscriber()).whenComplete((response, failure) ->
+                Minecraft.getInstance().execute(() -> {
+                    if (attempt != client.generation) { result.complete(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.cancelled")); return; }
+                    try {
+                        if (failure != null || response.statusCode() != 200) {
+                            if (failure == null && response.statusCode() == 401) client.failed(attempt, false);
+                            result.complete(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.failed"));
+                            return;
+                        }
+                        var payload = SocialWire.JSON.fromJson(new String(response.body(), StandardCharsets.UTF_8), SocialWire.TimerResponse.class);
+                        var timers = payload.validatedTimers(player.id(), expectedScope, System.currentTimeMillis());
+                        if (!payload.name().equalsIgnoreCase(player.name())) throw new IllegalArgumentException("Wrong player");
+                        int imported = SocialTimerService.receive(timers);
+                        result.complete(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.received", imported, payload.name()));
+                        ModProfiler.getInstance().recordClientEvent("social-timers-received", payload.name() + ":" + imported);
+                    } catch (Exception invalid) {
+                        result.complete(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.failed"));
+                    }
+                }));
+        return result;
+    }
+
     private final class Listener implements WebSocket.Listener {
+        // Large pages use bounded HTTPS requests; websocket notifications coalesce into a cursor.
         private final long attempt;
         private final String expectedScope;
         private final StringBuilder buffer = new StringBuilder();
@@ -290,11 +379,18 @@ public final class BackendSocialClient {
                 buffer.append(data);
                 bufferedCharacters = buffer.length();
                 if (last) {
+                    var envelope = com.google.gson.JsonParser.parseString(buffer.toString()).getAsJsonObject();
+                    if (envelope.has("type") && "chat.changed".equals(envelope.get("type").getAsString())) {
+                        if (!envelope.has("version") || envelope.get("version").getAsInt() != 1) throw new IllegalArgumentException();
+                        chat.changed(envelope.get("cursor").getAsLong());
+                        buffer.setLength(0); bufferedCharacters = 0; ws.request(1);
+                        return CompletableFuture.completedFuture(null);
+                    }
                     SocialWire.Snapshot message = SocialWire.JSON.fromJson(buffer.toString(), SocialWire.Snapshot.class);
-                    List<String> names = message.validatedNames(expectedScope);
+                    message.validatedNames(expectedScope);
                     if (message.sequence() <= sequence) throw new IllegalArgumentException();
                     sequence = message.sequence();
-                    PendingRoster next = new PendingRoster(attempt, names, System.currentTimeMillis());
+                    PendingRoster next = new PendingRoster(attempt, List.copyOf(message.players()), message.timerSharing(), message.chatSharing(), System.currentTimeMillis());
                     rosterUpdates.accumulateAndGet(next, (previous, incoming) -> previous != null
                             && previous.generation() > incoming.generation() ? previous : incoming);
                     buffer.setLength(0);

@@ -22,7 +22,23 @@ import java.util.function.Supplier;
 final class WidgetSettingsSections {
     private WidgetSettingsSections() {}
     static List<SettingsComponent> create(WidgetCatalog widget) {
+        return create(widget, widget.key());
+    }
+    static List<SettingsComponent> create(WidgetCatalog widget, String key) {
         var items = new ArrayList<SettingsComponent>();
+        if (widget.chatChannel() != null) {
+            Supplier<ru.wilyfox.client.hud.config.ChatWidgetConfig> config = () -> ConfigManager.get().chatWidgets.get(key);
+            items.add(new TextInputSettingsComponent(0, 0, 0, 0, "Tab name", () -> config.get().title,
+                    value -> config.get().title = value, 20));
+            items.add(new TextInputSettingsComponent(0, 0, 0, 0, "Text filter", () -> config.get().textFilter,
+                    value -> config.get().textFilter = value, 128));
+            items.add(cycle("Channel", () -> config.get().channel, value -> config.get().channel = value,
+                    ru.wilyfox.client.chat.ChatTab.values(), ru.wilyfox.client.chat.ChatTab::getTitle));
+            items.add(slider("Chat width", () -> config.get().width, value -> config.get().width = value, 100, 600));
+            items.add(slider("Chat rows", () -> config.get().rows, value -> config.get().rows = value, 2, 30));
+            items.add(toggle("Show chat title", () -> config.get().showTitle, value -> config.get().showTitle = value));
+            return items;
+        }
         switch (widget) {
             case LEVEL_PROGRESS -> {
                 items.add(toggle("Show Level Progress Bar", () -> ConfigManager.get().levelProgress.showBar,

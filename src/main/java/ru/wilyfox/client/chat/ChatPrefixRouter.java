@@ -39,10 +39,12 @@ public final class ChatPrefixRouter {
     }
 
     private static boolean matches(String text, String prefix) {
-        return text.startsWith(prefix)
-                || text.startsWith("[" + prefix + "]")
-                || text.startsWith(prefix + " ")
-                || text.startsWith(prefix + ":");
+        if (text.startsWith("[" + prefix + "]")) return true;
+        if (!text.startsWith(prefix)) return false;
+        int end = prefix.length();
+        // DW resource-pack channel glyphs are self-delimiting, unlike Latin letters.
+        return end == text.length() || prefix.codePoints().anyMatch(value -> value > 127 && !Character.isLetter(value))
+                || Character.isWhitespace(text.charAt(end)) || text.charAt(end) == ':';
     }
 
     public static String stripKnownPrefix(String text, ChatTab tab) {
@@ -65,7 +67,7 @@ public final class ChatPrefixRouter {
                 return clean.substring(candidate.length() + 1).stripLeading();
             }
 
-            if (clean.startsWith(candidate)) {
+            if (matches(clean, candidate)) {
                 return clean.substring(candidate.length()).stripLeading();
             }
         }

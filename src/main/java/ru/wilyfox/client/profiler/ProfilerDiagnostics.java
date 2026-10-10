@@ -17,7 +17,6 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import ru.wilyfox.client.alchemy.AlchemyIngredientTracker;
 import ru.wilyfox.client.chat.BoosterChatDebug;
-import ru.wilyfox.client.chat.BossShareService;
 import ru.wilyfox.client.chat.ChatDispatchQueue;
 import ru.wilyfox.client.clan.PlayerClanStorage;
 import ru.wilyfox.client.highlight.UsefulWorldHighlightRenderHook;
@@ -396,7 +395,6 @@ final class ProfilerDiagnostics {
                     PopUpManager.getInstance().diagnosticNotificationCount(),
                     chatQueue.size(),
                     BoosterChatDebug.diagnosticMessageCount(),
-                    BossShareService.diagnosticPendingShareCount(),
                     PresenceStore.knownCount(),
                     social.bufferedCharacters(),
                     social.connected(),
@@ -634,7 +632,6 @@ final class ProfilerDiagnostics {
             int popupNotifications,
             int chatQueue,
             int boosterDebugMessages,
-            int pendingBossShares,
             int knownModUsers,
             int socialBufferedCharacters,
             int socialConnected,
@@ -651,7 +648,7 @@ final class ProfilerDiagnostics {
         static FrogHelperSnapshot empty() {
             return new FrogHelperSnapshot(
                     -1, -1, -1, -1, -1, -1, -1, -1, -1,
-                    -1, -1, -1, -1, -1, -1, -1, -1, -1
+                    -1, -1, -1, -1, -1, -1, -1, -1
             );
         }
     }

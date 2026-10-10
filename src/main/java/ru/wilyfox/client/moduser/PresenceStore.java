@@ -9,6 +9,7 @@ import java.util.Map;
 public final class PresenceStore {
     private static Map<String, String> online = Map.of();
     private static List<String> names = List.of();
+    private static Map<String, SocialWire.Player> details = Map.of();
 
     private PresenceStore() {}
 
@@ -23,11 +24,21 @@ public final class PresenceStore {
         }
         online = Map.copyOf(next);
         names = next.values().stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        details = Map.of();
     }
+
+    static void replacePlayers(List<SocialWire.Player> players) {
+        replace(players.stream().map(SocialWire.Player::name).toList());
+        var next = new LinkedHashMap<String, SocialWire.Player>();
+        for (var player : players) next.put(player.name().toLowerCase(Locale.ROOT), player);
+        details = Map.copyOf(next);
+    }
+    static SocialWire.Player player(String name) { return name == null ? null : details.get(name.toLowerCase(Locale.ROOT)); }
 
     static void clear() {
         online = Map.of();
         names = List.of();
+        details = Map.of();
     }
 
     public static boolean isKnown(String name) {

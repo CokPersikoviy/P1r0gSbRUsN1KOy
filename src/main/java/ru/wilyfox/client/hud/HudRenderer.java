@@ -353,7 +353,7 @@ public class HudRenderer {
                     break;
                 }
             }
-            for (Widget widget : registeredWidgets) if (WidgetCatalog.find(widget.getClass().getSimpleName()) == null) widgets.add(widget);
+            for (Widget widget : registeredWidgets) if (WidgetCatalog.find(widgetKey(widget)) == null) widgets.add(widget);
             normalizeWidgetSnapParents();
             var window = Minecraft.getInstance().getWindow();
             updateAnchoredWidgets(window.getGuiScaledWidth(), window.getGuiScaledHeight());
@@ -397,14 +397,14 @@ public class HudRenderer {
     public void registerWidget(Widget widget, ScreenAnchor defaultAnchor) {
         registeredWidgets.add(widget);
         widgetRegistryRevision++;
-        if (WidgetCatalog.find(widget.getClass().getSimpleName()) == null
-                || WidgetCatalog.isAdded(ConfigManager.get(), widget.getClass().getSimpleName())) {
+        if (WidgetCatalog.find(widgetKey(widget)) == null
+                || WidgetCatalog.isAdded(ConfigManager.get(), widgetKey(widget))) {
             widgets.add(widget);
         }
         nextPassiveLayoutCheck = 0;
 
         if (widget instanceof AbstractWidget abstractWidget) {
-            abstractWidget.setConfigKey(widget.getClass().getSimpleName());
+            abstractWidget.setConfigKey(widgetKey(widget));
             var defaults = new WidgetLayoutConfig();
             defaults.x = abstractWidget.getStartX(); defaults.y = abstractWidget.getStartY();
             defaults.scale = abstractWidget.getScale(); defaults.anchor = defaultAnchor;
@@ -438,6 +438,43 @@ public class HudRenderer {
     public List<Widget> getWidgets() {
         return List.copyOf(registeredWidgets);
     }
+    public void unregisterWidget(Widget widget) {
+        registeredWidgets.remove(widget); widgets.remove(widget); defaultPlacements.remove(widget);
+        if (selectedWidget == widget) selectedWidget = null;
+        appliedConfig = null; widgetRegistryRevision++;
+    }
+
+    private static String widgetKey(Widget widget) {
+        return widget instanceof AbstractWidget placed && placed.getConfigKey() != null
+                ? placed.getConfigKey() : widget.getClass().getSimpleName();
+    }
+
+    public ru.wilyfox.client.hud.widget.ChatWidget chatWidgetAt(double x, double y) {
+        if (editing || settingsOpen) return null;
+        Widget widget = findTopHoveredWidget(x, y);
+        return widget instanceof ru.wilyfox.client.hud.widget.ChatWidget chat ? chat : null;
+    }
+
+    private boolean chatScreenOwns(Widget widget) {
+        return !editing && widget instanceof ru.wilyfox.client.hud.widget.ChatWidget
+                && Minecraft.getInstance().gui.screen() instanceof net.minecraft.client.gui.screens.ChatScreen;
+    }
+
+    /** Focused windows sit over vanilla chat, so drawing and input use the same stacking order. */
+    public void renderChatWindows(GuiGraphicsExtractor graphics) {
+        if (editing || settingsOpen || Minecraft.getInstance().level == null) return;
+        boolean begun = false;
+        long now = System.nanoTime();
+        var window = Minecraft.getInstance().getWindow();
+        graphics.enableScissor(0, 0, window.getGuiScaledWidth(), window.getGuiScaledHeight() - 16);
+        try { for (Widget widget : widgets) {
+            if (!chatScreenOwns(widget) || !widget.isVisible()) continue;
+            if (!begun) { HudBlur.beginFrame(graphics); begun = true; }
+            try (var profile = ModProfiler.getInstance().scope("chat/widget/render")) {
+                layoutAnimation.render(widget, graphics, Minecraft.getInstance().getDeltaTracker(), now);
+            }
+        } } finally { graphics.disableScissor(); }
+    }
 
     public List<Widget> getLayoutWidgets() {
         return List.copyOf(widgets);
@@ -445,6 +482,12 @@ public class HudRenderer {
 
     public int getLayoutWidgetCount() { return widgets.size(); }
     public int getRegisteredWidgetCount() { return registeredWidgets.size(); }
+    public int getLibraryWidgetCount() {
+        int count = 0;
+        for (Widget widget : registeredWidgets)
+            if (!(widget instanceof ru.wilyfox.client.hud.widget.ChatWidget chat) || chat.settings() != null && !chat.settings().deleted && chat.settings().detached) count++;
+        return count;
+    }
     public long getWidgetRegistryRevision() { return widgetRegistryRevision; }
     public Widget getSelectedWidget() { return selectedWidget; }
     public boolean isWidgetDragging() { return draggedWidget != null; }
@@ -467,6 +510,7 @@ public class HudRenderer {
         if (!(widget instanceof AbstractWidget placed)) return false;
         String key = placed.getConfigKey();
         if (WidgetCatalog.find(key) == null) return false;
+        if (widget instanceof ru.wilyfox.client.hud.widget.ChatWidget && ru.wilyfox.client.chat.ChatDock.isPinned(key)) return false;
         editedWidgetKeys().add(key);
         ConfigManager.layoutChanged();
         widgets.add(widget);
@@ -587,6 +631,7 @@ public class HudRenderer {
             try (ModProfiler.Scope widgetLoopScope = ModProfiler.getInstance().scope("hud/widgetLoop")) {
                 if (departures) layoutAnimation.renderDepartures(context, animationTime, null, editing);
                 for (Widget widget : widgets) {
+                    if (chatScreenOwns(widget)) continue;
                     if (!shouldRenderWidget(widget, editing)) {
                         if (!editing) layoutAnimation.hiddenData(widget);
                         skippedWidgets++;
@@ -678,6 +723,7 @@ public class HudRenderer {
             layoutAnimation.renderDepartures(context, animationTime, layer, editing);
         }
         for (Widget widget : widgets) {
+            if (chatScreenOwns(widget)) continue;
             if (!shouldRenderWidget(widget, editing)) {
                 if (!editing) layoutAnimation.hiddenData(widget);
                 continue;
@@ -1006,7 +1052,7 @@ public class HudRenderer {
         appliedLayoutRevision = -1;
         List<String> order = new ArrayList<>(ConfigManager.get().mainLayout.widgets);
         widgets.sort(java.util.Comparator.comparingInt(widget -> {
-            int index = order.indexOf(widget.getClass().getSimpleName());
+            int index = order.indexOf(widgetKey(widget));
             return index < 0 ? Integer.MAX_VALUE : index;
         }));
         // Config-loaded snap data skips the cycle checks that live edits go through

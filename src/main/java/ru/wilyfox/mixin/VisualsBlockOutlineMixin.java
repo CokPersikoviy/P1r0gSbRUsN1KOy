@@ -22,7 +22,7 @@ public abstract class VisualsBlockOutlineMixin {
     private void froghelper$outline(LevelRenderer renderer, PoseStack pose, SubmitNodeCollector collector, RenderType type, BlockOutlineRenderState state, int color, float width, boolean translucent, Operation<Void> original) {
         var config = ConfigManager.get().visuals;
         original.call(renderer, pose, collector, type, state,
-                config.blockOutline ? config.blockOutlineColor | 0xFF000000 : color,
+                config.blockOutline ? config.blockOutlineColor : color,
                 config.blockOutline ? (float) Math.clamp(config.blockOutlineWidth, 1, 8) : width, translucent);
     }
 }

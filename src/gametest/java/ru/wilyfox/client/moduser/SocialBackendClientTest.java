@@ -1,6 +1,7 @@
 package ru.wilyfox.client.moduser;
 
 import com.google.gson.JsonObject;
+import net.minecraft.network.chat.Component;
 import com.google.gson.Gson;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -128,6 +129,8 @@ public final class SocialBackendClientTest implements FabricClientGameTest {
             if (moved.get("creates").getAsInt() != 1 || !field(moved, "Timestamp").equals(field(joined, "Timestamp"))) {
                 throw new AssertionError("Mirror transitions must update the same embed and preserve login time");
             }
+            testBackendChat(context, backend, name.get());
+            testTimerButton(context, backend);
             // Exercise the real bearer/file upload path, then retry the identical ZIP.
             Path diagnostic = Files.createTempFile("fh-diagnostic-integration-",".zip");
             try {
@@ -160,6 +163,121 @@ public final class SocialBackendClientTest implements FabricClientGameTest {
             });
             HTTP.send(HttpRequest.newBuilder(backend.resolve("/fixture/stop")).timeout(Duration.ofSeconds(3))
                     .POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.discarding());
+        }
+    }
+
+    private static void testBackendChat(ClientGameTestContext context, URI backend, String name) throws Exception {
+        var tabs = ru.wilyfox.client.chat.ChatTabManager.getInstance();
+        var profiler = ru.wilyfox.client.profiler.ModProfiler.getInstance();
+        boolean wasEnabled = profiler.isEnabled();
+        for (int i = 0; i < 100 && context.computeOnClient(client -> tabs.getMessages(ru.wilyfox.client.chat.ChatTab.FH).size()) < 32; i++) context.waitTicks(2);
+        context.runOnClient(client -> {
+            if (tabs.getMessages(ru.wilyfox.client.chat.ChatTab.FH).size() != 32) throw new AssertionError("Initial FH history page missing");
+            ru.wilyfox.client.chat.ChatDock.select(ru.wilyfox.client.chat.ChatDock.key(ru.wilyfox.client.chat.ChatTab.FH));
+            if (((ru.wilyfox.bridge.ChatComponentAccessor) client.gui.hud.getChat()).froghelper$getTrimmedMessages().isEmpty())
+                throw new AssertionError("Backend history not displayed in native FH tab");
+            profiler.start();
+        });
+        long before = context.computeOnClient(client -> chatPackets(profiler));
+        try {
+            context.setScreen(() -> new net.minecraft.client.gui.screens.ChatScreen("/msg literal backend text", false));
+            context.waitTicks(3); context.takeScreenshot("fh-chat-history");
+            context.runOnClient(client -> ((net.minecraft.client.gui.screens.ChatScreen) client.gui.screen()).handleChatInput("/msg literal backend text", true));
+            for (int i = 0; i < 100 && context.computeOnClient(client -> tabs.getMessages(ru.wilyfox.client.chat.ChatTab.FH).size()) < 33; i++) context.waitTicks(2);
+            context.runOnClient(client -> {
+                var messages = tabs.getMessages(ru.wilyfox.client.chat.ChatTab.FH);
+                if (messages.size() != 33 || !messages.getLast().component().getString().contains(name + ": /msg literal backend text"))
+                    throw new AssertionError("FH send did not reach backend with authenticated identity");
+                if (chatPackets(profiler) != before) throw new AssertionError("FH input sent a Minecraft chat/command/completion packet");
+                if (((ru.wilyfox.bridge.ChatComponentAccessor) client.gui.hud.getChat()).froghelper$getAllMessages().stream()
+                        .anyMatch(m -> m.content().getString().contains("literal backend text"))) throw new AssertionError("Backend message leaked into native game archive");
+            });
+            HTTP.send(HttpRequest.newBuilder(backend.resolve("/fixture/chat-message")).header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString("{\"text\":\"Remote FH message\"}")).build(), HttpResponse.BodyHandlers.discarding());
+            for (int i = 0; i < 100 && context.computeOnClient(client -> tabs.getMessages(ru.wilyfox.client.chat.ChatTab.FH).size()) < 34; i++) context.waitTicks(2);
+            context.runOnClient(client -> {
+                if (tabs.getMessages(ru.wilyfox.client.chat.ChatTab.FH).size() != 34) throw new AssertionError("Websocket FH notification missed remote message");
+                client.gui.hud.getChat().scrollChat(10000);
+            });
+            for (int i = 0; i < 100 && context.computeOnClient(client -> tabs.getMessages(ru.wilyfox.client.chat.ChatTab.FH).size()) < 66; i++) context.waitTicks(2);
+            context.runOnClient(client -> {
+                if (tabs.getMessages(ru.wilyfox.client.chat.ChatTab.FH).size() != 66) throw new AssertionError("Scrolling FH did not load older history");
+                client.gui.hud.getChat().rescaleChat();
+                if (tabs.getMessages(ru.wilyfox.client.chat.ChatTab.FH).size() != 66) throw new AssertionError("Rescaling lost FH history");
+                tabs.setActiveTab(ru.wilyfox.client.chat.ChatTab.ALL);
+                if (tabs.getMessages(ru.wilyfox.client.chat.ChatTab.ALL).stream().anyMatch(m -> m.component().getString().contains("FH history")
+                        || m.component().getString().contains("literal backend text"))) throw new AssertionError("FH history leaked into ALL");
+            });
+            context.takeScreenshot("fh-chat-pinned-tabs");
+        } finally {
+            context.runOnClient(client -> { client.gui.setScreen(null); tabs.setActiveTab(ru.wilyfox.client.chat.ChatTab.ALL); if (!wasEnabled) profiler.stop(); });
+        }
+    }
+    private static long chatPackets(ru.wilyfox.client.profiler.ModProfiler profiler) {
+        try {
+            var method = profiler.getClass().getDeclaredMethod("snapshotLocked", Class.forName("ru.wilyfox.client.profiler.ProfilerDiagnostics$FullDiagnostics"));
+            method.setAccessible(true);
+            synchronized (profiler) {
+                var snapshot = (ru.wilyfox.client.profiler.ModProfiler.ReportSnapshot) method.invoke(profiler, new Object[]{null});
+                return snapshot.counters().stream().filter(c -> c.name().startsWith("network/serverbound/type/")
+                        && (c.name().contains("Chat") || c.name().contains("CommandSuggestion"))).mapToLong(ru.wilyfox.client.profiler.ModProfiler.CounterView::total).sum();
+            }
+        } catch (ReflectiveOperationException error) { throw new AssertionError(error); }
+    }
+    private static void testTimerButton(ClientGameTestContext context, URI backend) throws Exception {
+        HTTP.send(HttpRequest.newBuilder(backend.resolve("/fixture/timer-player")).POST(HttpRequest.BodyPublishers.noBody()).build(),
+                HttpResponse.BodyHandlers.discarding());
+        var ready = new java.util.concurrent.atomic.AtomicBoolean();
+        for (int i = 0; i < 100 && !ready.get(); i++) {
+            context.waitTicks(2);
+            context.runOnClient(client -> ready.set(PresenceStore.player("TimerSource") != null));
+        }
+        if (!ready.get()) throw new AssertionError("Extended timer roster never arrived");
+        var repoField = SocialTimerService.class.getDeclaredField("repository"); repoField.setAccessible(true);
+        var originalRepo = (ru.wilyfox.boss.BossRepository) repoField.get(null);
+        var isolated = new ru.wilyfox.boss.BossRepository();
+        var oldMode = ConfigManager.get().bossWidget.sourceMode;
+        try {
+            context.runOnClient(client -> {
+                SocialTimerService.bindRepository(isolated);
+                ConfigManager.get().bossWidget.sourceMode = ru.wilyfox.client.hud.config.BossTimerSourceMode.PROTOCOL_ONLY;
+                var source = PresenceStore.player("TimerSource");
+                if (source.timerCount() != 61 || !source.protocolBadge() || BackendSocialClient.timerUnavailable(source) != null)
+                    throw new AssertionError("Protocol badge/count or cross-subserver request missing");
+                if (!SocialScreen.playerLabel("TimerSource").getString().contains("P TimerSource [61]"))
+                    throw new AssertionError("Timer label has the wrong format");
+                client.gui.setScreen(new SocialScreen());
+            });
+            context.waitTicks(2);
+            context.takeScreenshot("social-timer-request");
+            var response = new AtomicReference<java.util.concurrent.CompletableFuture<Component>>();
+            context.runOnClient(client -> {
+                var screen = (SocialScreen) client.gui.screen();
+                try {
+                    var x = SocialScreen.class.getDeclaredField("panelX"); x.setAccessible(true);
+                    var y = SocialScreen.class.getDeclaredField("panelY"); y.setAccessible(true);
+                    int row = PresenceStore.knownDisplayNames().indexOf("TimerSource");
+                    var event = new net.minecraft.client.input.MouseButtonEvent(x.getInt(screen) + 300, y.getInt(screen) + 40 + row * 16,
+                            new net.minecraft.client.input.MouseButtonInfo(0, 0));
+                    if (!screen.mouseClicked(event, false)) throw new AssertionError("Timer button click was not handled");
+                    var pending = SocialScreen.class.getDeclaredField("pending"); pending.setAccessible(true);
+                    response.set((java.util.concurrent.CompletableFuture<Component>) pending.get(screen));
+                } catch (ReflectiveOperationException error) { throw new AssertionError(error); }
+            });
+            for (int i = 0; i < 100 && !response.get().isDone(); i++) context.waitTicks(2);
+            if (!response.get().isDone()) throw new AssertionError("Timer request never completed");
+            context.runOnClient(client -> {
+                if (isolated.getAllProtocol().size() != 61 || isolated.getAllMerged().size() != 61)
+                    throw new AssertionError("Imported timers are hidden in Protocol Only");
+                if (!response.get().join().getString().contains("61")) throw new AssertionError("Missing import feedback");
+            });
+            context.takeScreenshot("social-timers-received");
+        } finally {
+            context.runOnClient(client -> {
+                client.gui.setScreen(null);
+                SocialTimerService.bindRepository(originalRepo);
+                ConfigManager.get().bossWidget.sourceMode = oldMode;
+            });
         }
     }
 

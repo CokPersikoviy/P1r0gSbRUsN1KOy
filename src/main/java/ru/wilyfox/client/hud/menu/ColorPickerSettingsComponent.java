@@ -35,6 +35,9 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
     private String hexDraft = "#000000";
     private int cursorPosition = hexDraft.length();
     private int lastColor = -1;
+    private boolean alphaEnabled, synchronizedColor;
+
+    public ColorPickerSettingsComponent withAlpha() { alphaEnabled = true; return this; }
     private float hue;
     private float saturation;
     private float value;
@@ -92,6 +95,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
 
     @Override
     public String getTooltip(int mouseX, int mouseY) {
+        if (alphaEnabled && isHovered(mouseX, mouseY)) return label + " - Hex #AARRGGBB; AA: opacity (00 transparent, FF opaque)";
         return labelTruncated
                 && mouseX >= x + 8
                 && mouseX < hexX()
@@ -255,7 +259,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
         int boxY = controlY();
         int boxHeight = controlHeight();
         boolean hovered = contains(mouseX, mouseY, hexX, boxY, HEX_WIDTH, boxHeight);
-        boolean valid = parseHex(hexDraft) != null;
+        boolean valid = parseHex(hexDraft, alphaEnabled) != null;
 
         HudSurface.fillRounded(
                 context,
@@ -400,16 +404,16 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
     }
 
     private void applyHsvColor() {
-        applyColor(hsvToRgb(hue, saturation, value), false);
+        applyColor((alphaEnabled ? getter.getAsInt() & 0xFF000000 : 0) | hsvToRgb(hue, saturation, value), false);
     }
 
     private void applyColor(int color, boolean refreshHsv) {
-        int rgb = color & 0xFFFFFF;
+        int rgb = alphaEnabled ? color : color & 0xFFFFFF;
         boolean changed = currentColor() != rgb;
         setter.accept(rgb);
         if (changed && dragTarget != DragTarget.NONE) UiSounds.scroll();
-        lastColor = rgb;
-        hexDraft = formatHex(rgb);
+        lastColor = rgb; synchronizedColor = true;
+        hexDraft = formatCurrent(rgb);
         cursorPosition = hexDraft.length();
         selectAll = false;
         dirty = true;
@@ -424,12 +428,12 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
 
     private void syncFromConfig() {
         int color = currentColor();
-        if (color == lastColor || hexFocused || dragTarget != DragTarget.NONE) {
+        if (synchronizedColor && color == lastColor || hexFocused || dragTarget != DragTarget.NONE) {
             return;
         }
 
-        lastColor = color;
-        hexDraft = formatHex(color);
+        lastColor = color; synchronizedColor = true;
+        hexDraft = formatCurrent(color);
         cursorPosition = hexDraft.length();
         Hsv hsv = rgbToHsv(color);
         hue = hsv.hue();
@@ -442,7 +446,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
             return;
         }
 
-        Integer parsed = parseHex(hexDraft);
+        Integer parsed = parseHex(hexDraft, alphaEnabled);
         if (parsed != null) {
             applyColor(parsed, true);
             saveIfDirty();
@@ -455,13 +459,13 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
     }
 
     private void revertHexDraft() {
-        hexDraft = formatHex(currentColor());
+        hexDraft = formatCurrent(currentColor());
         cursorPosition = hexDraft.length();
         selectAll = false;
     }
 
     private void pasteHex(String clipboard) {
-        Integer parsed = parseHex(clipboard);
+        Integer parsed = parseHex(clipboard, alphaEnabled);
         if (parsed != null) {
             applyColor(parsed, true);
             hexFocused = true;
@@ -486,7 +490,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
             cursorPosition = 1;
             selectAll = false;
         }
-        if (hexDraft.length() >= 7) {
+        if (hexDraft.length() >= (alphaEnabled ? 9 : 7)) {
             return;
         }
 
@@ -530,7 +534,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
     }
 
     private void applyDraftIfComplete() {
-        Integer parsed = parseHex(hexDraft);
+        Integer parsed = parseHex(hexDraft, alphaEnabled);
         if (parsed != null) {
             applyColor(parsed, true);
             hexFocused = true;
@@ -546,7 +550,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
     }
 
     private int currentColor() {
-        return getter.getAsInt() & 0xFFFFFF;
+        return alphaEnabled ? getter.getAsInt() : getter.getAsInt() & 0xFFFFFF;
     }
 
     private int pencilX() {
@@ -620,11 +624,15 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
                 || character >= 'A' && character <= 'F';
     }
 
+    private String formatCurrent(int color) { return alphaEnabled ? String.format(Locale.ROOT, "#%08X", color) : formatHex(color); }
+
     static String formatHex(int color) {
         return String.format(Locale.ROOT, "#%06X", color & 0xFFFFFF);
     }
 
-    static Integer parseHex(String raw) {
+    static Integer parseHex(String raw) { return parseHex(raw, false); }
+
+    static Integer parseHex(String raw, boolean alphaEnabled) {
         if (raw == null) {
             return null;
         }
@@ -633,7 +641,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
         if (normalized.startsWith("#")) {
             normalized = normalized.substring(1);
         }
-        if (normalized.length() != 6) {
+        if (normalized.length() != (alphaEnabled ? 8 : 6)) {
             return null;
         }
         for (int index = 0; index < normalized.length(); index++) {
@@ -642,7 +650,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
             }
         }
 
-        return Integer.parseInt(normalized, 16);
+        return (int) Long.parseLong(normalized, 16);
     }
 
     static Hsv rgbToHsv(int color) {

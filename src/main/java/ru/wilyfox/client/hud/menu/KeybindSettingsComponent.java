@@ -22,6 +22,21 @@ public class KeybindSettingsComponent extends SettingsComponent {
     private final IntSupplier getter;
     private final IntConsumer setter;
     private boolean listening = false;
+    private IntSupplier modifiers = () -> 0;
+    private IntConsumer modifierSetter = ignored -> {};
+    private boolean modifierBinding;
+    public KeybindSettingsComponent withModifiers(IntSupplier get, IntConsumer set) {
+        modifiers = get; modifierSetter = set; modifierBinding = true; return this;
+    }
+    private static int heldModifiers() {
+        return (ru.wilyfox.utils.InputModifiers.hasShiftDown() ? 1 : 0)
+                | (ru.wilyfox.utils.InputModifiers.hasControlDown() ? 2 : 0)
+                | (ru.wilyfox.utils.InputModifiers.hasAltDown() ? 4 : 0);
+    }
+    private String modifierPrefix() {
+        int value = modifiers.getAsInt();
+        return ((value & 2) != 0 ? "Ctrl + " : "") + ((value & 1) != 0 ? "Shift + " : "") + ((value & 4) != 0 ? "Alt + " : "");
+    }
 
     public KeybindSettingsComponent(int x, int y, int width, int height, String label,
                                     IntSupplier getter, IntConsumer setter) {
@@ -42,7 +57,7 @@ public class KeybindSettingsComponent extends SettingsComponent {
         int textY = y + (height - mc.font.lineHeight) / 2;
         context.text(mc.font, label, x + 8, textY, textColor);
 
-        String keyText = listening ? "> ... <" : keyName(getter.getAsInt());
+        String keyText = listening ? "> ... <" : modifierPrefix() + keyName(getter.getAsInt());
         int boxWidth = Math.max(52, Math.min(128, mc.font.width(keyText) + 16));
         int boxX = x + width - 8 - boxWidth;
         int boxBg = listening || hovered ? WidgetTheme.PANEL_BG : WidgetTheme.BAR_BG;
@@ -61,6 +76,7 @@ public class KeybindSettingsComponent extends SettingsComponent {
         // reserved for arm/clear, so only buttons >= 2 are captured. No hover needed — like a key press.
         if (listening && button >= 2) {
             setter.accept(RunesBagConfig.MOUSE_CODE_OFFSET + button);
+            modifierSetter.accept(heldModifiers());
             ConfigManager.save();
             listening = false;
             return true;
@@ -69,6 +85,7 @@ public class KeybindSettingsComponent extends SettingsComponent {
             return false;
         }
         if (button == 1) {
+            modifierSetter.accept(0);
             setter.accept(GLFW.GLFW_KEY_UNKNOWN); // right-click clears
             ConfigManager.save();
             listening = false;
@@ -86,8 +103,10 @@ public class KeybindSettingsComponent extends SettingsComponent {
         if (!listening) {
             return false;
         }
+        if (modifierBinding && keyCode >= GLFW.GLFW_KEY_LEFT_SHIFT && keyCode <= GLFW.GLFW_KEY_RIGHT_SUPER) return true;
         if (keyCode != GLFW.GLFW_KEY_ESCAPE) { // Esc cancels without changing the bind
             setter.accept(keyCode);
+            modifierSetter.accept(modifiers & 7);
             ConfigManager.save();
             UiSounds.play(ru.wilyfox.client.audio.UiSound.SUCCESS);
         } else {

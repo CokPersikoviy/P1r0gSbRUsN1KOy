@@ -10,7 +10,6 @@ import ru.wilyfox.client.alchemy.AlchemyBrewingTracker;
 import ru.wilyfox.client.boss.BossMenuIconCollector;
 import ru.wilyfox.client.boss.BossDamageStore;
 import ru.wilyfox.client.booster.BoosterStore;
-import ru.wilyfox.client.chat.BossShareService;
 import ru.wilyfox.client.chat.AutoBossAnnouncer;
 import ru.wilyfox.client.chat.AutoMessageScheduler;
 import ru.wilyfox.client.chat.ActiveEffectChatTracker;
@@ -140,6 +139,7 @@ public class Client {
         UsefulWorldHighlightRenderHook.register();
         EstimatedTpsMonitor.register();
         KeyBinds.register();
+        ru.wilyfox.client.visuals.VisualsCamera.register();
         RuneSetSwitcher.register();
         Clicker.register();
         AutoFish.register();
@@ -163,7 +163,7 @@ public class Client {
         PopUpEventNotifier.getInstance().bindBoosterStore(boosterStore);
         PopUpEventNotifier.getInstance().bindWandCooldownTracker(wandCooldownTracker);
         PopUpEventNotifier.getInstance().register();
-        BossShareService.bindRepository(repository);
+        ru.wilyfox.client.moduser.SocialTimerService.bindRepository(repository);
         VisibilityStatusTracker.bindStore(visibilityStatusStore);
         ComboTimerChatTracker.bindStore(comboProgressStore);
         BossMenuIconCollector.bindRepository(repository);
@@ -303,6 +303,14 @@ public class Client {
                 ScreenAnchor.TOP_RIGHT
         );
 
+        for (var catalog : ru.wilyfox.client.hud.config.WidgetCatalog.values()) {
+            if (catalog.chatChannel() != null) hudRenderer.registerWidget(
+                    new ru.wilyfox.client.hud.widget.ChatWidget(catalog, 200, 30));
+        }
+        for (var key : ConfigManager.get().chatWidgets.keySet()) {
+            if (ru.wilyfox.client.hud.config.WidgetCatalog.isCustomChatKey(key)) hudRenderer.registerWidget(
+                    new ru.wilyfox.client.hud.widget.ChatWidget(key, ru.wilyfox.client.hud.config.WidgetCatalog.CHAT_ALL, 200, 30));
+        }
         hudRenderer.finalizeWidgetRegistration();
         ConfigManager.save();
     }

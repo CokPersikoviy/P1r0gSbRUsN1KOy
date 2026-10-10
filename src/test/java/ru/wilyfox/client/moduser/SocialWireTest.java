@@ -6,6 +6,38 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SocialWireTest {
+    @Test void timerMetadataIsOptionalAndProtocolBadgeUsesStrictFiftyThreshold() {
+        String id = "a".repeat(64);
+        assertNull(SocialWire.JSON.fromJson("{\"id\":\"" + id + "\",\"name\":\"Fox\"}", SocialWire.Player.class).timerCount());
+        assertFalse(new SocialWire.Player(id, "Fox", "HUB0:0", 50, true).protocolBadge());
+        assertTrue(new SocialWire.Player(id, "Fox", "PRISONEVO1:2", 51, true).protocolBadge());
+        assertFalse(new SocialWire.Player(id, "Fox", "HUB0:0", 51, false).protocolBadge());
+        for (Integer count : List.of(-1, 513)) {
+            var snapshot = new SocialWire.Snapshot(1, "presence.snapshot", 1, "HUB0:0",
+                    List.of(new SocialWire.Player(id, "Fox", "HUB0:0", count, true)), true);
+            assertThrows(IllegalArgumentException.class, () -> snapshot.validatedNames("HUB0:0"));
+        }
+        PresenceStore.replacePlayers(List.of(new SocialWire.Player(id, "Fox", "HUB0:0", 51, true)));
+        assertTrue(PresenceStore.player("fOx").protocolBadge());
+        PresenceStore.replace(List.of("Fox"));
+        assertNull(PresenceStore.player("Fox"));
+    }
+    @Test void timerResponsesKeepAbsoluteDeadlinesAndRejectReplayWrongIdentityAndOversizedPayloads() {
+        long now = 1_000_000;
+        String id = "a".repeat(64);
+        var timer = new SocialWire.Timer("Boss", 125, now + 60_000);
+        var valid = new SocialWire.TimerResponse(1, id, "Fox", "PRISONEVO1:2", now, List.of(timer));
+        assertEquals(List.of(timer), valid.validatedTimers(id, "PRISONEVO1:2", now));
+        assertThrows(IllegalArgumentException.class, () -> valid.validatedTimers("b".repeat(64), "PRISONEVO1:2", now));
+        assertThrows(IllegalArgumentException.class, () -> valid.validatedTimers(id, "HUB0:0", now));
+        assertThrows(IllegalArgumentException.class, () -> valid.validatedTimers(id, "PRISONEVO1:2", now + 46_000));
+        assertThrows(IllegalArgumentException.class, () -> new SocialWire.TimerResponse(1, id, "Fox", "PRISONEVO1:2", now,
+                List.of(timer, timer)).validatedTimers(id, "PRISONEVO1:2", now));
+        assertThrows(IllegalArgumentException.class, () -> new SocialWire.Timer("Boss\n", 125, now + 1).validate(now));
+        assertThrows(IllegalArgumentException.class, () -> new SocialWire.Timer("Boss", 125, now + 604_800_001).validate(now));
+        assertTrue(new SocialWire.TimerResponse(1, id, "Fox", "HUB0:0", now,
+                List.of(new SocialWire.Timer("Expired", 125, now - 1))).validatedTimers(id, "HUB0:0", now).isEmpty());
+    }
     @AfterEach void clear() { PresenceStore.clear(); }
 
     @Test void rosterIsOnlyCurrentSnapshotAndNeverHistoricalDiscovery() {

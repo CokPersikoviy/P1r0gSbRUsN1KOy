@@ -49,4 +49,6 @@ public class HudConfig {
     public Map<String, WidgetLayoutConfig> widgetLayouts = new LinkedHashMap<>();
     public Map<String, LocationWidgetLayoutConfig> locationLayouts = new LinkedHashMap<>();
     public Map<String, WidgetLocationConfig> widgetLocations = new LinkedHashMap<>();
+    public Map<String, ChatWidgetConfig> chatWidgets = new LinkedHashMap<>();
+    public java.util.List<String> chatTabOrder = new java.util.ArrayList<>();
 }

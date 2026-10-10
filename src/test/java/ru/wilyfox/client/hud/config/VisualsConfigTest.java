@@ -5,6 +5,16 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class VisualsConfigTest {
+    @Test void legacyRgbMigrationRunsOnceAndModernAlphaAndFractionalWidthsSurviveReload() {
+        var gson = new Gson();
+        var c = gson.fromJson("{\"blockOutlineColor\":1122867,\"skyColor\":4478310,\"fogColor\":7833753,\"blockOutlineWidth\":2}", VisualsConfig.class);
+        c.sanitize();
+        assertEquals(0xFF112233, c.blockOutlineColor);
+        assertEquals(0xFF445566, c.skyColor); assertEquals(0xFF778899, c.fogColor);
+        c.blockOutlineColor = 0x00112233; c.blockOutlineWidth = 2.55;
+        var saved = gson.fromJson(gson.toJson(c), VisualsConfig.class); saved.sanitize();
+        assertEquals(0x00112233, saved.blockOutlineColor); assertEquals(2.55, saved.blockOutlineWidth);
+    }
     @Test void oldConfigsKeepVanillaVisuals() {
         HudConfig config = HudConfigSanitizer.sanitize(new Gson().fromJson("{\"visuals\":null,\"render\":{\"staticHand\":true}}", HudConfig.class));
         assertEquals(0, config.visuals.ratio());
@@ -51,5 +61,35 @@ class VisualsConfigTest {
         assertTrue(saved.skyColorEnabled); assertFalse(saved.fogColorEnabled);
         assertEquals(config.blockOutlineColor, saved.blockOutlineColor);
         assertEquals(config.skyColor, saved.skyColor); assertEquals(config.fogColor, saved.fogColor);
+    }
+    @Test void newVisualGroupsStayOffInExistingConfigsAndRecoverNulls() {
+        var c = new Gson().fromJson("{\"aspectRatio\":\"R4_3\",\"blockOutline\":true,\"blockOutlineColor\":-15654349,\"hand\":null,\"crosshair\":null,\"tab\":null}", VisualsConfig.class);
+        c.sanitize();
+        assertTrue(c.blockOutline); assertEquals(0xFF112233, c.blockOutlineColor);
+        assertFalse(c.advancedOutline()); assertFalse(c.hand.enabled); assertFalse(c.crosshair.enabled);
+        assertFalse(c.hitboxes.show); assertFalse(c.camera.enabled); assertFalse(c.tab.enabled); assertFalse(c.compactReload);
+        assertEquals(4.0 / 3, c.ratio(), 1e-6);
+    }
+    @Test void malformedGeometryAndBindingsCannotCreateUnboundedWork() {
+        var c = new VisualsConfig(); c.crosshair.thickness = Double.NaN; c.crosshair.gap = Double.POSITIVE_INFINITY;
+        c.hand.main.scale = Double.NEGATIVE_INFINITY; c.camera.key = 9999; c.hitboxes.width = 9999;
+        c.tab.rows = 0; c.tab.columns = Integer.MAX_VALUE; c.fogDistance = -10; c.blockRainbowSpeed = 0;
+        c.weather = null; c.fogMode = null; c.blockStyle = null; c.hand.off = null;
+        c.sanitize();
+        assertEquals(2, c.crosshair.thickness); assertEquals(3, c.crosshair.gap); assertEquals(1, c.hand.main.scale);
+        assertEquals(-1, c.camera.key); assertEquals(8, c.hitboxes.width); assertEquals(1, c.tab.rows); assertEquals(8, c.tab.columns);
+        assertEquals(0.1, c.fogDistance); assertEquals(1, c.blockRainbowSpeed); assertNotNull(c.hand.off);
+        assertEquals(VisualsConfig.Weather.SERVER, c.weather); assertEquals(VisualsConfig.FogMode.DEFAULT, c.fogMode);
+    }
+    @Test void everyNewGroupRoundTripsWithoutLosingAlphaOrOffHandValues() {
+        var c = new VisualsConfig(); c.crosshair.enabled = true; c.crosshair.style = VisualsConfig.CrosshairStyle.X;
+        c.crosshair.outlineColor = 0x23112233; c.hitboxes.targets = VisualsConfig.Targets.PLAYERS;
+        c.hand.mirror = false; c.hand.off.x = -0.35; c.camera.key = 1004; c.tab.enabled = true;
+        c.blockStyle = VisualsConfig.LineStyle.CORNERS; c.blockFillColor = 0x19223344; c.weather = VisualsConfig.Weather.THUNDER;
+        var gson = new Gson(); var saved = gson.fromJson(gson.toJson(c), VisualsConfig.class); saved.sanitize();
+        assertTrue(saved.crosshair.enabled); assertEquals(c.crosshair.style, saved.crosshair.style);
+        assertEquals(c.crosshair.outlineColor, saved.crosshair.outlineColor); assertFalse(saved.hand.mirror);
+        assertEquals(c.hand.off.x, saved.hand.off.x); assertEquals(1004, saved.camera.key); assertTrue(saved.tab.enabled);
+        assertEquals(c.blockFillColor, saved.blockFillColor); assertEquals(c.weather, saved.weather);
     }
 }

@@ -14,40 +14,79 @@ class AutomaticDiagnosticsTest {
     static final class Marker extends jdk.jfr.Event { String label; }
     @Test void filteredJfrKeepsWindowEventsAndOmitsStartupCredentials() throws Exception {
         Path source = temporary.resolve("source.jfr");
-        long start,stop;
         try (var recording = new jdk.jfr.Recording()) {
             recording.enable("fh.TestCaptureMarker");
             recording.enable("jdk.JVMInformation").with("period","beginChunk");
             recording.enable("jdk.InitialSystemProperty").with("period","beginChunk");
             recording.start();
             var before = new Marker(); before.label="before"; before.commit();
-            Thread.sleep(20); start=System.currentTimeMillis();
+            Thread.sleep(20);
             var inside = new Marker(); inside.label="inside"; inside.commit();
-            Thread.sleep(20); stop=System.currentTimeMillis();
+            Thread.sleep(20);
             Thread.sleep(20); var after=new Marker(); after.label="after"; after.commit();
             recording.stop(); recording.dump(source);
         }
-        assertTrue(jdk.jfr.consumer.RecordingFile.readAllEvents(source).stream().anyMatch(e -> e.getEventType().getName().equals("jdk.JVMInformation")));
-        var filtered = DiagnosticArchive.filterJfr(source,temporary,start,stop);
+        var sourceEvents = jdk.jfr.consumer.RecordingFile.readAllEvents(source);
+        assertTrue(sourceEvents.stream().anyMatch(e -> e.getEventType().getName().equals("jdk.JVMInformation")));
+        // Use the event clock itself: short wall-clock windows can drift against JFR on Windows.
+        var insideEvent = sourceEvents.stream().filter(e -> e.getEventType().getName().equals("fh.TestCaptureMarker")
+                && e.getString("label").equals("inside")).findFirst().orElseThrow();
+        long start = insideEvent.getStartTime().toEpochMilli();
+        var filtered = DiagnosticArchive.filterJfr(source,temporary,start,start+1);
         var events = jdk.jfr.consumer.RecordingFile.readAllEvents(filtered);
         assertTrue(events.stream().anyMatch(e -> e.getEventType().getName().equals("fh.TestCaptureMarker") && e.getString("label").equals("inside")));
         assertFalse(events.stream().anyMatch(e -> e.getEventType().getName().equals("jdk.JVMInformation") || e.getEventType().getName().equals("jdk.InitialSystemProperty")));
         assertFalse(events.stream().anyMatch(e -> e.getEventType().getName().equals("fh.TestCaptureMarker") && !e.getString("label").equals("inside")));
     }
-    @Test void lowFpsTriggerRequiresActiveWindowAndRecoversBeforeAnotherCapture() {
+    @Test void lowFpsRequiresFiveContinuousSecondsThenRecoveryAndCooldown() {
         var policy = new LowFpsCapturePolicy();
         assertFalse(policy.shouldStart(0,14,false));
         assertFalse(policy.shouldStart(0,15,true));
         assertFalse(policy.shouldStart(0,-1,true));
-        assertTrue(policy.shouldStart(0,14,true));
-        assertFalse(policy.shouldStart(600_001,0,true)); // Sustained low FPS is one incident.
-        assertFalse(policy.shouldStart(600_002,20,true));
-        assertFalse(policy.shouldStart(605_003,20,true));
-        assertTrue(policy.shouldStart(605_004,0,true));
-        assertFalse(policy.shouldStart(610_000,20,true));
+        assertFalse(policy.shouldStart(0,14,true));
+        assertFalse(policy.shouldStart(4_999,0,true));
+        assertTrue(policy.shouldStart(5_000,14,true));
+        assertFalse(policy.shouldStart(610_000,0,true)); // A sustained drop stays one incident.
+        assertFalse(policy.shouldStart(610_001,20,true));
         assertFalse(policy.shouldStart(615_001,20,true));
-        assertFalse(policy.shouldStart(615_002,14,true)); // Recovery does not bypass the cooldown.
+        assertFalse(policy.shouldStart(615_002,0,true));
+        assertFalse(policy.shouldStart(620_001,0,true));
+        assertTrue(policy.shouldStart(620_002,0,true));
+        assertFalse(policy.shouldStart(625_000,20,true));
+        assertFalse(policy.shouldStart(630_000,20,true));
+        assertFalse(policy.shouldStart(630_001,14,true));
+        assertFalse(policy.shouldStart(635_001,14,true)); // Recovery does not bypass the cooldown.
         assertEquals(15_000,LowFpsCapturePolicy.CAPTURE_MILLIS);
+    }
+    @Test void recoveryToFifteenFpsOrWindowDeactivationResetsConfirmation() {
+        var policy = new LowFpsCapturePolicy();
+        assertFalse(policy.shouldStart(0,14,true));
+        assertFalse(policy.shouldStart(4_000,15,true));
+        assertFalse(policy.shouldStart(5_000,14,true));
+        assertFalse(policy.shouldStart(9_999,14,true));
+        assertFalse(policy.shouldStart(10_000,14,false));
+        assertFalse(policy.shouldStart(15_000,14,true));
+        assertFalse(policy.shouldStart(19_999,14,true));
+        assertTrue(policy.shouldStart(20_000,14,true));
+    }
+    @Test void invalidFpsResetsConfirmationAndMonotonicTimeCanHaveNegativeOrigin() {
+        var policy = new LowFpsCapturePolicy();
+        assertFalse(policy.shouldStart(-20_000,14,true));
+        assertFalse(policy.shouldStart(-15_001,-1,true));
+        assertFalse(policy.shouldStart(-15_000,14,true));
+        assertFalse(policy.shouldStart(-10_001,14,true));
+        assertTrue(policy.shouldStart(-10_000,14,true));
+    }
+    @Test void cooldownRequiresACompleteNewConfirmationWindow() {
+        var policy = new LowFpsCapturePolicy();
+        assertFalse(policy.shouldStart(0,14,true));
+        assertTrue(policy.shouldStart(5_000,14,true));
+        assertFalse(policy.shouldStart(10_000,20,true));
+        assertFalse(policy.shouldStart(15_000,20,true));
+        assertFalse(policy.shouldStart(604_000,14,true));
+        assertFalse(policy.shouldStart(605_000,14,true));
+        assertFalse(policy.shouldStart(609_999,14,true));
+        assertTrue(policy.shouldStart(610_000,14,true));
     }
     @Test void noIncidentCreatesNoFiles() throws Exception {
         var outbox = new DiagnosticOutbox(temporary,"1.1.4","26.2");

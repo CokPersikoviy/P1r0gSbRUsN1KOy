@@ -34,10 +34,18 @@ public enum WidgetCatalog {
     CHAT_QUEUE("OutgoingChatQueueWidget", "Chat Queue", c -> c.outgoingChatQueue.active),
     PROTOCOL_GRAPH("ProtocolGraphWidget", "Protocol Graph", c -> c.protocolGraphWidget.active),
     POP_UPS("PopUpsWidget", "Pop-ups", c -> c.popUps.active),
-    LEVEL_PROGRESS("LevelProgressWidget", "Level Progress", c -> c.levelProgress.active);
+    LEVEL_PROGRESS("LevelProgressWidget", "Level Progress", c -> c.levelProgress.active),
+    CHAT_ALL("ChatWidgetAll", "Chat ALL", c -> false),
+    CHAT_FH("ChatWidgetFH", "Chat FH", c -> false),
+    CHAT_GLOBAL("ChatWidgetGlobal", "Chat G", c -> false),
+    CHAT_TRADE("ChatWidgetTrade", "Chat T", c -> false),
+    CHAT_LOCAL("ChatWidgetLocal", "Chat L", c -> false),
+    CHAT_CLAN("ChatWidgetClan", "Chat C", c -> false),
+    CHAT_PRIVATE("ChatWidgetPrivate", "Chat PM", c -> false);
 
     private static final Map<String, WidgetCatalog> BY_KEY = Arrays.stream(values())
             .collect(Collectors.toUnmodifiableMap(WidgetCatalog::key, entry -> entry));
+    private static final java.util.regex.Pattern CUSTOM_CHAT_KEY = java.util.regex.Pattern.compile("ChatWidgetCustom_[a-f0-9-]{36}");
 
     private final String key;
     private final String title;
@@ -51,7 +59,24 @@ public enum WidgetCatalog {
 
     public String key() { return key; }
     public String title() { return title; }
-    public static WidgetCatalog find(String key) { return key == null ? null : BY_KEY.get(key); }
+    public ru.wilyfox.client.chat.ChatTab chatChannel() {
+        return switch (this) {
+            case CHAT_ALL -> ru.wilyfox.client.chat.ChatTab.ALL;
+            case CHAT_FH -> ru.wilyfox.client.chat.ChatTab.FH;
+            case CHAT_GLOBAL -> ru.wilyfox.client.chat.ChatTab.GLOBAL;
+            case CHAT_TRADE -> ru.wilyfox.client.chat.ChatTab.TRADE;
+            case CHAT_LOCAL -> ru.wilyfox.client.chat.ChatTab.LOCAL;
+            case CHAT_CLAN -> ru.wilyfox.client.chat.ChatTab.CLAN;
+            case CHAT_PRIVATE -> ru.wilyfox.client.chat.ChatTab.PRIVATE;
+            default -> null;
+        };
+    }
+    public static WidgetCatalog find(String key) {
+        return key == null ? null : isCustomChatKey(key) ? CHAT_ALL : BY_KEY.get(key);
+    }
+    public static boolean isCustomChatKey(String key) {
+        return key != null && key.startsWith("ChatWidgetCustom_") && CUSTOM_CHAT_KEY.matcher(key).matches();
+    }
 
     public boolean isAdded() { return ConfigManager.isWidgetInCurrentLayout(key); }
 
@@ -63,7 +88,7 @@ public enum WidgetCatalog {
     public static void sanitize(HudConfig config) {
         if (config.mainLayout == null) config.mainLayout = new MainWidgetLayoutConfig();
         if (config.mainLayout.widgets == null) config.mainLayout.widgets = new LinkedHashSet<>();
-        config.mainLayout.widgets.removeIf(key -> key == null || !BY_KEY.containsKey(key));
+        config.mainLayout.widgets.removeIf(key -> find(key) == null);
     }
 
     /** Run only when loading an existing config without mainLayout, never for a new install. */

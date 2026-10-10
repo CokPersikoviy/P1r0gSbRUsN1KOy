@@ -55,6 +55,17 @@ public final class LowHpMessageFormatter {
         return format(config, "PE1.2", "Бессмертный Легион", 130, 125, 20, true, "Стадия 2/4");
     }
 
+    /** Respawn messages reuse identity colors, independently of Low HP field visibility. */
+    public static Message formatRespawn(LowHpMessageFormatConfig config, String name, int level, String announcement) {
+        if (config == null) config = new LowHpMessageFormatConfig();
+        var result = new ArrayList<Fragment>();
+        addColored(result, config, LowHpMessageElement.NAME, clean(name));
+        addColored(result, config, LowHpMessageElement.LEVEL, level > 0 ? "[" + level + "]" : "");
+        String text = clean(announcement);
+        if (!text.isBlank()) result.add(new Fragment((result.isEmpty() ? "" : " ") + text, '7'));
+        return new Message(result);
+    }
+
     public static boolean isValidColor(String code) {
         if (code == null || code.length() != 2 || code.charAt(0) != '&' && code.charAt(0) != '§') return false;
         char value = Character.toLowerCase(code.charAt(1));
@@ -62,8 +73,13 @@ public final class LowHpMessageFormatter {
     }
 
     private static void add(List<Fragment> result, LowHpMessageFormatConfig config, LowHpMessageElement element, String text) {
+        if (!config.element(element).visible) return;
+        addColored(result, config, element, text);
+    }
+
+    private static void addColored(List<Fragment> result, LowHpMessageFormatConfig config, LowHpMessageElement element, String text) {
         var style = config.element(element);
-        if (!style.visible || text.isBlank()) return;
+        if (text.isBlank()) return;
         if (!result.isEmpty()) result.add(new Fragment(" ", 'f'));
         String color = isValidColor(style.colorCode) ? style.colorCode : element.defaultColor();
         result.add(new Fragment(text, Character.toLowerCase(color.charAt(1))));

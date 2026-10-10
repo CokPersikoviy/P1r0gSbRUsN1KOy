@@ -64,6 +64,7 @@ java {
 }
 
 jar {
+	from("THIRD_PARTY_NOTICES.md")
 	inputs.property "archivesName", project.base.archivesName
 
 	from("LICENSE") {

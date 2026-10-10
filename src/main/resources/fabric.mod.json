@@ -10,7 +10,7 @@
 	"contact": {
 		"sources": "https://github.com/CokPersikoviy/P1r0gSbRUsN1KOy"
 	},
-	"license": "CC0-1.0",
+	"license": ["CC0-1.0", "MIT"],
 	"icon": "assets/froghelper/icon.png",
 	"environment": "client",
 	"entrypoints": {

@@ -102,7 +102,7 @@ public final class HudWidgetSidebar {
         graphics.pose().pushMatrix();
         graphics.pose().translate(X + 10, Y + height - 15);
         graphics.pose().scale(.8f, .8f);
-        graphics.text(font, renderer.getLayoutWidgetCount() + "/" + renderer.getRegisteredWidgetCount(),
+        graphics.text(font, renderer.getLayoutWidgetCount() + "/" + renderer.getLibraryWidgetCount(),
                 0, 0, WidgetTheme.TEXT_MUTED);
         graphics.pose().popMatrix();
 
@@ -243,6 +243,7 @@ public final class HudWidgetSidebar {
         if (cachedRevision == renderer.getWidgetRegistryRevision()) return;
         String query = search.toLowerCase(Locale.ROOT).strip();
         filtered = renderer.getWidgets().stream()
+                .filter(widget -> !(widget instanceof ru.wilyfox.client.hud.widget.ChatWidget chat) || chat.settings() != null && !chat.settings().deleted && chat.settings().detached)
                 .filter(widget -> widget.getDisplayName().toLowerCase(Locale.ROOT).contains(query)).toList();
         cachedRevision = renderer.getWidgetRegistryRevision();
         clampScroll();

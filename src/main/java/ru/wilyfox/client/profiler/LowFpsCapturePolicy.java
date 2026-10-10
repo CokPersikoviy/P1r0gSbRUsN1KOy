@@ -1,23 +1,40 @@
 package ru.wilyfox.client.profiler;
 
-/** Monotonic time; recovery and cooldown avoid repeated captures of a permanently slow client. */
+/** Monotonic time; confirmation, recovery and cooldown separate sustained drops from isolated spikes. */
 final class LowFpsCapturePolicy {
+    static final long CONFIRMATION_MILLIS = 5_000;
     static final long CAPTURE_MILLIS = 15_000;
     static final long COOLDOWN_MILLIS = 600_000;
     private boolean armed = true;
-    private long nextCaptureAt;
-    private long recoveredSince = -1;
+    private boolean confirming, recovering, captured;
+    private long lowFpsSince, recoveredSince, lastCaptureAt;
 
     boolean shouldStart(long now, int fps, boolean active) {
-        if (!active) { recoveredSince = -1; return false; }
-        if (fps >= 20) {
-            if (recoveredSince < 0) recoveredSince = now;
-            if (now - recoveredSince >= 5_000) armed = true;
+        if (!active) {
+            confirming = false;
+            recovering = false;
             return false;
         }
-        recoveredSince = -1;
-        if (!armed || now < nextCaptureAt || fps < 0 || fps >= 15) return false;
-        armed = false; nextCaptureAt = now + COOLDOWN_MILLIS;
+        if (fps >= 20) {
+            if (!recovering) { recoveredSince = now; recovering = true; }
+            if (now - recoveredSince >= 5_000) armed = true;
+        } else {
+            recovering = false;
+        }
+        if (fps < 0 || fps >= 15 || !armed || captured && now - lastCaptureAt < COOLDOWN_MILLIS) {
+            confirming = false;
+            return false;
+        }
+        if (!confirming) {
+            lowFpsSince = now;
+            confirming = true;
+            return false;
+        }
+        if (now - lowFpsSince < CONFIRMATION_MILLIS) return false;
+        armed = false;
+        captured = true;
+        lastCaptureAt = now;
+        confirming = false;
         return true;
     }
 }

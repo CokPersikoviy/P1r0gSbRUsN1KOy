@@ -154,6 +154,7 @@ public final class ModProfiler {
         try {
             var environment = Map.of(
                     "context", SessionContext.capture(),
+                    "visuals", new com.google.gson.Gson().toJsonTree(ConfigManager.get().visuals),
                     "jvmArguments", ManagementFactory.getRuntimeMXBean().getInputArguments(),
                     "java", System.getProperty("java.version"),
                     "os", System.getProperty("os.name") + " " + System.getProperty("os.version"),
@@ -1327,7 +1328,6 @@ public final class ModProfiler {
         appendLongTrend(markdown, "FH popup notifications", samples, sample -> sample.frogHelper().popupNotifications());
         appendLongTrend(markdown, "FH chat queue", samples, sample -> sample.frogHelper().chatQueue());
         appendLongTrend(markdown, "FH booster debug messages", samples, sample -> sample.frogHelper().boosterDebugMessages());
-        appendLongTrend(markdown, "FH pending boss shares", samples, sample -> sample.frogHelper().pendingBossShares());
         appendLongTrend(markdown, "FH known mod users", samples, sample -> sample.frogHelper().knownModUsers());
         appendLongTrend(markdown, "FH social buffered characters", samples, sample -> sample.frogHelper().socialBufferedCharacters());
         appendLongTrend(markdown, "FH clan entries", samples, sample -> sample.frogHelper().clanEntries());
@@ -1455,7 +1455,6 @@ public final class ModProfiler {
         appendContextRow(markdown, "Popup notifications", Integer.toString(state.popupNotifications()));
         appendContextRow(markdown, "Chat dispatch queue", Integer.toString(state.chatQueue()));
         appendContextRow(markdown, "Booster debug messages", Integer.toString(state.boosterDebugMessages()));
-        appendContextRow(markdown, "Pending boss shares", Integer.toString(state.pendingBossShares()));
         appendContextRow(markdown, "Known mod users", Integer.toString(state.knownModUsers()));
         appendContextRow(markdown, "Social buffered chars / connected / request pending", state.socialBufferedCharacters() + " / " + state.socialConnected() + " / " + state.socialRequestPending());
         appendContextRow(markdown, "Player clan entries", Integer.toString(state.clanEntries()));
@@ -1631,7 +1630,6 @@ public final class ModProfiler {
                 + ", popups=" + state.popupNotifications()
                 + ", chatQ=" + state.chatQueue()
                 + ", boosterDebug=" + state.boosterDebugMessages()
-                + ", shares=" + state.pendingBossShares()
                 + ", socialIn=" + state.socialBufferedCharacters()
                 + ", highlightBoxes=" + state.highlightCachedBoxes()
                 + ", highlightChunks=" + state.highlightCachedChunks()

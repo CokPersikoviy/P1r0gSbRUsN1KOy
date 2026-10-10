@@ -56,6 +56,8 @@ final class HudSettingsCoreSections {
                 value -> ConfigManager.get().render.toneDownChat = value);
         toggle(items, "Chat timestamps", () -> ConfigManager.get().render.chatTimestamps,
                 value -> ConfigManager.get().render.chatTimestamps = value);
+        toggle(items, "Fixed chat widget font", () -> ConfigManager.get().render.fixedChatWidgetFont,
+                value -> ConfigManager.get().render.fixedChatWidgetFont = value);
         toggle(items, "Copy chat by RMB", () -> ConfigManager.get().render.copyChatMessages,
                 value -> ConfigManager.get().render.copyChatMessages = value);
         items.add(toggle("Full Message Copy", () -> ConfigManager.get().render.fullMessageCopy,

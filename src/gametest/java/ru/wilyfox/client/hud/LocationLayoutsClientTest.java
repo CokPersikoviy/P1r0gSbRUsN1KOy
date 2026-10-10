@@ -30,6 +30,7 @@ public final class LocationLayoutsClientTest implements FabricClientGameTest {
         int oldHeight = context.computeOnClient(client -> client.getWindow().getScreenHeight());
         var id = new String[1];
         try (var world = context.worldBuilder().create()) {
+            checkMigratedFishing(context, renderer, state, gson);
             context.runOnClient(client -> {
                 client.options.guiScale().set(2); client.getWindow().setWindowed(1280, 720); client.resizeGui();
                 ConfigManager.get().mainLayout.widgets.clear(); ConfigManager.get().widgetLayouts.clear();
@@ -51,6 +52,20 @@ public final class LocationLayoutsClientTest implements FabricClientGameTest {
                 expect(renderer.getLayoutWidgetCount() == 0, "New layout must start empty");
                 overlay(renderer, client);
                 var panel = panel(renderer);
+                var inherit = controls(panel).stream().filter(ToggleSettingsComponent.class::isInstance)
+                        .map(ToggleSettingsComponent.class::cast).findFirst().orElseThrow();
+                expect(!ConfigManager.get().locationLayouts.get(id[0]).inheritMainLayout, "New layouts must not inherit by default");
+                long revision = ConfigManager.getLayoutRevision();
+                panel.mousePressed(inherit.getX() + 10, inherit.getY() + 10, 0);
+                expect(ConfigManager.get().locationLayouts.get(id[0]).inheritMainLayout && ConfigManager.getLayoutRevision() > revision,
+                        "Inheritance toggle did not enable inheritance and invalidate runtime membership");
+                expect(renderer.getLayoutWidgetCount() == 0, "Inheritance must not copy Main widgets into the editor");
+                try {
+                    var saved = HudConfigCodec.decode(gson, JsonParser.parseString(Files.readString(FabricLoader.getInstance().getConfigDir().resolve("froghelper.json"))));
+                    expect(saved.locationLayouts.get(id[0]).inheritMainLayout, "Inheritance toggle was not saved");
+                } catch (java.io.IOException failure) { throw new AssertionError(failure); }
+                panel.mousePressed(inherit.getX() + 10, inherit.getY() + 10, 0);
+                expect(!ConfigManager.get().locationLayouts.get(id[0]).inheritMainLayout, "Inheritance toggle did not disable inheritance");
                 var visibility = controls(panel).stream().filter(LocationSettingsComponent.class::isInstance).map(LocationSettingsComponent.class::cast).findFirst().orElseThrow();
                 panel.mousePressed(visibility.getX() + 10, visibility.getY() + 10, 0);
                 overlay(renderer, client);
@@ -95,7 +110,7 @@ public final class LocationLayoutsClientTest implements FabricClientGameTest {
                 client.gui.setScreen(null);
                 location(state, "bay"); renderer.refreshLayout();
                 expect(renderer.getLayoutWidgetCount() == 2 && renderer.getLayoutWidgets().stream().filter(w -> w == boss).count() == 1,
-                        "Location overlays cloned a widget or lost an additional widget");
+                        "Selected layout cloned a widget or lost one of its widgets");
                 expect(boss.getStartX() == 270 && boss.getStartY() == 110 && boss.getScale() == 1.6f, "Runtime did not apply the fishing placement");
                 client.getWindow().setWindowed(1600, 900); client.resizeGui();
                 renderer.render(new GuiGraphicsExtractor(client, new GuiRenderState(), 0, 0), DeltaTracker.ZERO);
@@ -144,6 +159,51 @@ public final class LocationLayoutsClientTest implements FabricClientGameTest {
                 ConfigManager.save(); renderer.refreshLayout();
             });
         }
+    }
+    private static void checkMigratedFishing(ClientGameTestContext context, HudRenderer renderer, Object state, Gson gson) {
+        context.runOnClient(client -> {
+            renderer.setSettings(false); renderer.setEditing(false); ConfigManager.setEditorLayout(null);
+            var legacy = HudConfigCodec.decode(gson, JsonParser.parseString("""
+                    {"bossWidget":{"active":true},"scoreboard":{"active":true},
+                     "widgetLayouts":{"BossHudWidget":{"x":37,"y":92,"scale":1.4}}}
+                    """));
+            write(null, ConfigManager.class, "CONFIG", legacy); ConfigManager.layoutChanged();
+            var mainKeys = Set.copyOf(legacy.mainLayout.widgets);
+            expect(mainKeys.containsAll(Set.of("BossHudWidget", "ScoreboardWidget")), "Legacy widgets did not migrate to main");
+            location(state, "market"); renderer.refreshLayout();
+            expect(ConfigManager.getActiveWidgetKeys().equals(mainKeys), "Migrated main was not the fallback layout");
+            var fishing = new LocationWidgetLayoutConfig(); fishing.name = "Fishing"; fishing.locationVisibility.add("#fishing");
+            legacy.locationLayouts.put("migration-fishing", fishing); ConfigManager.layoutChanged();
+            location(state, "bay"); renderer.refreshLayout();
+            expect(renderer.getLayoutWidgetCount() == 0 && ConfigManager.getActiveWidgetKeys().isEmpty(),
+                    "Empty fishing inherited migrated main widgets");
+            fishing.widgets.add("BossHudWidget");
+            var position = new WidgetLayoutConfig(); position.x = 120; position.y = 40; position.scale = 1.2f;
+            fishing.placements.put("BossHudWidget", position); ConfigManager.layoutChanged(); ConfigManager.save(); renderer.refreshLayout();
+            expect(renderer.getLayoutWidgetCount() == 1 && ConfigManager.getActiveWidgetKeys().equals(Set.of("BossHudWidget")),
+                    "Single-timer fishing still includes widgets from migrated main");
+            var boss = widget(renderer, "BossHudWidget");
+            expect(boss.getStartX() == 120 && boss.getStartY() == 40 && boss.getScale() == 1.2f, "Fishing placement did not apply");
+            try {
+                var loaded = HudConfigCodec.decode(gson, JsonParser.parseString(Files.readString(FabricLoader.getInstance().getConfigDir().resolve("froghelper.json"))));
+                write(null, ConfigManager.class, "CONFIG", loaded); ConfigManager.layoutChanged(); renderer.refreshLayout();
+                expect(renderer.getLayoutWidgetCount() == 1 && loaded.mainLayout.widgets.equals(mainKeys),
+                        "Reload either restored main on fishing or discarded migrated widgets");
+                loaded.locationLayouts.get("migration-fishing").inheritMainLayout = true;
+                ConfigManager.layoutChanged(); renderer.refreshLayout();
+                expect(ConfigManager.getActiveWidgetKeys().equals(mainKeys) && renderer.getLayoutWidgetCount() == mainKeys.size(),
+                        "Inheritance did not restore migrated Main widgets or duplicated the timer");
+                expect(boss.getStartX() == 120 && boss.getScale() == 1.2f, "Inherited Main replaced the location timer placement");
+                loaded.locationLayouts.get("migration-fishing").inheritMainLayout = false;
+                ConfigManager.layoutChanged(); ConfigManager.save(); renderer.refreshLayout();
+                expect(renderer.getLayoutWidgetCount() == 1, "Disabling inheritance left Main widgets in the runtime layout");
+            } catch (java.io.IOException failure) { throw new AssertionError(failure); }
+            location(state, "azurepond"); renderer.refreshLayout();
+            expect(renderer.getLayoutWidgetCount() == 1, "All fishing selector failed on another fishing location");
+            location(state, "market"); renderer.refreshLayout();
+            expect(ConfigManager.getActiveWidgetKeys().equals(mainKeys) && boss.getStartX() == 37 && boss.getScale() == 1.4f,
+                    "Leaving fishing did not restore the migrated main layout and its placement");
+        });
     }
     private static void overlay(HudRenderer renderer, net.minecraft.client.Minecraft client) {
         renderer.renderSettingsOverlay(new GuiGraphicsExtractor(client, new GuiRenderState(), 0, 0), DeltaTracker.ZERO);

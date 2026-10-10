@@ -25,6 +25,14 @@ import ru.wilyfox.utils.Formatting;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Comparator;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import ru.wilyfox.client.visuals.VisualsTab;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
 import static ru.wilyfox.client.debug.DebugLogger.info;
@@ -36,6 +44,8 @@ public abstract class PlayerTabOverlayMixin {
     @Shadow
     @Final
     private Minecraft minecraft;
+
+    @Shadow @Final private static Comparator<PlayerInfo> PLAYER_COMPARATOR;
 
     @Shadow
     private Component footer;
@@ -64,21 +74,16 @@ public abstract class PlayerTabOverlayMixin {
         int y = froghelper$getTabBottom(screenWidth, font) + 4;
         y = froghelper$renderActivePotions(context, screenWidth, font, y);
 
-        if (!ConfigManager.get().render.showCurrentServerInTab) {
-            return;
+        if (ConfigManager.get().render.showCurrentServerInTab) {
+            String serverName = DiamondWorldProtocolClient.getCurrentServerDisplayName(footer);
+            if (serverName != null && !serverName.isBlank()) {
+                int textWidth = font.width(serverName), x = (screenWidth - textWidth) / 2;
+                context.fill(x - 4, y - 2, x + textWidth + 4, y + 9, 0x78111111);
+                context.text(font, serverName, x, y, 0xFFD8D8D8, false);
+                y += 13;
+            }
         }
-
-        String serverName = DiamondWorldProtocolClient.getCurrentServerDisplayName(footer);
-        if (serverName == null || serverName.isBlank()) {
-            return;
-        }
-
-        int textWidth = font.width(serverName);
-        int x = (screenWidth - textWidth) / 2;
-
-        int padding = 4;
-        context.fill(x - padding, y - 2, x + textWidth + padding, y + 9, 0x78111111);
-        context.text(font, serverName, x, y, 0xFFD8D8D8, false);
+        VisualsTab.finish(context, screenWidth, y);
     }
 
     private int froghelper$renderActivePotions(GuiGraphicsExtractor context, int screenWidth, Font font, int y) {
@@ -127,6 +132,7 @@ public abstract class PlayerTabOverlayMixin {
     }
 
     private int froghelper$getTabBottom(int screenWidth, Font font) {
+        if (ConfigManager.get().visuals.tab.enabled) return VisualsTab.bottom();
         int y = 10;
 
         if (header != null) {
@@ -174,5 +180,25 @@ public abstract class PlayerTabOverlayMixin {
                 || text.contains("boost")
                 || text.contains("money")
                 || text.contains("shard");
+    }
+    @WrapOperation(method = "extractRenderState", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/components/PlayerTabOverlay;getPlayerInfos()Ljava/util/List;"))
+    private List<PlayerInfo> froghelper$page(PlayerTabOverlay overlay, Operation<List<PlayerInfo>> original) {
+        return !ConfigManager.get().visuals.tab.enabled || minecraft.player == null ? original.call(overlay)
+                : VisualsTab.page(() -> minecraft.player.connection.getListedOnlinePlayers().stream().sorted(PLAYER_COMPARATOR).toList());
+    }
+    @ModifyConstant(method = "extractRenderState", constant = @Constant(intValue = 20))
+    private int froghelper$rows(int vanilla) { return ConfigManager.get().visuals.tab.enabled ? ConfigManager.get().visuals.tab.rows : vanilla; }
+    @ModifyVariable(method = "extractRenderState", at = @At("STORE"), name = "slotWidth")
+    private int froghelper$columnWidth(int width, @Local(name = "cols") int cols) {
+        return ConfigManager.get().visuals.tab.enabled ? VisualsTab.width(width, cols) : width;
+    }
+    @WrapOperation(method = "extractRenderState", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;fill(IIIII)V", ordinal = 2))
+    private void froghelper$slot(GuiGraphicsExtractor g, int x0, int y0, int x1, int y1, int color, Operation<Void> original) {
+        original.call(g, x0, y0, x1, y1, ConfigManager.get().visuals.tab.enabled ? VisualsTab.slot(x0, y0, x1, y1, color) : color);
+    }
+    @WrapOperation(method = "extractRenderState", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;fill(IIIII)V", ordinal = 3))
+    private void froghelper$footer(GuiGraphicsExtractor g, int x0, int y0, int x1, int y1, int color, Operation<Void> original) {
+        if (ConfigManager.get().visuals.tab.enabled) VisualsTab.area(y1);
+        original.call(g, x0, y0, x1, y1, color);
     }
 }

@@ -2,6 +2,7 @@ package ru.wilyfox.client.chat;
 
 public enum ChatTab {
     ALL("ALL", "", new String[0]),
+    FH("FH", "", new String[0]),
     GLOBAL("G", "Ⓖ", new String[]{"G", "Ⓖ"}),
     TRADE("T", "Ⓜ", new String[]{"T", "Ⓜ"}),
     LOCAL("L", "Ⓛ", new String[]{"L", "Ⓛ"}),

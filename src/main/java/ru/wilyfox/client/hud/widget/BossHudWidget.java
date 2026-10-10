@@ -531,15 +531,12 @@ public class BossHudWidget extends AbstractWidget {
     }
 
     private String bossStatusPrefix(BossInfo boss) {
-        // Captured (clan holds it / location busy) takes priority over the raid-event star.
-        if (DiamondWorldProtocolClient.getCapturedBossLevels().contains(boss.getLevel())) {
-            return CAPTURE_MARKER;
-        }
-        if (DiamondWorldProtocolClient.isMythicalEventActive()
-                && DiamondWorldProtocolClient.isRaidBossLevel(boss.getLevel())) {
-            return RAID_MARKER;
-        }
-        return "";
+        boolean captured = DiamondWorldProtocolClient.getCapturedBossLevels().contains(boss.getLevel());
+        boolean mythicalRaid = DiamondWorldProtocolClient.isMythicalEventActive()
+                && DiamondWorldProtocolClient.isRaidBossLevel(boss.getLevel());
+        // Capture and the mythical event are independent statuses; show both when applicable.
+        if (captured) return mythicalRaid ? CAPTURE_MARKER + RAID_MARKER : CAPTURE_MARKER;
+        return mythicalRaid ? RAID_MARKER : "";
     }
 
     private String bossCollectibleSuffix(BossInfo boss) {

@@ -18,6 +18,11 @@ class WidgetSettingsSectionsTest {
         var labels = new HashSet<String>();
         for (var widget : WidgetCatalog.values()) {
             var controls = WidgetSettingsSections.create(widget);
+            if (widget.chatChannel() != null) {
+                assertEquals(Set.of("Tab name", "Text filter", "Channel", "Chat width", "Chat rows", "Show chat title"),
+                        new HashSet<>(controls.stream().map(control -> control.label).toList()));
+                continue;
+            }
             assertEquals(expected.getOrDefault(widget, 0), controls.size(), widget.title());
             for (var control : controls) assertTrue(labels.add(control.label), "Duplicated control: " + control.label);
         }

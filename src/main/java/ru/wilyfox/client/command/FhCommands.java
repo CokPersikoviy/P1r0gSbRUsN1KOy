@@ -2,8 +2,6 @@ package ru.wilyfox.client.command;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
-import net.minecraft.commands.SharedSuggestionProvider;
-import ru.wilyfox.client.chat.BossShareService;
 import ru.wilyfox.client.profiler.ProfilerDebugCommand;
 import ru.wilyfox.client.protocol.ProtocolDebugCommand;
 
@@ -43,20 +41,13 @@ public final class FhCommands {
                     .then(literal("anomalies").executes(ctx -> run("/fhproto anomalies")))
                     .then(literal("reset").executes(ctx -> run("/fhproto reset"))));
 
-            // /fhshare <nick>
-            dispatcher.register(literal("fhshare")
-                    .executes(ctx -> run("/fhshare"))
-                    .then(argument("nick", StringArgumentType.word())
-                            .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(ctx.getSource().getOnlinePlayerNames(), builder))
-                            .executes(ctx -> run("/fhshare " + StringArgumentType.getString(ctx, "nick")))));
         });
     }
 
     /** Fallback executor - the ChatScreenMixin intercept normally handles these first. Each handler
      *  only acts on its own prefix. */
     private static int run(String command) {
-        if (BossShareService.handleOutgoingCommand(command, false)
-                || ProtocolDebugCommand.handleOutgoingCommand(command, false)
+        if (ProtocolDebugCommand.handleOutgoingCommand(command, false)
                 || ProfilerDebugCommand.handleOutgoingCommand(command, false)) {
             return 1;
         }

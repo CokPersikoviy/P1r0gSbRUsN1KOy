@@ -106,7 +106,7 @@ public final class ChatMessageCopyExtractor {
         }
     }
 
-    static String selectCopiedText(String displayedText, boolean fullMessage) {
+    public static String selectCopiedText(String displayedText, boolean fullMessage) {
         if (fullMessage) {
             return displayedText == null ? "" : displayedText;
         }

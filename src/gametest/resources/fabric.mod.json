@@ -17,6 +17,7 @@
       "ru.wilyfox.client.hud.menu.DragNumberClientTest",
       "ru.wilyfox.client.audio.UiSoundsClientTest",
       "ru.wilyfox.client.visuals.VisualsClientTest",
+      "ru.wilyfox.client.visuals.VisualsExtendedClientTest",
       "ru.wilyfox.HudDragClientTest",
       "ru.wilyfox.HudBlurClientTest",
       "ru.wilyfox.DungeonMapClientTest",
@@ -25,6 +26,7 @@
       "ru.wilyfox.client.moduser.SocialMetadataClientTest",
       "ru.wilyfox.client.highlight.UsefulHighlightClientTest",
       "ru.wilyfox.client.chat.LowHpMessageClientTest",
+      "ru.wilyfox.client.chat.ChatTabsClientTest",
       "ru.wilyfox.client.hud.widget.FishingQuestsClientTest",
       "ru.wilyfox.client.hud.fishing.FishingParticlesClientTest",
       "ru.wilyfox.client.profiler.TransitionDiagnosticsClientTest",
@@ -32,7 +34,8 @@
       "ru.wilyfox.client.hud.widget.WeakClientHudClientTest",
       "ru.wilyfox.client.hud.menu.LowHpMessageBuilderClientTest",
       "ru.wilyfox.boss.BossTrackerMemoryClientTest",
-      "ru.wilyfox.client.profiler.ProfilerCrashSaveClientTest"
+      "ru.wilyfox.client.profiler.ProfilerCrashSaveClientTest",
+      "ru.wilyfox.client.chat.ChatWindowsClientTest"
     ]
   },
   "depends": {

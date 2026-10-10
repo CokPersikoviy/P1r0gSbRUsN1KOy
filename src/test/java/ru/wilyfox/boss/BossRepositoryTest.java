@@ -10,6 +10,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BossRepositoryTest {
+    @Test void sharedTimersAreVisibleInEverySourceModeAndNeverOverrideDirectObservations() {
+        var now = new java.util.concurrent.atomic.AtomicLong(1_000);
+        var repo = new BossRepository(now::get, () -> GRACE_MS);
+        assertEquals(2, repo.importShared(java.util.List.of(new BossInfo("Remote", 5_000, 125), new BossInfo("Direct", 6_000, 130))));
+        assertEquals(2, repo.getAllWorld().size()); assertEquals(2, repo.getAllProtocol().size()); assertEquals(2, repo.getAllMerged().size());
+        repo.upsertProtocol("direct", "Direct", 7_000, 130);
+        assertEquals(7_000, repo.getAllProtocol().stream().filter(b -> b.getName().equals("Direct")).findFirst().orElseThrow().getRespawnAt());
+        assertEquals(2, repo.getAllMerged().size());
+        now.set(5_001); assertEquals(1, repo.getAllWorld().size());
+        repo.clearProtocol(); assertTrue(repo.getAllMerged().isEmpty());
+    }
     private static final long GRACE_MS = 30_000L;
 
     @Test

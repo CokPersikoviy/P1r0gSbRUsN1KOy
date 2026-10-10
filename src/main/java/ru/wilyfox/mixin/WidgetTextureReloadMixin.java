@@ -10,5 +10,8 @@ import ru.wilyfox.client.hud.internal.WidgetLayoutAnimation;
 @Mixin(TextureManager.class)
 public class WidgetTextureReloadMixin {
     @Inject(method = {"lambda$reload$2", "close"}, at = @At("HEAD"))
-    private void froghelper$invalidateSnapshots(CallbackInfo ci) { WidgetLayoutAnimation.invalidateResources(); }
+    private void froghelper$invalidateSnapshots(CallbackInfo ci) {
+        WidgetLayoutAnimation.invalidateResources();
+        net.minecraft.client.Minecraft.getInstance().execute(() -> ru.wilyfox.client.chat.ChatTabManager.getInstance().clearLineCache());
+    }
 }
