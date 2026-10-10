@@ -52,7 +52,7 @@ public class CycleSettingsComponent<T> extends SettingsComponent {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button != 0 || !isHovered(mouseX, mouseY)) {
+        if ((button != 0 && button != 1) || values.length == 0 || !isHovered(mouseX, mouseY)) {
             return false;
         }
 
@@ -66,7 +66,8 @@ public class CycleSettingsComponent<T> extends SettingsComponent {
             }
         }
 
-        setter.accept(values[(index + 1) % values.length]);
+        int direction = button == 1 ? -1 : 1;
+        setter.accept(values[Math.floorMod(index + direction, values.length)]);
         ConfigManager.save();
         return true;
     }

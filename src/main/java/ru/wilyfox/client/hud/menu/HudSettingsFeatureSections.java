@@ -348,6 +348,13 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.FISHING).add(
+                new ToggleSettingsComponent(0, 0, 0, 0, "Cast preview",
+                        () -> ConfigManager.get().fishing.showCastPreview,
+                        value -> ConfigManager.get().fishing.showCastPreview = value)
+                        .withWarningTooltip("Approximate landing point; casts have a small random spread.")
+        );
+
+        componentsByCategory.get(SettingsCategory.FISHING).add(
                 new ToggleSettingsComponent(0, 0, 0, 0, "Higher nibble notification",
                         () -> ConfigManager.get().fishing.higherBitingNotification,
                         value -> ConfigManager.get().fishing.higherBitingNotification = value)

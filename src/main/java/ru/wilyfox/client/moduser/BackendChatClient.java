@@ -26,10 +26,10 @@ final class BackendChatClient {
     private CompletableFuture<?> reading, sending;
     BackendChatClient(URI backend, HttpClient http) { this.backend = backend; this.http = http; }
     record Page(int version, List<BackendChatMessage> messages, boolean hasMore) {
-        void validate() {
+        void validate(long backendNow) {
             if (version != 1 || messages == null || messages.size() > 32) throw new IllegalArgumentException("Invalid chat page");
             long previous = 0;
-            for (var m : messages) { if (m == null) throw new IllegalArgumentException(); m.validate();
+            for (var m : messages) { if (m == null) throw new IllegalArgumentException(); m.validateAt(backendNow);
                 if (m.id() <= previous) throw new IllegalArgumentException("Unordered chat page"); previous = m.id(); }
         }
     }
@@ -67,7 +67,8 @@ final class BackendChatClient {
                     reading = null;
                     try {
                         if (error != null || response.statusCode() != 200) { nextRead = System.currentTimeMillis() + 10_000; return; }
-                        var page = SocialWire.JSON.fromJson(new String(response.body(), StandardCharsets.UTF_8), Page.class); page.validate();
+                        var page = SocialWire.JSON.fromJson(new String(response.body(), StandardCharsets.UTF_8), Page.class);
+                        page.validate(SocialWire.responseTime(response.headers(), System.currentTimeMillis()));
                         resync = false;
                         if (older && page.messages().stream().anyMatch(m -> m.id() >= oldest)
                                 || !older && initial && page.messages().stream().anyMatch(m -> m.id() <= cursor)) throw new IllegalArgumentException();
@@ -78,7 +79,10 @@ final class BackendChatClient {
                         initial = true;
                         if (moreNew) announced.accumulateAndGet(cursor + 1, Math::max);
                         nextRead = System.currentTimeMillis() + (moreNew || announced.get() > cursor ? 600 : 10_000);
-                    } catch (RuntimeException invalid) { nextRead = System.currentTimeMillis() + 10_000; }
+                    } catch (RuntimeException invalid) {
+                        ru.wilyfox.FrogHelper.LOGGER.warn("FH chat history rejected: {}", invalid.getMessage());
+                        nextRead = System.currentTimeMillis() + 10_000;
+                    }
                 }));
     }
     void send(String input, String bearer) {
@@ -99,11 +103,19 @@ final class BackendChatClient {
                     if (attempt != generation) return;
                     sending = null;
                     try {
-                        if (error != null || response.statusCode() != 200) { feedback("froghelper.chat.fh_failed"); return; }
-                        var message = SocialWire.JSON.fromJson(new String(response.body(), StandardCharsets.UTF_8), BackendChatMessage.class); message.validate();
+                        if (error != null || response.statusCode() != 200) {
+                            ru.wilyfox.FrogHelper.LOGGER.warn("FH message confirmation failed: {}", error != null
+                                    ? error.getClass().getSimpleName() : "HTTP " + response.statusCode());
+                            feedback("froghelper.chat.fh_failed"); return;
+                        }
+                        var message = SocialWire.JSON.fromJson(new String(response.body(), StandardCharsets.UTF_8), BackendChatMessage.class);
+                        message.validateAt(SocialWire.responseTime(response.headers(), System.currentTimeMillis()));
                         ChatTabManager.getInstance().acceptBackendMessages(List.of(message), true);
                         changed(message.id()); nextRead = 0;
-                    } catch (RuntimeException invalid) { feedback("froghelper.chat.fh_failed"); }
+                    } catch (RuntimeException invalid) {
+                        ru.wilyfox.FrogHelper.LOGGER.warn("FH message confirmation rejected: {}", invalid.getMessage());
+                        feedback("froghelper.chat.fh_failed");
+                    }
                 }));
     }
     private static void feedback(String key) { Minecraft.getInstance().gui.hud.setOverlayMessage(Component.translatable(key), false); }

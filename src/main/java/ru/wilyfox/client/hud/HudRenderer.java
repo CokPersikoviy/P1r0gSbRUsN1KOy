@@ -1,6 +1,10 @@
 package ru.wilyfox.client.hud;
 
 import ru.wilyfox.client.audio.UiSounds;
+import com.google.gson.JsonElement;
+import ru.wilyfox.client.chat.ChatDock;
+import ru.wilyfox.client.hud.internal.UndoHistory;
+import ru.wilyfox.client.hud.widget.ChatWidget;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
@@ -57,6 +61,10 @@ public class HudRenderer {
     private String appliedLocation;
     private final Map<Widget, WidgetLayoutConfig> defaultPlacements = new IdentityHashMap<>();
     private HudSettingsPanel settingsPanel;
+    private record MenuSnapshot(JsonElement config, String layout) {}
+    private final UndoHistory<MenuSnapshot> undoHistory =
+            new UndoHistory<>(40, (before, after) -> before.config.equals(after.config));
+    private boolean scaleGesture;
 
     private ScreenAnchor activeScreenAnchor = null;
     private CornerSnapIndicator activeDraggedCornerIndicator = null;
@@ -239,6 +247,7 @@ public class HudRenderer {
         refreshLayout();
         nextPassiveLayoutCheck = 0;
         if (editing) widgetSidebar.open();
+        if (!editing && !settingsOpen) clearUndoHistory();
 
         if (!editing) {
             if (settingsPanel != null) settingsPanel.finishInteraction();
@@ -262,6 +271,7 @@ public class HudRenderer {
         if (!settings && settingsPanel != null) settingsPanel.finishInteraction();
         if (!settings && settingsPanel != null && settingsPanel.isContextSettings()) settingsPanel.clearWidget();
         this.settingsOpen = settings;
+        if (!editing && !settings) clearUndoHistory();
         nextPassiveLayoutCheck = 0;
     }
 
@@ -740,6 +750,17 @@ public class HudRenderer {
     }
 
     public void onMousePressed(double mouseX, double mouseY, int button) {
+        if (!editing && !settingsOpen) return;
+        // Complete a previous gesture if its release was consumed or focus changed.
+        if (undoHistory.isPending()) {
+            settingsPanel.finishInteraction();
+            finishUndoAction();
+        }
+        beginUndoAction();
+        handleMousePressed(mouseX, mouseY, button);
+    }
+
+    private void handleMousePressed(double mouseX, double mouseY, int button) {
         if (settingsOpen) {
             settingsPanel.mousePressed(mouseX, mouseY, button);
             return;
@@ -798,6 +819,11 @@ public class HudRenderer {
     }
 
     public void onMouseReleased(int button, int screenWidth, int screenHeight, double mouseX, double mouseY) {
+        handleMouseReleased(button, screenWidth, screenHeight, mouseX, mouseY);
+        if (!scaleGesture) finishUndoAction();
+    }
+
+    private void handleMouseReleased(int button, int screenWidth, int screenHeight, double mouseX, double mouseY) {
         if (button != 0) {
             return;
         }
@@ -893,6 +919,8 @@ public class HudRenderer {
         }
 
         if (hovered instanceof AbstractWidget scalableWidget) {
+            beginUndoAction();
+            scaleGesture = true;
             float step = shiftHeld ? 0.02f : 0.10f;
             float previousScale = scalableWidget.getScale();
             scalableWidget.adjustScale(scrollY > 0 ? step : -step);
@@ -902,7 +930,7 @@ public class HudRenderer {
                 int screenHeight = Minecraft.getInstance().getWindow().getGuiScaledHeight();
                 applyStoredScreenAnchor(scalableWidget, scalableWidget.getScreenAnchor(), screenWidth, screenHeight);
             }
-            ConfigManager.saveWidgetLayout(scalableWidget);
+            ConfigManager.captureWidgetLayout(scalableWidget);
             return true;
         }
 
@@ -910,6 +938,28 @@ public class HudRenderer {
     }
 
     public boolean onKeyPressed(int keyCode, int scanCode, int modifiers) {
+        if ((editing || settingsOpen) && keyCode == GLFW.GLFW_KEY_Z
+                && (modifiers & GLFW.GLFW_MOD_CONTROL) != 0) {
+            undoLastAction();
+            return true;
+        }
+        boolean separateAction = !undoHistory.isPending() && (editing || settingsOpen);
+        if (separateAction) beginUndoAction();
+        boolean handled = handleKeyPressed(keyCode, scanCode, modifiers);
+        if (separateAction) finishUndoAction();
+        return handled;
+    }
+
+    public boolean onKeyReleased(int keyCode, int modifiers) {
+        if (scaleGesture && (keyCode == GLFW.GLFW_KEY_LEFT_CONTROL || keyCode == GLFW.GLFW_KEY_RIGHT_CONTROL)) {
+            // GLFW release modifiers omit the released key but retain the other Ctrl key.
+            if ((modifiers & GLFW.GLFW_MOD_CONTROL) == 0) finishUndoAction();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleKeyPressed(int keyCode, int scanCode, int modifiers) {
         if (settingsOpen) return settingsPanel.keyPressed(keyCode, scanCode, modifiers);
         if (editing && !settingsOpen && keyCode == GLFW.GLFW_KEY_TAB) {
             widgetSidebar.toggleVisibility();
@@ -925,9 +975,73 @@ public class HudRenderer {
     }
 
     public boolean onCharTyped(int codePoint, int modifiers) {
+        boolean separateAction = !undoHistory.isPending() && (editing || settingsOpen);
+        if (separateAction) beginUndoAction();
+        boolean handled = handleCharTyped(codePoint, modifiers);
+        if (separateAction) finishUndoAction();
+        return handled;
+    }
+
+    private boolean handleCharTyped(int codePoint, int modifiers) {
         if (settingsOpen) return settingsPanel.charTyped(codePoint, modifiers);
         if (editing && widgetSidebar.charTyped(codePoint)) return true;
         return settingsOpen && settingsPanel.charTyped(codePoint, modifiers);
+    }
+
+    private void beginUndoAction() {
+        if (undoHistory.isPending() || (!editing && !settingsOpen)) return;
+        // Include defaults and exact runtime positions before the first drag too.
+        if (editing) for (Widget widget : widgets) {
+            if (widget instanceof AbstractWidget placed) ConfigManager.captureWidgetLayout(placed);
+        }
+        undoHistory.begin(new MenuSnapshot(ConfigManager.snapshot(), selectedLayout));
+    }
+
+    private void finishUndoAction() {
+        if (scaleGesture) ConfigManager.save();
+        if (undoHistory.isPending()) undoHistory.finish(new MenuSnapshot(ConfigManager.snapshot(), selectedLayout));
+        scaleGesture = false;
+    }
+
+    private void clearUndoHistory() {
+        if (scaleGesture) ConfigManager.save();
+        undoHistory.clear();
+        scaleGesture = false;
+    }
+
+    private void undoLastAction() {
+        beginUndoAction();
+        settingsPanel.finishInteraction();
+        if (draggedWidget != null) saveAllWidgetLayouts();
+        finishUndoAction();
+        var snapshot = undoHistory.undo();
+        if (snapshot == null) return;
+        ConfigManager.restoreSnapshot(snapshot.config);
+        pendingLibraryDrag = draggedWidget = null;
+        draggingWidgetGroup = false;
+        draggedGroupWidgets.clear(); draggedGroupStates.clear();
+        activeScreenAnchor = null;
+        activeDraggedCornerIndicator = activeTargetCornerIndicator = null;
+        selectedLayout = ConfigManager.get().locationLayouts.containsKey(snapshot.layout) ? snapshot.layout : HudLayoutResolver.MAIN;
+        ConfigManager.setEditorLayout(editing ? selectedLayout : null);
+        reconcileChatWidgets();
+        layoutAnimation.clear();
+        appliedConfig = null;
+        refreshLayout();
+        if (!settingsPanel.rebuildAfterUndo(widgets, selectedLayout)) setSettings(false);
+        UiSounds.click();
+    }
+
+    private void reconcileChatWidgets() {
+        for (Widget widget : List.copyOf(registeredWidgets)) {
+            String key = widgetKey(widget);
+            if (WidgetCatalog.isCustomChatKey(key) && !ConfigManager.get().chatWidgets.containsKey(key)) unregisterWidget(widget);
+        }
+        for (String key : ConfigManager.get().chatWidgets.keySet()) {
+            if (WidgetCatalog.isCustomChatKey(key) && registeredWidgets.stream().noneMatch(widget -> key.equals(widgetKey(widget))))
+                registerWidget(new ChatWidget(key, WidgetCatalog.CHAT_ALL, 200, 30));
+        }
+        ChatDock.ensureDockSelection();
     }
 
     public boolean handleChatClick(double mouseX, double mouseY, int button) {

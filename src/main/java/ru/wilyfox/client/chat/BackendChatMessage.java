@@ -6,7 +6,12 @@ public record BackendChatMessage(long id, String name, String text, long sentAt)
         if (id <= 0 || name == null || !name.matches("[A-Za-z0-9_]{1,16}") || text == null || text.isBlank()
                 || !text.equals(text.strip()) || text.codePointCount(0, text.length()) > 256
                 || text.codePoints().anyMatch(c -> Character.isISOControl(c) || c == '\u00a7')
-                || sentAt < 1_600_000_000_000L || sentAt > System.currentTimeMillis() + 60_000)
+                || sentAt < 1_600_000_000_000L || sentAt > 4_102_444_800_000L)
             throw new IllegalArgumentException("Invalid backend chat message");
+    }
+    /** Check wire timestamps against the backend clock; the local archive preserves server time. */
+    public void validateAt(long backendNow) {
+        validate();
+        if (sentAt > backendNow + 60_000) throw new IllegalArgumentException("Chat timestamp ahead of backend clock");
     }
 }

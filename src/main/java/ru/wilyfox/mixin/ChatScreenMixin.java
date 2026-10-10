@@ -103,7 +103,9 @@ public abstract class ChatScreenMixin extends Screen {
         } else if (froghelper$searchActive) {
             froghelper$searchInput.keyPressed(event);
             cir.setReturnValue(true);
-        } else if (!froghelper$searchActive && event.isConfirmation() && ChatOutgoingRouter.format(input.getValue()) == null) {
+        } else if (!froghelper$searchActive && event.isConfirmation()
+                && ChatDock.outgoingChannel() != ru.wilyfox.client.chat.ChatTab.FH
+                && ChatOutgoingRouter.format(input.getValue()) == null) {
             var error = Component.translatable(ChatDock.outgoingChannel() == ru.wilyfox.client.chat.ChatTab.PRIVATE
                     && ChatOutgoingRouter.replyCommand().isEmpty() ? "froghelper.chat.pm_hint" : "froghelper.chat.too_long");
             ru.wilyfox.client.popup.PopUpManager.getInstance().publish(ru.wilyfox.client.popup.PopUpRequest.of(

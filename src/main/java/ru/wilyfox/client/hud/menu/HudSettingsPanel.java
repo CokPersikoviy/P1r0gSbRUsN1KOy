@@ -36,6 +36,7 @@ public class HudSettingsPanel {
     private String settingsLayout;
     private List<SettingsComponent> widgetComponents = List.of();
     private Runnable closeWidgetAction;
+    private Runnable deleteLayoutAction;
 
     private boolean initialized = false;
     private int scrollOffset = 0;
@@ -63,6 +64,7 @@ public class HudSettingsPanel {
         finishInteraction();
         settingsWidget = widget;
         settingsLayout = null;
+        deleteLayoutAction = null;
         closeWidgetAction = onClose;
         widgetComponents = new ArrayList<>();
         widgetComponents.add(new DragNumberSettingsComponent(0, 0, 0, 0, "Scale (%)",
@@ -89,6 +91,7 @@ public class HudSettingsPanel {
         if (id == null || id.isEmpty() || !ConfigManager.get().locationLayouts.containsKey(id)) return false;
         finishInteraction();
         settingsWidget = null; settingsLayout = id; closeWidgetAction = onClose;
+        deleteLayoutAction = onDelete;
         widgetComponents = new ArrayList<>();
         String[] nameDraft = {ConfigManager.get().locationLayouts.get(id).name};
         widgetComponents.add(new TextInputSettingsComponent(0, 0, 0, 0, "Name",
@@ -132,6 +135,7 @@ public class HudSettingsPanel {
         settingsLayout = null;
         widgetComponents = List.of();
         closeWidgetAction = null;
+        deleteLayoutAction = null;
         scrollOffset = 0;
         hoveredSoundTarget = null;
     }
@@ -140,6 +144,26 @@ public class HudSettingsPanel {
         UiSounds.openClose();
         if (closeWidgetAction != null) closeWidgetAction.run();
         else clearWidget();
+    }
+
+    /** Discard drafts and callbacks that might refer to objects from the previous config. */
+    public boolean rebuildAfterUndo(List<Widget> layoutWidgets, String selectedLayout) {
+        int previousScroll = scrollOffset;
+        Widget widget = settingsWidget;
+        String layout = settingsLayout;
+        Runnable close = closeWidgetAction, delete = deleteLayoutAction;
+        capturedNumber = null;
+        widgetComponents = List.of();
+        settingsWidget = null; settingsLayout = null;
+        initialized = false;
+        componentsByCategory.clear();
+        ensureInitialized();
+        boolean valid = widget != null ? layoutWidgets.contains(widget) && openWidget(widget, close)
+                : layout == null || layout.equals(selectedLayout) && openLayout(layout, close, delete);
+        if (!valid) clearWidget();
+        scrollOffset = valid ? previousScroll : 0;
+        hoveredSoundTarget = null;
+        return valid;
     }
 
     private List<SettingsComponent> activeComponents() {

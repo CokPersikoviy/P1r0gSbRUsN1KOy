@@ -135,6 +135,7 @@ public class Client {
         DungeonMapTracker.getInstance().register();
 
         PlayerHealthBarRenderHook.register();
+        ru.wilyfox.client.hud.fishing.FishingCastPreview.register();
         DungeonDecorationHighlightRenderHook.register();
         UsefulWorldHighlightRenderHook.register();
         EstimatedTpsMonitor.register();

@@ -23,7 +23,7 @@ public final class ChatOutgoingRouter {
     public static String format(String input) {
         return format(input, ChatDock.outgoingChannel(), isDwConnection(), replyCommand());
     }
-    /** Null means a PM has no advertised reply command or the prefixed message exceeds the server limit. */
+    /** Null prevents game delivery: backend channel, unavailable PM reply, or oversized prefixed text. */
     static String format(String input, ChatTab tab, boolean onDw, String replyCommand) {
         if (tab == ChatTab.FH) return null; // Backend chat must never fall through to a game packet.
         String text = input == null ? "" : input.strip();

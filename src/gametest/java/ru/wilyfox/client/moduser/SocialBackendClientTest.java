@@ -113,6 +113,9 @@ public final class SocialBackendClientTest implements FabricClientGameTest {
             if (!field(joined, "Nickname").startsWith(name.get() + " [") || !field(joined, "Version").equals(version)) {
                 throw new AssertionError("Authenticated name and mod version must reach the server embed");
             }
+            // Webhook delivery and the client's WebSocket roster arrive independently.
+            for (int i = 0; i < 100 && !context.computeOnClient(client -> PresenceStore.isKnown(name.get())); i++)
+                context.waitTicks(2);
             context.runOnClient(client -> {
                 if (!PresenceStore.isKnown(name.get())) throw new AssertionError("Self missing from authenticated roster");
                 KeyMapping.click(KeyMappingHelper.getBoundKeyOf(KeyBinds.SOCIAL));
@@ -182,7 +185,11 @@ public final class SocialBackendClientTest implements FabricClientGameTest {
         try {
             context.setScreen(() -> new net.minecraft.client.gui.screens.ChatScreen("/msg literal backend text", false));
             context.waitTicks(3); context.takeScreenshot("fh-chat-history");
-            context.runOnClient(client -> ((net.minecraft.client.gui.screens.ChatScreen) client.gui.screen()).handleChatInput("/msg literal backend text", true));
+            context.runOnClient(client -> {
+                var screen = (net.minecraft.client.gui.screens.ChatScreen) client.gui.screen();
+                if (!screen.keyPressed(new KeyEvent(GLFW.GLFW_KEY_ENTER, 0, 0)) || client.gui.screen() != null)
+                    throw new AssertionError("FH Enter was blocked before backend submission");
+            });
             for (int i = 0; i < 100 && context.computeOnClient(client -> tabs.getMessages(ru.wilyfox.client.chat.ChatTab.FH).size()) < 33; i++) context.waitTicks(2);
             context.runOnClient(client -> {
                 var messages = tabs.getMessages(ru.wilyfox.client.chat.ChatTab.FH);
@@ -270,6 +277,9 @@ public final class SocialBackendClientTest implements FabricClientGameTest {
                 if (isolated.getAllProtocol().size() != 61 || isolated.getAllMerged().size() != 61)
                     throw new AssertionError("Imported timers are hidden in Protocol Only");
                 if (!response.get().join().getString().contains("61")) throw new AssertionError("Missing import feedback");
+                long remaining = isolated.getAllProtocol().iterator().next().getRespawnAt() - System.currentTimeMillis();
+                if (remaining < 100_000 || remaining > 122_000)
+                    throw new AssertionError("Backend clock skew changed the remaining timer duration: " + remaining);
             });
             context.takeScreenshot("social-timers-received");
         } finally {

@@ -77,6 +77,11 @@ public class HudEditingScreen extends UiSoundScreen {
         int modifiers = 0;
         return hudRenderer.onCharTyped(codePoint, modifiers) || super.charTyped(event);
     }
+
+    @Override
+    public boolean keyReleased(net.minecraft.client.input.KeyEvent event) {
+        return hudRenderer.onKeyReleased(event.key(), event.modifiers()) || super.keyReleased(event);
+    }
 }
 
 

@@ -322,30 +322,37 @@ public final class BackendSocialClient {
             return CompletableFuture.completedFuture(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.busy"));
         client.nextTimerRequestAt = now + 1_100;
         long attempt = client.generation;
-        String expectedScope = player.scope();
         var result = new CompletableFuture<net.minecraft.network.chat.Component>();
         client.timerResult = result;
         var download = HttpRequest.newBuilder(client.backend.resolve("/v1/timers/" + player.id()))
                 .timeout(Duration.ofSeconds(8)).header("Authorization", "Bearer " + client.accessToken).GET().build();
-        client.timerDownload = HTTP.sendAsync(download, ignored -> new LimitedBodySubscriber()).whenComplete((response, failure) ->
-                Minecraft.getInstance().execute(() -> {
+        client.timerDownload = HTTP.sendAsync(download, ignored -> new LimitedBodySubscriber()).whenComplete((response, failure) -> {
+            long receivedAt = System.currentTimeMillis();
+            Minecraft.getInstance().execute(() -> {
                     if (attempt != client.generation) { result.complete(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.cancelled")); return; }
                     try {
-                        if (failure != null || response.statusCode() != 200) {
-                            if (failure == null && response.statusCode() == 401) client.failed(attempt, false);
-                            result.complete(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.failed"));
+                        if (failure != null) {
+                            FrogHelper.LOGGER.warn("Timer download from {} failed: {}", player.name(), failure.getClass().getSimpleName());
+                            result.complete(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.network_error"));
+                            return;
+                        }
+                        if (response.statusCode() != 200) {
+                            FrogHelper.LOGGER.warn("Timer download from {} failed: HTTP {}", player.name(), response.statusCode());
+                            result.complete(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.http_error", response.statusCode()));
+                            if (response.statusCode() == 401) client.failed(attempt, false);
                             return;
                         }
                         var payload = SocialWire.JSON.fromJson(new String(response.body(), StandardCharsets.UTF_8), SocialWire.TimerResponse.class);
-                        var timers = payload.validatedTimers(player.id(), expectedScope, System.currentTimeMillis());
-                        if (!payload.name().equalsIgnoreCase(player.name())) throw new IllegalArgumentException("Wrong player");
+                        var timers = SocialWire.receivedTimers(payload, player, response.headers(), receivedAt, System.currentTimeMillis());
                         int imported = SocialTimerService.receive(timers);
                         result.complete(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.received", imported, payload.name()));
                         ModProfiler.getInstance().recordClientEvent("social-timers-received", payload.name() + ":" + imported);
                     } catch (Exception invalid) {
-                        result.complete(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.failed"));
+                        FrogHelper.LOGGER.warn("Timer response from {} rejected: {}", player.name(), invalid.getMessage());
+                        result.complete(net.minecraft.network.chat.Component.translatable("social.froghelper.timers.invalid_response"));
                     }
-                }));
+                });
+        });
         return result;
     }
 

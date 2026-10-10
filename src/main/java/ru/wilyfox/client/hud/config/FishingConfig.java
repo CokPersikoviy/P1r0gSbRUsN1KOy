@@ -3,6 +3,7 @@ package ru.wilyfox.client.hud.config;
 public class FishingConfig {
     public boolean showPetExperienceOverlay = true;
     public boolean showFishingMarkers = true;
+    public boolean showCastPreview = false;
     public boolean showFishingNibblesWidget = false;
     public FishingWidgetVisibility nibblesVisibility = FishingWidgetVisibility.FISHING_WARP;
     public FishingNibblesSort nibblesSort = FishingNibblesSort.DIMENSION;

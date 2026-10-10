@@ -41,6 +41,17 @@ public class ConfigManager {
         return CONFIG;
     }
 
+    public static synchronized com.google.gson.JsonElement snapshot() {
+        return GSON.toJsonTree(CONFIG);
+    }
+
+    /** Replace the complete settings state, invalidating layout and theme caches too. */
+    public static synchronized void restoreSnapshot(com.google.gson.JsonElement snapshot) {
+        CONFIG = HudConfigCodec.decode(GSON, snapshot);
+        layoutChanged();
+        save();
+    }
+
     public static synchronized void save() {
         CONFIG = HudConfigSanitizer.sanitize(CONFIG);
         WidgetTheme.syncConfiguredTheme();

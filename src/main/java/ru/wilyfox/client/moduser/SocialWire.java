@@ -45,6 +45,29 @@ final class SocialWire {
         }
     }
     static boolean validScope(String scope) { return scope != null && scope.matches("[A-Z]{1,24}[0-9]{0,8}:[0-9]{1,8}"); }
+    /** HTTP Date comes from the authenticated backend, independent of the player's wall clock. */
+    static List<Timer> receivedTimers(TimerResponse payload, Player player, java.net.http.HttpHeaders headers,
+                                      long receivedAt, long localNow) {
+        if (payload == null) throw new IllegalArgumentException("Missing timer response");
+        if (!player.name().equalsIgnoreCase(payload.name())) throw new IllegalArgumentException("Wrong timer author");
+        long serverNow = Math.addExact(responseTime(headers, receivedAt), Math.max(0, localNow - receivedAt));
+        long clockOffset = Math.subtractExact(localNow, serverNow);
+        return payload.validatedTimers(player.id(), player.scope(), serverNow).stream()
+                .map(timer -> new Timer(timer.name(), timer.level(), Math.addExact(timer.respawnAt(), clockOffset))).toList();
+    }
+    static long responseTime(java.net.http.HttpHeaders headers, long fallback) {
+        long serverTime = fallback;
+        var date = headers.firstValue("Date");
+        if (date.isPresent()) {
+            try {
+                serverTime = java.time.ZonedDateTime.parse(date.get(), java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
+                        .toInstant().toEpochMilli();
+            } catch (java.time.DateTimeException invalid) {
+                throw new IllegalArgumentException("Invalid backend Date header");
+            }
+        }
+        return serverTime;
+    }
     record Timer(String name, int level, long respawnAt) {
         void validate(long now) {
             if (name == null || name.isBlank() || !name.equals(name.trim()) || name.codePointCount(0, name.length()) > 64
@@ -56,9 +79,13 @@ final class SocialWire {
     record TimerUpload(int version, String scope, boolean protocolOnly, List<Timer> timers) {}
     record TimerResponse(int version, String id, String name, String scope, long updatedAt, List<Timer> timers) {
         List<Timer> validatedTimers(String expectedId, String expectedScope, long now) {
-            if (version != 1 || !expectedId.equals(id) || !expectedScope.equals(scope) || name == null || !name.matches("[A-Za-z0-9_]{1,16}")
-                    || updatedAt < now - 45_000 || updatedAt > now + 5_000 || timers == null || timers.size() > 512)
-                throw new IllegalArgumentException("Invalid timer response");
+            if (version != 1) throw new IllegalArgumentException("Unsupported timer response version");
+            if (!expectedId.equals(id) || name == null || !name.matches("[A-Za-z0-9_]{1,16}"))
+                throw new IllegalArgumentException("Invalid timer author");
+            if (!expectedScope.equals(scope)) throw new IllegalArgumentException("Timer source changed subserver");
+            if (updatedAt < now - 45_000) throw new IllegalArgumentException("Timer snapshot expired");
+            if (updatedAt > now + 5_000) throw new IllegalArgumentException("Timer snapshot ahead of backend clock");
+            if (timers == null || timers.size() > 512) throw new IllegalArgumentException("Invalid timer count");
             var names = new java.util.HashSet<String>();
             for (Timer timer : timers) {
                 if (timer == null) throw new IllegalArgumentException("Invalid timer");

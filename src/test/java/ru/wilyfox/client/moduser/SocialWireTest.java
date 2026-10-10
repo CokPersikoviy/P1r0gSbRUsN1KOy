@@ -6,6 +6,29 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SocialWireTest {
+    @Test void backendDateHandlesClockSkewAndPreservesRemainingRespawnTime() {
+        long serverNow = 1_700_000_000_000L;
+        String id = "a".repeat(64);
+        var player = new SocialWire.Player(id, "Fox", "HUB0:0", 61, true);
+        var payload = new SocialWire.TimerResponse(1, id, "Fox", "HUB0:0", serverNow,
+                List.of(new SocialWire.Timer("Boss", 125, serverNow + 60_000),
+                        new SocialWire.Timer("Already respawned", 100, serverNow + 1_000)));
+        String date = java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.format(
+                java.time.Instant.ofEpochMilli(serverNow).atZone(java.time.ZoneOffset.UTC));
+        var headers = java.net.http.HttpHeaders.of(java.util.Map.of("Date", List.of(date)), (key, value) -> true);
+        for (long skew : List.of(-120_000L, 120_000L)) {
+            long receivedAt = serverNow + skew, localNow = receivedAt + 1_500;
+            var timers = SocialWire.receivedTimers(payload, player, headers, receivedAt, localNow);
+            assertEquals(1, timers.size());
+            assertEquals(58_500, timers.getFirst().respawnAt() - localNow);
+            var expired = new SocialWire.TimerResponse(1, id, "Fox", "HUB0:0", serverNow - 46_000, payload.timers());
+            assertThrows(IllegalArgumentException.class, () -> SocialWire.receivedTimers(expired, player, headers, receivedAt, localNow));
+        }
+        var wrongAuthor = new SocialWire.TimerResponse(1, id, "Other", "HUB0:0", serverNow, payload.timers());
+        assertThrows(IllegalArgumentException.class, () -> SocialWire.receivedTimers(wrongAuthor, player, headers, serverNow, serverNow));
+        var missingDate = java.net.http.HttpHeaders.of(java.util.Map.of(), (key, value) -> true);
+        assertEquals(serverNow + 60_000, SocialWire.receivedTimers(payload, player, missingDate, serverNow, serverNow).getFirst().respawnAt());
+    }
     @Test void timerMetadataIsOptionalAndProtocolBadgeUsesStrictFiftyThreshold() {
         String id = "a".repeat(64);
         assertNull(SocialWire.JSON.fromJson("{\"id\":\"" + id + "\",\"name\":\"Fox\"}", SocialWire.Player.class).timerCount());
