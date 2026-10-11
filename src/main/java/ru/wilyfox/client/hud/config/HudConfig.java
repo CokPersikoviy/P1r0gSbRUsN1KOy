@@ -49,6 +49,7 @@ public class HudConfig {
     public QuickAccessConfig quickAccess = new QuickAccessConfig();
     public ThemeConfig theme = new ThemeConfig();
     public MainWidgetLayoutConfig mainLayout = new MainWidgetLayoutConfig();
+    public WidgetListSort widgetListSort = WidgetListSort.ALPHABETICAL;
     public Map<String, WidgetLayoutConfig> widgetLayouts = new LinkedHashMap<>();
     public Map<String, LocationWidgetLayoutConfig> locationLayouts = new LinkedHashMap<>();
     public Map<String, WidgetLocationConfig> widgetLocations = new LinkedHashMap<>();

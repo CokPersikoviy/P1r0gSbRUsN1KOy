@@ -186,6 +186,7 @@ public final class PopUpEventNotifier {
                 bossRepository.getAllMerged(),
                 System.currentTimeMillis()
         )) {
+            if (!ru.wilyfox.client.boss.BossTimerFilter.accepts(boss)) continue;
             PopUpManager.getInstance().publish(PopUpRequest.of(
                     PopUpSource.BOSS_SPAWN,
                     "Boss Respawned",

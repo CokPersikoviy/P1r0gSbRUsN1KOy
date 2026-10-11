@@ -17,6 +17,7 @@ public class RenderConfig {
     public boolean copyChatMessages = true;
     public boolean fullMessageCopy = false;
     public boolean chatTimestamps = true;
+    public boolean collapseChatRepeats = true;
     public ChatTimestampConfig timestamp = new ChatTimestampConfig();
     public boolean fixedChatWidgetFont = false;
     public int extraChatHistoryLines = 200;

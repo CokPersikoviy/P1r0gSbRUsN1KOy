@@ -40,6 +40,11 @@ public abstract class ChatScreenMixin extends Screen {
     @Unique private ChatWidget froghelper$searchWidget;
     @Shadow private boolean handleComponentClicked(Style style, boolean allowInsertions) { throw new AssertionError(); }
 
+    @Inject(method = "handleComponentClicked", at = @At("HEAD"), cancellable = true)
+    private void froghelper$openChatImage(Style style, boolean allowInsertions, CallbackInfoReturnable<Boolean> cir) {
+        if (ru.wilyfox.client.chat.FhImageScreen.openLink(style, this)) cir.setReturnValue(true);
+    }
+
     @Inject(method = "init", at = @At("TAIL"))
     private void froghelper$initSearch(CallbackInfo ci) {
         froghelper$searchInput = new EditBox(this.minecraft.fontFilterFishy, 4, this.height - 12,

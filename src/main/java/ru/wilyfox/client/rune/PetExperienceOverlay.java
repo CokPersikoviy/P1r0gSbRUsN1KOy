@@ -1,6 +1,5 @@
 package ru.wilyfox.client.rune;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -8,8 +7,8 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
-import ru.wilyfox.client.hud.config.WidgetChrome;
-import ru.wilyfox.client.hud.widget.HudSurface;
+import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.widget.InventoryOverlayPanel;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 import java.util.List;
@@ -45,29 +44,13 @@ public final class PetExperienceOverlay {
     }
 
     public static void render(GuiGraphicsExtractor context, int x, int y, OverlayData data) {
-        Minecraft mc = Minecraft.getInstance();
-        int lineHeight = mc.font.lineHeight + 1;
-        int maxWidth = mc.font.width(data.title());
-        for (String line : data.lines()) {
-            maxWidth = Math.max(maxWidth, mc.font.width(line));
-        }
-        int width = maxWidth + 12;
-        int height = 12 + lineHeight + data.lines().size() * lineHeight;
-        HudSurface.drawPanel(context, x, y, width, height, WidgetChrome.FROST, HudSurface.nativeRenderer());
-
-        int textY = y + 5;
-        context.text(mc.font, data.title(), x + 6, textY, WidgetTheme.TITLE);
-        textY += lineHeight + 2;
-        for (int i = 0; i < data.lines().size(); i++) {
-            int color = switch (i) {
-                case 1 -> WidgetTheme.TEXT_PRIMARY;
-                case 2 -> WidgetTheme.TEXT_SECONDARY;
-                case 3 -> WidgetTheme.TEXT_SOFT;
-                default -> WidgetTheme.TITLE;
-            };
-            context.text(mc.font, data.lines().get(i), x + 6, textY, color);
-            textY += lineHeight;
-        }
+        InventoryOverlayPanel.render(context, x, y, data.title(), data.lines(),
+                ConfigManager.get().fishing.petExperienceOverlayScalePercent, false, index -> switch (index) {
+                    case 1 -> WidgetTheme.TEXT_PRIMARY;
+                    case 2 -> WidgetTheme.TEXT_SECONDARY;
+                    case 3 -> WidgetTheme.TEXT_SOFT;
+                    default -> WidgetTheme.TITLE;
+                });
     }
 
     private static void collectStack(ItemStack stack, ExperienceByDimension values) {

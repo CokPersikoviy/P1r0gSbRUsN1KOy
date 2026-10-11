@@ -12,6 +12,7 @@ import ru.wilyfox.client.hud.config.VisualsConfig;
 public final class VisualsCamera {
     private static boolean active, wasDown, toggled, hitWasDown, distanceChanged;
     private static float yaw, pitch;
+    private static double distance;
     private static CameraType previous;
     private VisualsCamera() {}
     public static void register() {
@@ -46,14 +47,19 @@ public final class VisualsCamera {
         wasDown = down;
         boolean wanted = c.mode == VisualsConfig.LookMode.HOLD ? down : toggled;
         if (wanted && !active) {
+            distance = c.rememberDistance && c.lastDistance != null ? c.lastDistance : c.distance;
             previous = mc.options.getCameraType(); yaw = mc.player.getYRot(); pitch = mc.player.getXRot();
             mc.options.setCameraType(c.frontView ? CameraType.THIRD_PERSON_FRONT : CameraType.THIRD_PERSON_BACK); active = true;
         } else if (!wanted && active) stop(mc);
     }
     private static void stop(Minecraft mc) {
         if (active && previous != null) mc.options.setCameraType(previous);
-        // Keep the chosen distance, with one config write after the gesture instead of per wheel event.
-        if (distanceChanged) ConfigManager.save();
+        // Save only the remembered distance, once after the gesture. The configured start stays intact.
+        var c = ConfigManager.get().visuals.camera;
+        if (distanceChanged && c.rememberDistance) {
+            c.lastDistance = distance;
+            ConfigManager.save();
+        }
         distanceChanged = false;
         active = false; toggled = false; previous = null;
     }
@@ -68,12 +74,12 @@ public final class VisualsCamera {
         var c = ConfigManager.get().visuals.camera;
         if (!active || !c.enabled || mc.player == null || mc.gui.screen() != null || !mc.isWindowActive()
                 || amount == 0 || !Double.isFinite(amount)) return false;
-        double distance = Math.clamp(c.distance - amount * .5, .5, 20);
-        if (distance != c.distance) { c.distance = distance; distanceChanged = true; }
+        double nextDistance = Math.clamp(distance - amount * .5, .5, 20);
+        if (nextDistance != distance) { distance = nextDistance; distanceChanged = true; }
         return true; // Also consume wheel events at the limit; they must not scroll the hotbar.
     }
     public static float zoom(float vanilla) {
         var c = ConfigManager.get().visuals.camera;
-        return active ? (float) c.distance : c.distanceEnabled ? (float) c.thirdPersonDistance : vanilla;
+        return active ? (float) distance : c.distanceEnabled ? (float) c.thirdPersonDistance : vanilla;
     }
 }

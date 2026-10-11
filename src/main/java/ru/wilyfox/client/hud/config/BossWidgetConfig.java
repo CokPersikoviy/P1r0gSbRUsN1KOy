@@ -21,6 +21,11 @@ public class BossWidgetConfig {
 
     public int minLevel = 15;
     public int maxLevel = MAX_LEVEL_CEILING;
+    public boolean matchPlayerLevel = false;
+
+    public int effectiveMaxLevel(int playerLevel) {
+        return matchPlayerLevel && playerLevel > 0 ? playerLevel : maxLevel;
+    }
 
     public boolean showName = true;
     public boolean showIcons = true;

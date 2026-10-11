@@ -88,16 +88,21 @@ public final class HudBlur {
     }
 
     public static void blurBehind(GuiGraphicsExtractor context, int x, int y, int w, int h, int radius) {
-        if (HudSurface.nativeRenderer()) return;
+        blurBehindIfAvailable(context, x, y, w, h, radius);
+    }
+
+    static boolean blurBehindIfAvailable(GuiGraphicsExtractor context, int x, int y, int w, int h, int radius) {
+        if (HudSurface.nativeRenderer()) return false;
         // Screens can explicitly request FROST even when gameplay widgets use BARE/SOLID.
         // Preparing here also covers standalone screens without an explicit beginFrame call.
         prepareTarget(context);
-        if (!available || blurred == null || w <= 0 || h <= 0) return;
+        if (!available || blurred == null || w <= 0 || h <= 0) return false;
         requested = true;
         var window = Minecraft.getInstance().gameRenderer.gameRenderState().windowRenderState;
         RoundedPanelRenderState.blit(context, blurred.getColorTextureView(),
                 RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR), x, y, w, h, radius,
                 (float) window.width / window.guiScale, (float) window.height / window.guiScale);
+        return true;
     }
 
     public static void close() {

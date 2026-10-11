@@ -18,7 +18,8 @@ import java.util.List;
 
 /** Displays players currently online with FrogHelper in this game region. */
 public class SocialScreen extends UiSoundScreen {
-    private static final int PANEL_WIDTH = 330;
+    private static final int MAX_PANEL_WIDTH = 390;
+    private int panelWidth;
     private static final int BUTTON_WIDTH = 64;
     private static final int FOOTER_HEIGHT = 22;
     private static final int PANEL_PADDING = 14;
@@ -32,6 +33,7 @@ public class SocialScreen extends UiSoundScreen {
     private int visibleRows;
     private int scroll;
     private String requestedName;
+    private boolean requestingConfig;
     private Component timerStatus = Component.empty();
     private java.util.concurrent.CompletableFuture<Component> pending;
 
@@ -56,10 +58,11 @@ public class SocialScreen extends UiSoundScreen {
 
     private void layout() {
         int count = PresenceStore.knownCount();
+        panelWidth = Math.min(MAX_PANEL_WIDTH, Math.max(160, width - 16));
         int availableRows = Math.max(1, (height - HEADER_HEIGHT - PANEL_PADDING - FOOTER_HEIGHT - 24) / ROW_HEIGHT);
         visibleRows = Math.max(1, Math.min(count, Math.min(MAX_VISIBLE_ROWS, availableRows)));
         panelHeight = HEADER_HEIGHT + visibleRows * ROW_HEIGHT + PANEL_PADDING + FOOTER_HEIGHT;
-        panelX = (width - PANEL_WIDTH) / 2;
+        panelX = (width - panelWidth) / 2;
         panelY = (height - panelHeight) / 2;
         clampScroll(count);
     }
@@ -78,11 +81,11 @@ public class SocialScreen extends UiSoundScreen {
 
             graphics.fill(0, 0, width, height, WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0x66));
             HudBlur.beginFrame(graphics);
-            HudSurface.drawPanel(graphics, panelX, panelY, PANEL_WIDTH, panelHeight, WidgetChrome.FROST, HudSurface.nativeRenderer());
+            HudSurface.drawPanel(graphics, panelX, panelY, panelWidth, panelHeight, WidgetChrome.FROST, HudSurface.nativeRenderer());
             graphics.text(minecraft.font, ModUserBadge.prefix(Component.translatable("screen.froghelper.online_count", names.size())),
                     panelX + PANEL_PADDING, panelY + 10, WidgetTheme.TITLE);
             graphics.fill(panelX + PANEL_PADDING, panelY + HEADER_HEIGHT - 6,
-                    panelX + PANEL_WIDTH - PANEL_PADDING, panelY + HEADER_HEIGHT - 5, WidgetTheme.ACCENT_LINE);
+                    panelX + panelWidth - PANEL_PADDING, panelY + HEADER_HEIGHT - 5, WidgetTheme.ACCENT_LINE);
 
             if (names.isEmpty()) {
                 graphics.text(minecraft.font, Component.translatable(BackendSocialClient.statusText()),
@@ -100,9 +103,10 @@ public class SocialScreen extends UiSoundScreen {
                 int rowY = listTop + i * ROW_HEIGHT;
                 String name = names.get(index);
                 var player = PresenceStore.player(name);
-                int buttonX = panelX + PANEL_WIDTH - PANEL_PADDING - BUTTON_WIDTH;
+                int buttonX = panelX + panelWidth - PANEL_PADDING - BUTTON_WIDTH;
+                int configX = buttonX - BUTTON_WIDTH - 6;
                 Component label = playerLabel(name);
-                graphics.enableScissor(rowX, rowY, buttonX - 5, rowY + ROW_HEIGHT);
+                graphics.enableScissor(rowX, rowY, configX - 5, rowY + ROW_HEIGHT);
                 graphics.text(minecraft.font, label, rowX, rowY + 2, WidgetTheme.TEXT_PRIMARY);
                 graphics.disableScissor();
                 boolean hovered = mouseX >= buttonX && mouseX < buttonX + BUTTON_WIDTH && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT - 2;
@@ -111,16 +115,27 @@ public class SocialScreen extends UiSoundScreen {
                 boolean enabled = unavailable == null && !waiting;
                 HudSurface.fillRounded(graphics, buttonX, rowY, BUTTON_WIDTH, ROW_HEIGHT - 2, 3,
                         hovered && enabled ? WidgetTheme.PANEL_BG : WidgetTheme.PANEL_BG_SOFT);
-                graphics.centeredText(minecraft.font, Component.translatable(waiting && name.equals(requestedName)
+                graphics.centeredText(minecraft.font, Component.translatable(waiting && !requestingConfig && name.equals(requestedName)
                         ? "social.froghelper.timers.loading" : "social.froghelper.timers.request"),
                         buttonX + BUTTON_WIDTH / 2, rowY + 2, enabled ? WidgetTheme.TITLE : WidgetTheme.TEXT_MUTED);
                 if (hovered) graphics.setTooltipForNextFrame(minecraft.font, Component.translatable(unavailable != null ? unavailable
                         : waiting ? "social.froghelper.timers.busy" : "social.froghelper.timers.request_hint"), mouseX, mouseY);
-                else if (mouseX >= rowX && mouseX < buttonX - 5 && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT) {
+                else if (mouseX >= rowX && mouseX < configX - 5 && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT) {
                     Component tooltip = player != null && player.protocolBadge()
                             ? Component.translatable("social.froghelper.timers.protocol_hint", player.timerCount()) : label;
                     graphics.setTooltipForNextFrame(minecraft.font, tooltip, mouseX, mouseY);
                 }
+                boolean configHovered = mouseX >= configX && mouseX < configX + BUTTON_WIDTH
+                        && mouseY >= rowY && mouseY < rowY + ROW_HEIGHT - 2;
+                String configUnavailable = BackendSocialClient.configUnavailable(player);
+                boolean configEnabled = configUnavailable == null && !waiting;
+                HudSurface.fillRounded(graphics, configX, rowY, BUTTON_WIDTH, ROW_HEIGHT - 2, 3,
+                        configHovered && configEnabled ? WidgetTheme.PANEL_BG : WidgetTheme.PANEL_BG_SOFT);
+                graphics.centeredText(minecraft.font, Component.translatable(waiting && requestingConfig && name.equals(requestedName)
+                        ? "social.froghelper.timers.loading" : "social.froghelper.config.request"),
+                        configX + BUTTON_WIDTH / 2, rowY + 2, configEnabled ? WidgetTheme.TITLE : WidgetTheme.TEXT_MUTED);
+                if (configHovered) graphics.setTooltipForNextFrame(minecraft.font, Component.translatable(configUnavailable != null
+                        ? configUnavailable : waiting ? "social.froghelper.config.busy" : "social.froghelper.config.request_hint"), mouseX, mouseY);
             }
 
             if (names.size() > visibleRows) {
@@ -131,7 +146,7 @@ public class SocialScreen extends UiSoundScreen {
                 pending = null;
             }
             int footerY = listTop + visibleRows * ROW_HEIGHT + 5;
-            var lines = minecraft.font.split(timerStatus, PANEL_WIDTH - PANEL_PADDING * 2);
+            var lines = minecraft.font.split(timerStatus, panelWidth - PANEL_PADDING * 2);
             for (int i = 0; i < Math.min(2, lines.size()); i++)
                 graphics.text(minecraft.font, lines.get(i), rowX, footerY + i * minecraft.font.lineHeight, WidgetTheme.TEXT_SOFT);
         }
@@ -148,24 +163,27 @@ public class SocialScreen extends UiSoundScreen {
     @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (event.button() != 0) return super.mouseClicked(event, doubleClick);
         layout();
-        int buttonX = panelX + PANEL_WIDTH - PANEL_PADDING - BUTTON_WIDTH;
+        int buttonX = panelX + panelWidth - PANEL_PADDING - BUTTON_WIDTH;
+        int configX = buttonX - BUTTON_WIDTH - 6;
+        boolean configButton = event.x() >= configX && event.x() < configX + BUTTON_WIDTH;
         int row = (int) ((event.y() - panelY - HEADER_HEIGHT) / ROW_HEIGHT);
-        if (event.x() < buttonX || event.x() >= buttonX + BUTTON_WIDTH || event.y() < panelY + HEADER_HEIGHT
+        if ((!configButton && event.x() < buttonX) || event.x() >= buttonX + BUTTON_WIDTH || event.y() < panelY + HEADER_HEIGHT
                 || row < 0 || row >= visibleRows || event.y() >= panelY + HEADER_HEIGHT + row * ROW_HEIGHT + ROW_HEIGHT - 2) return false;
         var names = PresenceStore.knownDisplayNames();
         if (scroll + row >= names.size() || pending != null && !pending.isDone()) return true;
         String name = names.get(scroll + row);
-        String unavailable = BackendSocialClient.timerUnavailable(PresenceStore.player(name));
+        String unavailable = configButton ? BackendSocialClient.configUnavailable(PresenceStore.player(name))
+                : BackendSocialClient.timerUnavailable(PresenceStore.player(name));
         if (unavailable != null) { timerStatus = Component.translatable(unavailable); return true; }
-        requestedName = name;
+        requestedName = name; requestingConfig = configButton;
         timerStatus = Component.translatable("social.froghelper.timers.loading");
         ru.wilyfox.client.audio.UiSounds.click();
-        pending = BackendSocialClient.requestTimers(name);
+        pending = configButton ? BackendSocialClient.requestConfig(name) : BackendSocialClient.requestTimers(name);
         return true;
     }
 
     private void drawScrollbar(GuiGraphicsExtractor graphics, int count, int listTop) {
-        int trackX = panelX + PANEL_WIDTH - 5;
+        int trackX = panelX + panelWidth - 5;
         int trackHeight = visibleRows * ROW_HEIGHT;
         graphics.fill(trackX, listTop, trackX + 2, listTop + trackHeight, WidgetTheme.BAR_BG);
 

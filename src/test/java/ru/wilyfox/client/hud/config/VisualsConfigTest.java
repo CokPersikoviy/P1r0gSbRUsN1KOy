@@ -81,6 +81,21 @@ class VisualsConfigTest {
         assertEquals(0.1, c.fogDistance); assertEquals(1, c.blockRainbowSpeed); assertNotNull(c.hand.off);
         assertEquals(VisualsConfig.Weather.SERVER, c.weather); assertEquals(VisualsConfig.FogMode.DEFAULT, c.fogMode);
     }
+    @Test void freelookMigratesOldDistanceAndKeepsFixedAndRememberedValuesSeparate() {
+        var gson = new Gson();
+        var c = gson.fromJson("{\"camera\":{\"distance\":9.5}}", VisualsConfig.class);
+        c.sanitize();
+        assertTrue(c.camera.rememberDistance);
+        assertEquals(9.5, c.camera.lastDistance.doubleValue());
+        c.camera.rememberDistance = false;
+        c.camera.distance = 6;
+        c.camera.lastDistance = 14d;
+        var saved = gson.fromJson(gson.toJson(c), VisualsConfig.class);
+        saved.sanitize();
+        assertFalse(saved.camera.rememberDistance);
+        assertEquals(6, saved.camera.distance);
+        assertEquals(14, saved.camera.lastDistance.doubleValue());
+    }
     @Test void everyNewGroupRoundTripsWithoutLosingAlphaOrOffHandValues() {
         var c = new VisualsConfig(); c.crosshair.enabled = true; c.crosshair.style = VisualsConfig.CrosshairStyle.X;
         c.crosshair.outlineColor = 0x23112233; c.hitboxes.targets = VisualsConfig.Targets.PLAYERS;

@@ -19,6 +19,12 @@ final class HudSettingsFeatureSections {
             Map<SettingsCategory, List<SettingsComponent>> componentsByCategory,
             Runnable rebuildAutoMessageComponents
     ) {
+        componentsByCategory.get(SettingsCategory.RUNES_BAG_KEYBINDS).add(
+                new DragNumberSettingsComponent(0, 0, 0, 0, "Rune set stats scale %",
+                        () -> ConfigManager.get().runesBag.setEffectOverlayScalePercent,
+                        value -> ConfigManager.get().runesBag.setEffectOverlayScalePercent = value,
+                        50, 300).withFormatter(value -> value + "%")
+        );
         for (int i = 0; i < 7; i++) {
             final int index = i;
             componentsByCategory.get(SettingsCategory.RUNES_BAG_KEYBINDS).add(
@@ -47,6 +53,13 @@ final class HudSettingsFeatureSections {
                         () -> ConfigManager.get().alchemy.autoBrewingCost,
                         value -> ConfigManager.get().alchemy.autoBrewingCost = value
                 )
+        );
+        componentsByCategory.get(SettingsCategory.ALCHEMY).add(
+                new DragNumberSettingsComponent(0, 0, 0, 0, "Auto-brewing cost scale %",
+                        () -> ConfigManager.get().alchemy.autoBrewingCostScalePercent,
+                        value -> ConfigManager.get().alchemy.autoBrewingCostScalePercent = value,
+                        50, 300).withFormatter(value -> value + "%")
+                        .withVisibility(() -> ConfigManager.get().alchemy.autoBrewingCost)
         );
         componentsByCategory.get(SettingsCategory.ALCHEMY).add(new BreakLineSettingsComponent("Recipe alerts"));
         componentsByCategory.get(SettingsCategory.ALCHEMY).add(
@@ -336,6 +349,14 @@ final class HudSettingsFeatureSections {
                         () -> ConfigManager.get().fishing.showPetExperienceOverlay,
                         value -> ConfigManager.get().fishing.showPetExperienceOverlay = value
                 )
+        );
+
+        componentsByCategory.get(SettingsCategory.FISHING).add(
+                new DragNumberSettingsComponent(0, 0, 0, 0, "Fish experience scale %",
+                        () -> ConfigManager.get().fishing.petExperienceOverlayScalePercent,
+                        value -> ConfigManager.get().fishing.petExperienceOverlayScalePercent = value,
+                        50, 300).withFormatter(value -> value + "%")
+                        .withVisibility(() -> ConfigManager.get().fishing.showPetExperienceOverlay)
         );
 
         componentsByCategory.get(SettingsCategory.FISHING).add(

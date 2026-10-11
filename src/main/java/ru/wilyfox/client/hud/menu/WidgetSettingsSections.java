@@ -173,8 +173,16 @@ final class WidgetSettingsSections {
                                 () -> ConfigManager.get().bossWidget.maxLevel,
                                 value -> ConfigManager.get().bossWidget.maxLevel = value,
                                 15, WidgetSettingsSections::bossLevelCeiling, 5
-                        )
+                        ).withVisibility(() -> !ConfigManager.get().bossWidget.matchPlayerLevel)
                 );
+
+                items.add(new ToggleSettingsComponent(0, 0, 0, 0, "Match player level",
+                        () -> ConfigManager.get().bossWidget.matchPlayerLevel,
+                        value -> ConfigManager.get().bossWidget.matchPlayerLevel = value));
+                items.add(new StatusSettingsComponent("Auto max level", () -> {
+                    int level = ru.wilyfox.client.protocol.DiamondWorldProtocolClient.getCurrentLevel();
+                    return level > 0 ? Integer.toString(level) : "Waiting for player level";
+                }).withVisibility(() -> ConfigManager.get().bossWidget.matchPlayerLevel));
 
                 items.add(
                         new ToggleSettingsComponent(

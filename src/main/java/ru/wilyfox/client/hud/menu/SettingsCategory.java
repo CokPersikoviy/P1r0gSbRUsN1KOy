@@ -15,7 +15,8 @@ public enum SettingsCategory {
     VISUALS("Visuals"),
     WIDGET("Widget"),
     RUNES_BAG_KEYBINDS("Runes Bag Keybinds"),
-    CLICKER("Clicker");
+    CLICKER("Clicker"),
+    CONFIGS("Configs");
 
     private final String title;
 

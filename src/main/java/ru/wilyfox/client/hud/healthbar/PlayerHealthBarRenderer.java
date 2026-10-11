@@ -211,10 +211,9 @@ public final class PlayerHealthBarRenderer {
         int accentHeight = Math.max(1, Math.round(ACCENT_HEIGHT * sizeScale));
 
         float opacityMultiplier = config.opacityPercent / 100.0f;
-        int verticalOffset = config.verticalOffset;
-
         int x1 = -barWidth / 2;
-        int y1 = verticalOffset;
+        // Billboard Y points down; a positive setting should raise the entire bar and its label.
+        int y1 = -config.verticalOffset;
         int x2 = x1 + barWidth;
         int y2 = y1 + barHeight;
         int fillWidth = Math.round(barWidth * progress);

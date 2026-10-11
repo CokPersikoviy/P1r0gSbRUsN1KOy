@@ -193,13 +193,13 @@ public final class VisualsExtendedClientTest implements FabricClientGameTest {
         var window = client.getWindow(); boolean focused = window.isFocused(); set(window, "focused", true);
         try {
             var c = ConfigManager.get().visuals.camera; c.enabled = true; c.mode = VisualsConfig.LookMode.HOLD;
+            c.rememberDistance = true; c.distance = 4; c.lastDistance = 4d;
             client.options.setCameraType(CameraType.FIRST_PERSON); float playerYaw = client.player.getYRot();
             VisualsCamera.tick(client, false); VisualsCamera.tick(client, true);
             expect(VisualsCamera.active() && client.options.getCameraType() == CameraType.THIRD_PERSON_BACK, "Hold freelook did not start");
             VisualsCamera.turn(100, 10000);
             expect(VisualsCamera.pitch() == 90 && client.player.getYRot() == playerYaw, "Freelook rotated the player or exceeded pitch limits");
             int selectedSlot = client.player.getInventory().getSelectedSlot();
-            c.distance = 4;
             wheel(client, -1);
             expect(close(VisualsCamera.zoom(4), 4.5f), "Mouse wheel did not increase freelook distance immediately");
             wheel(client, 2);
@@ -210,18 +210,32 @@ public final class VisualsExtendedClientTest implements FabricClientGameTest {
             expect(close(VisualsCamera.zoom(4), 20), "Freelook zoom exceeded its far limit");
             expect(client.player.getInventory().getSelectedSlot() == selectedSlot, "Freelook wheel switched hotbar slots");
             set(window, "focused", false);
-            expect(!VisualsCamera.scroll(client, 1) && c.distance == 20, "Unfocused window changed freelook distance");
+            expect(!VisualsCamera.scroll(client, 1) && close(VisualsCamera.zoom(4), 20), "Unfocused window changed freelook distance");
             set(window, "focused", true);
             client.gui.setScreen(new net.minecraft.client.gui.screens.ChatScreen("", false));
-            expect(!VisualsCamera.scroll(client, 1) && c.distance == 20, "Freelook consumed menu scrolling");
+            expect(!VisualsCamera.scroll(client, 1) && close(VisualsCamera.zoom(4), 20), "Freelook consumed menu scrolling");
             client.gui.setScreen(null);
             VisualsCamera.tick(client, false);
             expect(!VisualsCamera.active() && client.options.getCameraType() == CameraType.FIRST_PERSON, "Freelook did not restore previous perspective");
             expect(!VisualsCamera.scroll(client, 1), "Inactive freelook consumed scrolling");
+            expect(c.lastDistance == 20 && c.distance == 4, "Remembered zoom overwrote the configured start distance");
             c.mode = VisualsConfig.LookMode.TOGGLE; VisualsCamera.tick(client, true); VisualsCamera.tick(client, false);
             expect(VisualsCamera.active(), "Toggle freelook released on key-up");
             wheel(client, 1);
             expect(close(VisualsCamera.zoom(4), 19.5f), "Toggle freelook did not retain or adjust its distance");
+            VisualsCamera.tick(client, true); VisualsCamera.tick(client, false);
+            expect(!VisualsCamera.active() && c.lastDistance == 19.5, "Toggle freelook did not save its final distance");
+            c.rememberDistance = false; c.distance = 6; c.mode = VisualsConfig.LookMode.HOLD;
+            VisualsCamera.tick(client, true);
+            expect(close(VisualsCamera.zoom(4), 6), "Fixed mode did not start at the configured distance");
+            wheel(client, -4);
+            expect(close(VisualsCamera.zoom(4), 8), "Fixed mode could not zoom during freelook");
+            VisualsCamera.tick(client, false); VisualsCamera.tick(client, true);
+            expect(close(VisualsCamera.zoom(4), 6) && c.distance == 6 && c.lastDistance == 19.5,
+                    "Fixed mode retained wheel zoom or overwrote remembered distance");
+            VisualsCamera.tick(client, false); c.rememberDistance = true;
+            VisualsCamera.tick(client, true);
+            expect(close(VisualsCamera.zoom(4), 19.5f), "Remembered mode lost its distance after switching modes");
             c.enabled = false; VisualsCamera.tick(client, false); expect(!VisualsCamera.active(), "Disabled freelook remained active");
         } finally { set(window, "focused", focused); }
     }

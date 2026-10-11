@@ -154,6 +154,14 @@ public final class ChatTabOverlay {
         int emojiButtonX = getEmojiButtonX(minecraft);
 
         if (isOverEmojiButton(mouseX, mouseY, emojiButtonX, screenHeight)) {
+            if (ChatDock.outgoingChannel() == ChatTab.FH) {
+                var current = minecraft.gui.screen();
+                String input = current == null ? "" : current.children().stream()
+                        .filter(child -> child instanceof net.minecraft.client.gui.components.EditBox)
+                        .map(child -> ((net.minecraft.client.gui.components.EditBox) child).getValue()).findFirst().orElse("");
+                minecraft.gui.setScreen(new FhImageAttachScreen(current, input));
+                UiSounds.openClose(); return true;
+            }
             emojiMenuOpen = !emojiMenuOpen;
             UiSounds.openClose();
             return true;
@@ -187,11 +195,13 @@ public final class ChatTabOverlay {
 
         graphics.centeredText(
                 minecraft.font,
-                ":)",
+                ChatDock.outgoingChannel() == ChatTab.FH ? "↑" : ":)",
                 x + EMOJI_BUTTON_WIDTH / 2,
                 y + (TAB_HEIGHT - minecraft.font.lineHeight) / 2,
             textColor
         );
+        if (hovered && ChatDock.outgoingChannel() == ChatTab.FH) graphics.setTooltipForNextFrame(minecraft.font,
+                net.minecraft.network.chat.Component.translatable("froghelper.chat.image_attach"), mouseX, mouseY);
     }
 
     private void renderEmojiMenu(GuiGraphicsExtractor graphics, Minecraft minecraft, int buttonX, int buttonY, int mouseX, int mouseY, int screenWidth, int screenHeight) {

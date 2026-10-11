@@ -305,7 +305,7 @@ public final class AutoBossAnnouncer {
 
     private static void publishBossCapture(BossMessageParser.BossCapture capture) {
         DwBossType type = DiamondWorldProtocolClient.getBossTypeByName(capture.bossName());
-        if (type == null || capture.clanName().isBlank()) {
+        if (type == null || capture.clanName().isBlank() || !ru.wilyfox.client.boss.BossTimerFilter.accepts(type)) {
             return;
         }
 

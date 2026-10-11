@@ -2,6 +2,7 @@ package ru.wilyfox.client.hud.config;
 
 public class FishingConfig {
     public boolean showPetExperienceOverlay = true;
+    public int petExperienceOverlayScalePercent = 100;
     public boolean showFishingMarkers = true;
     public boolean showCastPreview = false;
     public boolean showFishingNibblesWidget = false;

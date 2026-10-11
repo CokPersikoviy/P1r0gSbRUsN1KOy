@@ -8,7 +8,7 @@ public final class ChatMessageSanitizer {
     }
 
     public static String forLogic(String text) {
-        return ModUserBadge.strip(text);
+        return ModUserBadge.strip(text).replace("\uF8FE ", "").replace("\uF8FE", "");
     }
 
     public static Component forLogic(Component component) {

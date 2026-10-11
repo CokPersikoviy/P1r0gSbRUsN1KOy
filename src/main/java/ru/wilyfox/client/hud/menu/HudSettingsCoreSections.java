@@ -16,6 +16,14 @@ final class HudSettingsCoreSections {
     }
 
     static void populate(Map<SettingsCategory, List<SettingsComponent>> sections) {
+        sections.get(SettingsCategory.CONFIGS).add(new StatusSettingsComponent("Active config", () ->
+                ru.wilyfox.client.hud.config.ConfigProfiles.entries().stream()
+                        .filter(entry -> entry.id().equals(ru.wilyfox.client.hud.config.ConfigProfiles.activeId()))
+                        .map(ru.wilyfox.client.hud.config.ConfigProfileStore.Entry::name).findFirst().orElse("Main")));
+        sections.get(SettingsCategory.CONFIGS).add(new ActionSettingsComponent("Select / delete downloaded configs", () -> {
+            var client = net.minecraft.client.Minecraft.getInstance();
+            client.gui.setScreen(new ru.wilyfox.client.hud.config.ConfigProfilesScreen(client.gui.screen()));
+        }));
         populateRender(sections.get(SettingsCategory.RENDER));
         populateWidgets(sections.get(SettingsCategory.WIDGET));
         HudSettingsVisualsSection.populate(sections.get(SettingsCategory.VISUALS));
@@ -64,6 +72,12 @@ final class HudSettingsCoreSections {
                 value -> ConfigManager.get().render.toneDownChat = value);
         toggle(items, "Chat timestamps", () -> ConfigManager.get().render.chatTimestamps,
                 value -> ConfigManager.get().render.chatTimestamps = value);
+        toggle(items, "Collapse repeated messages", () -> ConfigManager.get().render.collapseChatRepeats,
+                value -> {
+                    ConfigManager.get().render.collapseChatRepeats = value;
+                    ru.wilyfox.client.chat.ChatTabManager.getInstance().clearLineCache();
+                    ru.wilyfox.client.chat.ChatTabManager.getInstance().rebuildVanillaChat();
+                });
         items.add(new CycleSettingsComponent<>(0, 0, 0, 0, "Timestamp format",
                 () -> ConfigManager.get().render.timestamp.format, value -> ConfigManager.get().render.timestamp.format = value,
                 ru.wilyfox.client.hud.config.ChatTimestampConfig.Format.values(), ru.wilyfox.client.hud.config.ChatTimestampConfig.Format::label)

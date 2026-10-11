@@ -1,6 +1,5 @@
 package ru.wilyfox.client.rune;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
@@ -8,8 +7,8 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import ru.wilyfox.client.hud.config.WidgetChrome;
-import ru.wilyfox.client.hud.widget.HudSurface;
+import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.widget.InventoryOverlayPanel;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 import ru.wilyfox.utils.Formatting;
 
@@ -142,28 +141,9 @@ public final class RuneSetEffectOverlay {
         return screen instanceof InventoryScreen;
     }
 
-    public static void render(GuiGraphicsExtractor context, int x, int y, OverlayData data) {
-        Minecraft mc = Minecraft.getInstance();
-        int lineHeight = mc.font.lineHeight + 1;
-
-        int maxWidth = mc.font.width(data.title());
-        for (String line : data.lines()) {
-            maxWidth = Math.max(maxWidth, mc.font.width(line));
-        }
-
-        int width = maxWidth + 12;
-        int height = 12 + lineHeight + Math.max(0, data.lines().size()) * lineHeight;
-
-        HudSurface.drawPanel(context, x, y, width, height, WidgetChrome.FROST, HudSurface.nativeRenderer());
-
-        int textY = y + 5;
-        context.text(mc.font, data.title(), x + 6, textY, WidgetTheme.TITLE);
-        textY += lineHeight + 2;
-
-        for (String line : data.lines()) {
-            context.text(mc.font, line, x + 6, textY, WidgetTheme.TEXT_SOFT);
-            textY += lineHeight;
-        }
+    public static void render(GuiGraphicsExtractor context, int rightX, int y, OverlayData data) {
+        InventoryOverlayPanel.render(context, rightX, y, data.title(), data.lines(),
+                ConfigManager.get().runesBag.setEffectOverlayScalePercent, true, index -> WidgetTheme.TEXT_SOFT);
     }
 
     private static String findSelectedSetName(AbstractContainerMenu menu) {

@@ -5,6 +5,9 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class PopUpManagerTest {
+    @org.junit.jupiter.api.BeforeAll
+    static void initializeConfigRuntime() { ru.wilyfox.MinecraftTestBootstrap.initialize(); }
+
     @Test
     void soundIsPublishedOnceAndNeverReplayedByRenderingOrMeasurement() {
         var sounds = new java.util.ArrayList<PopUpRequest>();

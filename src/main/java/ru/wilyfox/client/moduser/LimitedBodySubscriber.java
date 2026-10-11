@@ -12,6 +12,9 @@ final class LimitedBodySubscriber implements HttpResponse.BodySubscriber<byte[]>
     private Flow.Subscription subscription;
     private int received;
     private boolean failed;
+    private final int limit;
+    LimitedBodySubscriber() { this(SocialWire.MAX_MESSAGE_SIZE); }
+    LimitedBodySubscriber(int limit) { this.limit = limit; }
 
     @Override public CompletionStage<byte[]> getBody() { return delegate.getBody(); }
     @Override public void onSubscribe(Flow.Subscription subscription) {
@@ -21,7 +24,7 @@ final class LimitedBodySubscriber implements HttpResponse.BodySubscriber<byte[]>
     @Override public void onNext(List<ByteBuffer> buffers) {
         if (failed) return;
         for (ByteBuffer buffer : buffers) {
-            if (buffer.remaining() > SocialWire.MAX_MESSAGE_SIZE - received) {
+            if (buffer.remaining() > limit - received) {
                 failed = true;
                 subscription.cancel();
                 delegate.onError(new IllegalArgumentException("Response exceeds size limit"));

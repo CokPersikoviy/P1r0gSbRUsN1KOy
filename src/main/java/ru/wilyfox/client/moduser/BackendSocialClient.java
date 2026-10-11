@@ -56,6 +56,7 @@ public final class BackendSocialClient {
     private boolean timerSharing;
     private boolean chatSharing;
     private final BackendChatClient chat;
+    private final BackendConfigClient configs;
     private CompletableFuture<?> timerPublish, timerDownload;
     private CompletableFuture<net.minecraft.network.chat.Component> timerResult;
     private SocialWire.TimerUpload sentTimers;
@@ -75,6 +76,7 @@ public final class BackendSocialClient {
         }
         this.backend = backend;
         this.chat = new BackendChatClient(backend, HTTP);
+        this.configs = new BackendConfigClient(backend, HTTP, () -> failed(generation, false));
     }
 
     public static void init() {
@@ -114,6 +116,19 @@ public final class BackendSocialClient {
     public record DebugSnapshot(int bufferedCharacters, int connected, int requestPending) {}
     private record PendingRoster(long generation, List<SocialWire.Player> players, boolean timerSharing, boolean chatSharing, long receivedAt) {}
     public static void sendChat(String text) { DEFAULT.chat.send(text, DEFAULT.accessToken); }
+    public static void sendChatImage(Path path, String text) { DEFAULT.chat.sendImage(path, text, DEFAULT.accessToken); }
+    public static CompletableFuture<byte[]> downloadChatImage(long id, String attachment) {
+        var client = DEFAULT;
+        if (!diagnosticAuthorizationReady() || id <= 0 || attachment == null || !attachment.matches("0|[0-9]{17,20}"))
+            return CompletableFuture.failedFuture(new IOException("FH image unavailable"));
+        long attempt = client.generation;
+        var request = HttpRequest.newBuilder(client.backend.resolve("/v1/chat/" + id + "/image/" + attachment))
+                .timeout(Duration.ofSeconds(30)).header("Authorization", "Bearer " + client.accessToken).GET().build();
+        return HTTP.sendAsync(request, ignored -> new LimitedBodySubscriber(ru.wilyfox.client.chat.FhImages.MAX_BYTES)).thenApply(response -> {
+            if (attempt != client.generation || response.statusCode() != 200) throw new java.util.concurrent.CompletionException(new IOException("FH image unavailable"));
+            return response.body();
+        });
+    }
     public static void requestOlderChat() { DEFAULT.chat.older(); }
 
     void tick(Minecraft client) {
@@ -149,6 +164,7 @@ public final class BackendSocialClient {
         if (socket != null) sendMetadata(now);
         if (socket != null && timerSharing) publishTimers(now);
         chat.tick(socket != null && chatSharing, accessToken, client.player.getGameProfile().name());
+        configs.tick(socket != null, accessToken);
         if (now >= retryAt) rejectedToken = null;
         if (socket == null && request == null && now >= retryAt && !Objects.equals(token, rejectedToken)) {
             login(client.player.getGameProfile().name());
@@ -156,6 +172,7 @@ public final class BackendSocialClient {
     }
 
     void reset() {
+        configs.reset();
         generation++;
         if (socket != null) socket.abort();
         if (request != null) request.cancel(true);
@@ -226,7 +243,7 @@ public final class BackendSocialClient {
                     expiresAt = session.expiresAt() * 1_000;
                     accessToken = session.accessToken();
                     URI uri = URI.create(("https".equals(backend.getScheme()) ? "wss://" : "ws://") + backend.getAuthority() + "/v1/presence?scope="
-                            + URLEncoder.encode(expectedScope, StandardCharsets.UTF_8) + "&chat=1");
+                            + URLEncoder.encode(expectedScope, StandardCharsets.UTF_8) + "&chat=1&media=1");
                     requestStartedAt = System.currentTimeMillis();
                     var opening = HTTP.newWebSocketBuilder().connectTimeout(Duration.ofSeconds(10))
                             .header("Authorization", "Bearer " + session.accessToken())
@@ -310,6 +327,21 @@ public final class BackendSocialClient {
         if (player.timerCount() == 0) return "social.froghelper.timers.empty";
         if (client.socket == null || client.accessToken == null) return "social.froghelper.unavailable";
         return null;
+    }
+
+    static String configUnavailable(SocialWire.Player player) {
+        if (player == null || player.configAvailable() == null) return "social.froghelper.config.backend_old";
+        if (player.name().equalsIgnoreCase(Minecraft.getInstance().player == null ? "" : Minecraft.getInstance().player.getGameProfile().name()))
+            return "social.froghelper.config.self";
+        if (!player.configAvailable()) return "social.froghelper.config.unavailable";
+        if (DEFAULT.socket == null || DEFAULT.accessToken == null) return "social.froghelper.unavailable";
+        return null;
+    }
+    public static CompletableFuture<net.minecraft.network.chat.Component> requestConfig(String name) {
+        var player = PresenceStore.player(name);
+        String unavailable = configUnavailable(player);
+        if (unavailable != null) return CompletableFuture.completedFuture(net.minecraft.network.chat.Component.translatable(unavailable));
+        return DEFAULT.configs.download(player, DEFAULT.accessToken);
     }
 
     public static CompletableFuture<net.minecraft.network.chat.Component> requestTimers(String name) {

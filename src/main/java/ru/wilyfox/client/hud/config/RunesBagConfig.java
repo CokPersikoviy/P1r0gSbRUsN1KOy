@@ -9,6 +9,8 @@ import org.lwjgl.glfw.GLFW;
  * globally. These are only consulted inside the rune-bag screen, so they never collide with gameplay.
  */
 public class RunesBagConfig {
+    public int setEffectOverlayScalePercent = 100;
+
     /**
      * A selector bind stored as a mouse button is encoded as {@code MOUSE_CODE_OFFSET + glfwButton}.
      * GLFW keycodes top out around {@code GLFW_KEY_LAST} (348), so this offset never collides with a

@@ -141,6 +141,7 @@ public class Client {
         ru.wilyfox.client.resource.AccountRewardTimerTracker.INSTANCE.register();
         EstimatedTpsMonitor.register();
         KeyBinds.register();
+        ru.wilyfox.client.hud.config.ConfigProfiles.register();
         ru.wilyfox.client.visuals.VisualsCamera.register();
         RuneSetSwitcher.register();
         Clicker.register();

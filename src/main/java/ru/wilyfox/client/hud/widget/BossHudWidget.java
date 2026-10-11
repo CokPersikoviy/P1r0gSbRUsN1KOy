@@ -18,7 +18,7 @@ import ru.wilyfox.client.hud.HudEditingScreen;
 import ru.wilyfox.client.hud.internal.HudFrameClock;
 import ru.wilyfox.utils.MouseUtils;
 import ru.wilyfox.client.hud.config.BossTimerSourceMode;
-import ru.wilyfox.client.boss.BossBlacklist;
+import ru.wilyfox.client.boss.BossTimerFilter;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
@@ -41,7 +41,6 @@ public class BossHudWidget extends AbstractWidget {
     /** Prefixed to bosses the clan currently holds (captured / location busy). */
     private static final String CAPTURE_MARKER = "✗ ";
     /** Event boss (not a real respawn timer) — never listed in the boss timer. */
-    private static final String EXCLUDED_BOSS = ru.wilyfox.utils.BossName.identityKey("древний страж");
     private static final int PADDING_X = 6;
     private static final int PADDING_Y = 5;
     private static final int LINE_GAP = 1;
@@ -434,8 +433,7 @@ public class BossHudWidget extends AbstractWidget {
 
     private List<BossInfo> computeVisibleBosses() {
         int maxBosses = ConfigManager.get().bossWidget.maxBosses;
-        int minLevel = ConfigManager.get().bossWidget.minLevel;
-        int maxLevel = ConfigManager.get().bossWidget.maxLevel;
+        int playerLevel = DiamondWorldProtocolClient.getCurrentLevel();
         BossTimerSourceMode sourceMode = ConfigManager.get().bossWidget.sourceMode;
 
         List<BossInfo> result = new ArrayList<>();
@@ -447,11 +445,7 @@ public class BossHudWidget extends AbstractWidget {
         };
 
         for (BossInfo boss : source) {
-            if (BossBlacklist.isBlocked(boss) || isExcludedBoss(boss)) {
-                continue;
-            }
-
-            if (boss.getLevel() < minLevel || boss.getLevel() > maxLevel) {
+            if (!BossTimerFilter.accepts(boss, playerLevel)) {
                 continue;
             }
 
@@ -524,10 +518,6 @@ public class BossHudWidget extends AbstractWidget {
         context.pose().scale(iconScale, iconScale);
         WidgetUtils.drawItemIcon(context, stack, 0, 0);
         context.pose().popMatrix();
-    }
-
-    private static boolean isExcludedBoss(BossInfo boss) {
-        return boss.getIdentityKey().contains(EXCLUDED_BOSS);
     }
 
     private String bossStatusPrefix(BossInfo boss) {

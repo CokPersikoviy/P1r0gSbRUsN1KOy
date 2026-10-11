@@ -46,6 +46,8 @@ public final class MainWidgetLayoutClientTest implements FabricClientGameTest {
             context.waitTicks(3);
             context.takeScreenshot("widgets-main-layout-empty");
             context.runOnClient(client -> {
+                renderer.onMousePressed(25, 45, 0);
+                "boss timers".codePoints().forEach(codePoint -> renderer.onCharTyped(codePoint, 0));
                 renderer.onMousePressed(132, 72, 0);
                 Widget boss = find(renderer, "BossHudWidget");
                 expect(renderer.isWidgetAdded(boss), "Sidebar add must insert the widget");
@@ -100,6 +102,7 @@ public final class MainWidgetLayoutClientTest implements FabricClientGameTest {
                 expect(boss.getStartX() == x + 11 && boss.getStartY() == y + 13, "Re-add must preserve placement");
 
                 renderer.onMousePressed(25, 45, 0);
+                renderer.onKeyPressed(GLFW.GLFW_KEY_BACKSPACE, 0, GLFW.GLFW_MOD_CONTROL);
                 for (int codePoint : "quests".codePoints().toArray()) renderer.onCharTyped(codePoint, 0);
                 renderer.onMousePressed(132, 72, 0);
                 Widget quests = find(renderer, "FishingQuestsWidget");
@@ -200,6 +203,28 @@ public final class MainWidgetLayoutClientTest implements FabricClientGameTest {
             context.takeScreenshot("widgets-sidebar-counter");
             context.runOnClient(client -> {
                 var library = new ru.wilyfox.client.hud.internal.HudWidgetSidebar(renderer);
+                library.contains(8, 8);
+                ConfigManager.get().widgetListSort = ru.wilyfox.client.hud.config.WidgetListSort.ALPHABETICAL;
+                var cycle = (ru.wilyfox.client.hud.menu.SettingsComponent) field(library, "sortCycle");
+                library.mousePressed(cycle.getX() + 5, cycle.getY() + 5, 0);
+                expect(ConfigManager.get().widgetListSort == ru.wilyfox.client.hud.config.WidgetListSort.ACTIVE_FIRST,
+                        "LMB must cycle widget sorting forward without opening layout selector");
+                library.mouseScrolled(25, 90, 0);
+                Widget boss = find(renderer, "BossHudWidget");
+                expect(((java.util.List<?>) field(library, "filtered")).getFirst() == boss, "Active sorting did not bring the added widget first");
+                renderer.removeWidget(boss);
+                library.mouseScrolled(25, 90, 0);
+                expect(((java.util.List<?>) field(library, "filtered")).getFirst() != boss, "Removing a widget did not refresh active sorting");
+                renderer.addWidget(boss);
+                library.mousePressed(cycle.getX() + 5, cycle.getY() + 5, 1);
+                library.mousePressed(cycle.getX() + 5, cycle.getY() + 5, 1);
+                expect(ConfigManager.get().widgetListSort == ru.wilyfox.client.hud.config.WidgetListSort.INACTIVE_FIRST,
+                        "RMB must cycle widget sorting backward");
+                library.mouseScrolled(25, 90, 0);
+                expect(((java.util.List<?>) field(library, "filtered")).getLast() == boss, "Inactive sorting did not move the added widget last");
+                library.mousePressed(cycle.getX() + 5, cycle.getY() + 5, 0);
+                library.mousePressed(25, 45, 0);
+                "boss timers".codePoints().forEach(library::charTyped);
                 library.mousePressed(90, 72, 1);
                 expect(renderer.isSettingsOpen() && renderer.getSelectedWidget() == find(renderer, "BossHudWidget"),
                         "RMB in the library must open settings for a covered widget");
@@ -230,6 +255,7 @@ public final class MainWidgetLayoutClientTest implements FabricClientGameTest {
                 ConfigManager.get().widgetLayouts = original.widgetLayouts;
                 ConfigManager.get().lastWindowWidth = original.lastWindowWidth;
                 ConfigManager.get().lastWindowHeight = original.lastWindowHeight;
+                ConfigManager.get().widgetListSort = original.widgetListSort;
                 client.options.guiScale().set(oldScale);
                 client.getWindow().setWindowed(oldWidth, oldHeight);
                 client.resizeGui();

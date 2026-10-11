@@ -46,6 +46,12 @@ public final class HudSurface {
     }
 
     public static void drawPanel(GuiGraphicsExtractor context, int x, int y, int w, int h, WidgetChrome chrome, boolean useNative) {
+        drawPanel(context, x, y, w, h, chrome, useNative, false);
+    }
+
+    /** Inventory blur replaces the already shaded world, so its backdrop needs the menu shade again. */
+    public static void drawPanel(GuiGraphicsExtractor context, int x, int y, int w, int h, WidgetChrome chrome,
+                                 boolean useNative, boolean inventoryBackdrop) {
         if (chrome == WidgetChrome.BARE || w <= 0 || h <= 0
                 || ru.wilyfox.client.hud.internal.WidgetRenderScope.backgroundAlpha() <= 0
                 || ru.wilyfox.client.hud.internal.WidgetRenderScope.alpha() <= 0) {
@@ -65,10 +71,14 @@ public final class HudSurface {
 
             // Frosted glass: composite the blurred backdrop first, then pick the tint from whether the
             // blur actually landed this frame (light tint over live blur, heavier flat tint otherwise).
-            if (chrome == WidgetChrome.FROST) {
-                HudBlur.blurBehind(context, x, y, w, h, WidgetMetrics.RADIUS);
-            }
+            boolean blurred = chrome == WidgetChrome.FROST
+                    && HudBlur.blurBehindIfAvailable(context, x, y, w, h, WidgetMetrics.RADIUS);
             fillRoundedSmooth(context, x, y, w, h, WidgetMetrics.RADIUS, panelTint(chrome, false));
+            if (blurred && inventoryBackdrop) {
+                var window = net.minecraft.client.Minecraft.getInstance().gameRenderer.gameRenderState().windowRenderState;
+                RoundedPanelRenderState.menuShade(context, x, y, w, h, WidgetMetrics.RADIUS,
+                        (float) window.height / window.guiScale);
+            }
             // One thin lit line along the top — the theme accent colour, not a hardcoded white.
             context.fill(x + WidgetMetrics.RADIUS, y, x + w - WidgetMetrics.RADIUS, y + 1, accent);
         }

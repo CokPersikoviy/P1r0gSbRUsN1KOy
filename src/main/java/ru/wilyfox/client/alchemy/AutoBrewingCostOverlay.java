@@ -1,6 +1,5 @@
 package ru.wilyfox.client.alchemy;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
@@ -10,8 +9,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import ru.wilyfox.client.hud.config.ConfigManager;
-import ru.wilyfox.client.hud.config.WidgetChrome;
-import ru.wilyfox.client.hud.widget.HudSurface;
+import ru.wilyfox.client.hud.widget.InventoryOverlayPanel;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 import java.util.ArrayList;
@@ -49,23 +47,8 @@ public final class AutoBrewingCostOverlay {
     }
 
     public static void render(GuiGraphicsExtractor context, int x, int y, OverlayData data) {
-        Minecraft minecraft = Minecraft.getInstance();
-        int lineHeight = minecraft.font.lineHeight + 1;
-        int width = minecraft.font.width(data.title());
-        for (String line : data.lines()) {
-            width = Math.max(width, minecraft.font.width(line));
-        }
-        width += 12;
-        int height = 12 + lineHeight + data.lines().size() * lineHeight;
-
-        HudSurface.drawPanel(context, x, y, width, height, WidgetChrome.FROST, HudSurface.nativeRenderer());
-        int textY = y + 5;
-        context.text(minecraft.font, data.title(), x + 6, textY, WidgetTheme.TITLE);
-        textY += lineHeight + 2;
-        for (String line : data.lines()) {
-            context.text(minecraft.font, line, x + 6, textY, WidgetTheme.TEXT_SOFT);
-            textY += lineHeight;
-        }
+        InventoryOverlayPanel.render(context, x, y, data.title(), data.lines(),
+                ConfigManager.get().alchemy.autoBrewingCostScalePercent, false, index -> WidgetTheme.TEXT_SOFT);
     }
 
     static int getPotionsBrewed(int currentPrice) {

@@ -1084,6 +1084,17 @@ public class HudRenderer {
         UiSounds.click();
     }
 
+    public void refreshConfiguration() {
+        clearUndoHistory();
+        settingsPanel.clearWidget();
+        selectedLayout = HudLayoutResolver.MAIN;
+        reconcileChatWidgets();
+        layoutAnimation.clear();
+        appliedConfig = null;
+        refreshLayout();
+        settingsPanel.rebuildAfterUndo(widgets, selectedLayout);
+    }
+
     private void reconcileChatWidgets() {
         for (Widget widget : List.copyOf(registeredWidgets)) {
             String key = widgetKey(widget);

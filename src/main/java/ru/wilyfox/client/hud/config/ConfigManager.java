@@ -58,6 +58,7 @@ public class ConfigManager {
 
         try {
             AtomicFileWriter.write(CONFIG_PATH, writer -> GSON.toJson(CONFIG, writer));
+            ConfigProfiles.saveIfReady();
         } catch (IOException | JsonIOException exception) {
             error(LOGGER, "Failed to save FrogHelper config to {}", CONFIG_PATH, exception);
         }

@@ -192,6 +192,7 @@ final class HudSettingsVisualsSection {
         r.add(toggle("Freelook", () -> c().camera.enabled, v -> c().camera.enabled = v));
         r.add(bind("Freelook key", () -> c().camera.key, v -> c().camera.key = v, () -> c().camera.modifiers, v -> c().camera.modifiers = v));
         r.add(cycle("Key mode", () -> c().camera.mode, v -> c().camera.mode = v, VisualsConfig.LookMode.values()));
+        r.add(toggle("Remember last distance", () -> c().camera.rememberDistance, v -> c().camera.rememberDistance = v));
         r.add(decimal("Freelook distance", () -> c().camera.distance, v -> c().camera.distance = v, 0.5, 20));
         r.add(toggle("Front view", () -> c().camera.frontView, v -> c().camera.frontView = v));
         r.add(toggle("Invert pitch", () -> c().camera.invertPitch, v -> c().camera.invertPitch = v));

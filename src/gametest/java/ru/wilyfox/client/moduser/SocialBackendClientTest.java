@@ -263,8 +263,9 @@ public final class SocialBackendClientTest implements FabricClientGameTest {
                 try {
                     var x = SocialScreen.class.getDeclaredField("panelX"); x.setAccessible(true);
                     var y = SocialScreen.class.getDeclaredField("panelY"); y.setAccessible(true);
+                    var w = SocialScreen.class.getDeclaredField("panelWidth"); w.setAccessible(true);
                     int row = PresenceStore.knownDisplayNames().indexOf("TimerSource");
-                    var event = new net.minecraft.client.input.MouseButtonEvent(x.getInt(screen) + 300, y.getInt(screen) + 40 + row * 16,
+                    var event = new net.minecraft.client.input.MouseButtonEvent(x.getInt(screen) + w.getInt(screen) - 46, y.getInt(screen) + 40 + row * 16,
                             new net.minecraft.client.input.MouseButtonInfo(0, 0));
                     if (!screen.mouseClicked(event, false)) throw new AssertionError("Timer button click was not handled");
                     var pending = SocialScreen.class.getDeclaredField("pending"); pending.setAccessible(true);

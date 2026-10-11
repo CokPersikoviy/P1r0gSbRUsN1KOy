@@ -63,7 +63,7 @@ public final class ChatWidgetView {
         if (!filter.equals(normalized)) { filter = normalized; reset(); }
     }
     private boolean matches(ChatMessageEntry entry) {
-        return (query.isEmpty() || entry.searchText().contains(query)) && (filter.isEmpty() || entry.searchText().contains(filter))
+        return store.isDisplayMessage(entry.message()) && (query.isEmpty() || entry.searchText().contains(query)) && (filter.isEmpty() || entry.searchText().contains(filter))
                 && store.routesTo(windowKey, entry);
     }
     public void scroll(int delta) {

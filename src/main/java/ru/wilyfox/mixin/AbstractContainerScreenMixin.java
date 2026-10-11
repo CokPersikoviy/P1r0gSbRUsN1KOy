@@ -122,11 +122,6 @@ public abstract class AbstractContainerScreenMixin {
             RuneSetEffectOverlay.OverlayData data = RuneSetEffectOverlay.collect(menu);
             if (data != null) {
                 int panelX = leftPos - 8;
-                int widestLine = Minecraft.getInstance().font.width(data.title());
-                for (String line : data.lines()) {
-                    widestLine = Math.max(widestLine, Minecraft.getInstance().font.width(line));
-                }
-                panelX -= widestLine + 12;
                 int panelY = topPos + 8;
 
                 HudBlur.beginFrame(context); // container screen: capture here for the frosted plate's blur

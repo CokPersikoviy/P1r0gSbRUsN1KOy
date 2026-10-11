@@ -55,13 +55,13 @@ final class BackendChatClient {
         if (initial && !catchingUp && !olderRequested && !resync && store.getActiveTab() != ChatTab.FH) return;
         boolean older = initial && !catchingUp && olderRequested;
         olderRequested = false;
-        String query = older ? "?before=" + oldest : initial && cursor > 0 ? "?after=" + cursor : "";
+        String query = "?media=1" + (older ? "&before=" + oldest : initial && cursor > 0 ? "&after=" + cursor : "");
         long attempt = generation;
         var request = HttpRequest.newBuilder(backend.resolve("/v1/chat" + query)).timeout(Duration.ofSeconds(8))
                 .header("Authorization", "Bearer " + bearer).GET().build();
         nextRead = now + 10_000;
         lastRead = now;
-        reading = http.sendAsync(request, ignored -> new LimitedBodySubscriber()).whenComplete((response, error) ->
+        reading = http.sendAsync(request, ignored -> new LimitedBodySubscriber(512 * 1024)).whenComplete((response, error) ->
                 Minecraft.getInstance().execute(() -> {
                     if (attempt != generation) return;
                     reading = null;
@@ -117,6 +117,39 @@ final class BackendChatClient {
                         feedback("froghelper.chat.fh_failed");
                     }
                 }));
+    }
+    void sendImage(java.nio.file.Path path, String input, String bearer) {
+        String text = input == null ? "" : input.strip();
+        if (!enabled || bearer == null) { feedback("froghelper.chat.fh_unavailable"); return; }
+        if (sending != null || System.currentTimeMillis() < nextSend) { feedback("froghelper.chat.fh_busy"); return; }
+        if (!text.isEmpty()) {
+            try { new BackendChatMessage(1, "Player", text, System.currentTimeMillis()).validate(); }
+            catch (IllegalArgumentException invalid) { feedback("froghelper.chat.fh_invalid"); return; }
+        }
+        long attempt = generation;
+        nextSend = System.currentTimeMillis() + 3100;
+        String nonce = UUID.randomUUID().toString();
+        sending = ru.wilyfox.client.chat.FhImages.supply(() -> {
+            try { return ru.wilyfox.client.chat.FhImages.read(path); }
+            catch (java.io.IOException | RuntimeException error) { throw new java.util.concurrent.CompletionException(error); }
+        }).thenCompose(bytes -> {
+            if (attempt != generation) return CompletableFuture.<HttpResponse<byte[]>>failedFuture(new IllegalStateException("Session changed"));
+            var request = HttpRequest.newBuilder(backend.resolve("/v1/chat/image?nonce=" + nonce + "&text="
+                            + java.net.URLEncoder.encode(text, StandardCharsets.UTF_8))).timeout(Duration.ofSeconds(45))
+                    .header("Authorization", "Bearer " + bearer).header("Content-Type", "application/octet-stream")
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(bytes)).build();
+            return http.sendAsync(request, ignored -> new LimitedBodySubscriber());
+        }).whenComplete((response, error) -> Minecraft.getInstance().execute(() -> {
+            if (attempt != generation) return;
+            sending = null;
+            try {
+                if (error != null || response.statusCode() != 200) { feedback("froghelper.chat.image_send_failed"); return; }
+                var message = SocialWire.JSON.fromJson(new String(response.body(), StandardCharsets.UTF_8), BackendChatMessage.class);
+                message.validateAt(SocialWire.responseTime(response.headers(), System.currentTimeMillis()));
+                ChatTabManager.getInstance().acceptBackendMessages(List.of(message), true); changed(message.id()); nextRead = 0;
+                feedback("froghelper.chat.image_sent");
+            } catch (RuntimeException invalid) { feedback("froghelper.chat.image_send_failed"); }
+        }));
     }
     private static void feedback(String key) { Minecraft.getInstance().gui.hud.setOverlayMessage(Component.translatable(key), false); }
 }

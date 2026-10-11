@@ -5,6 +5,7 @@ public class AlchemyConfig {
     public int recipeActionLeadMillis = 1_000;
     public boolean recipeActionSound = false;
     public boolean autoBrewingCost = true;
+    public int autoBrewingCostScalePercent = 100;
     public boolean potionsInTab = true;
     public boolean potionExpirationChat = false;
 }

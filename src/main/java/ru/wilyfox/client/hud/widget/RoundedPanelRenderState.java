@@ -30,10 +30,11 @@ public final class RoundedPanelRenderState implements GuiElementRenderState {
     private final boolean textured;
     private final float guiWidth;
     private final float guiHeight;
+    private final boolean menuGradient;
 
     private RoundedPanelRenderState(ColoredRectangleRenderState template, TextureSetup textureSetup,
                                     int x, int y, int width, int height, int radius, int color,
-                                    boolean textured, float guiWidth, float guiHeight) {
+                                    boolean textured, float guiWidth, float guiHeight, boolean menuGradient) {
         // The sentinel rectangle already owns a snapshot, rather than the mutable pose stack.
         this.pose = template.pose();
         this.scissor = template.scissorArea();
@@ -49,6 +50,7 @@ public final class RoundedPanelRenderState implements GuiElementRenderState {
         this.textured = textured;
         this.guiWidth = guiWidth;
         this.guiHeight = guiHeight;
+        this.menuGradient = menuGradient;
     }
 
     public static void fill(GuiGraphicsExtractor context, int x, int y, int width, int height, int radius, int color) {
@@ -57,7 +59,7 @@ public final class RoundedPanelRenderState implements GuiElementRenderState {
         }
         ((GuiElementSubmitter) context).froghelper$submit(x, y, width, height,
                 template -> new RoundedPanelRenderState(template, TextureSetup.noTexture(),
-                        x, y, width, height, radius, color, false, 1, 1));
+                        x, y, width, height, radius, color, false, 1, 1, false));
     }
 
     public static void blit(GuiGraphicsExtractor context, GpuTextureView texture, GpuSampler sampler,
@@ -67,7 +69,15 @@ public final class RoundedPanelRenderState implements GuiElementRenderState {
         }
         ((GuiElementSubmitter) context).froghelper$submit(x, y, width, height,
                 template -> new RoundedPanelRenderState(template, TextureSetup.singleTexture(texture, sampler),
-                        x, y, width, height, radius, -1, true, guiWidth, guiHeight));
+                        x, y, width, height, radius, -1, true, guiWidth, guiHeight, false));
+    }
+
+    /** Same C0101010→D0101010 gradient as Screen.extractTransparentBackground, clipped to the plate. */
+    public static void menuShade(GuiGraphicsExtractor context, int x, int y, int width, int height, int radius, float guiHeight) {
+        if (width <= 0 || height <= 0 || guiHeight <= 0) return;
+        ((GuiElementSubmitter) context).froghelper$submit(x, y, width, height,
+                template -> new RoundedPanelRenderState(template, TextureSetup.noTexture(),
+                        x, y, width, height, radius, -1, false, 1, guiHeight, true));
     }
 
     @Override
@@ -126,6 +136,13 @@ public final class RoundedPanelRenderState implements GuiElementRenderState {
     }
 
     private void vertex(VertexConsumer vertices, float x, float y, int color) {
+        if (menuGradient) {
+            float screenY = pose.m01() * x + pose.m11() * y + pose.m21();
+            float gradientAlpha = 192 + 16 * Math.clamp(screenY / guiHeight, 0f, 1f);
+            // Preserve antialias coverage at rounded edges while sampling in screen coordinates.
+            int alpha = Math.round(gradientAlpha * (color >>> 24) / 255f);
+            color = (alpha << 24) | 0x101010;
+        }
         vertices.addVertexWith2DPose(pose, x, y).setColor(color);
         if (textured) {
             float screenX = pose.m00() * x + pose.m10() * y + pose.m20();

@@ -108,12 +108,16 @@ public class VisualsConfig {
     }
     public static class Camera {
         public boolean enabled, distanceEnabled, invertPitch, frontView;
+        public boolean rememberDistance = true;
         public int key = -1, modifiers;
         public LookMode mode = LookMode.HOLD;
         public double distance = 4, thirdPersonDistance = 4;
+        // Missing in older configs: adopt their previously selected distance on migration.
+        public Double lastDistance;
         void sanitize() {
             modifiers &= 7; key = bind(key); if (mode == null) mode = LookMode.HOLD;
             distance = number(distance, 0.5, 20, 4); thirdPersonDistance = number(thirdPersonDistance, 0.5, 20, 4);
+            lastDistance = lastDistance == null ? distance : number(lastDistance, 0.5, 20, distance);
         }
     }
     public static class Tab {

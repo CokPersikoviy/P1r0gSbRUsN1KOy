@@ -6,12 +6,16 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.lwjgl.glfw.GLFW;
 import ru.wilyfox.client.hud.HudRenderer;
 import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.WidgetListSort;
+import ru.wilyfox.client.hud.menu.CycleSettingsComponent;
+import net.minecraft.network.chat.Component;
 import ru.wilyfox.client.hud.widget.HudSurface;
 import ru.wilyfox.client.hud.widget.Widget;
 import ru.wilyfox.client.hud.widget.WidgetTheme;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Comparator;
 
 /** Editor-only widget library. It never changes the coordinate system of the saved HUD. */
 public final class HudWidgetSidebar {
@@ -26,8 +30,27 @@ public final class HudWidgetSidebar {
     private String search = "";
     private List<Widget> filtered = List.of();
     private long cachedRevision = -1;
+    private long cachedLayoutRevision = -1;
+    private WidgetListSort cachedSort;
     private int scroll;
     private int width = 180, height = 220;
+    private final CycleSettingsComponent<WidgetListSort> sortCycle = new CycleSettingsComponent<>(
+            0, 0, 39, 20, "", () -> ConfigManager.get().widgetListSort,
+            value -> { ConfigManager.get().widgetListSort = value; invalidateSearch(); },
+            WidgetListSort.values(), value -> value.label) {
+        @Override public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+            var font = Minecraft.getInstance().font;
+            boolean hovered = isHovered(mouseX, mouseY);
+            HudSurface.fillRounded(graphics, x, y, width, height, 3,
+                    hovered ? WidgetTheme.PANEL_BG : WidgetTheme.PANEL_BG_SOFT);
+            graphics.centeredText(font, ConfigManager.get().widgetListSort.label + " >",
+                    x + width / 2, y + (height - font.lineHeight) / 2, WidgetTheme.TITLE);
+            if (hovered) graphics.setTooltipForNextFrame(font,
+                    Component.translatable(ConfigManager.get().widgetListSort.translationKey)
+                            .append(Component.literal("\n"))
+                            .append(Component.translatable("froghelper.widgets.sort.controls")), mouseX, mouseY);
+        }
+    };
 
     public HudWidgetSidebar(HudRenderer renderer) { this.renderer = renderer; }
 
@@ -54,7 +77,8 @@ public final class HudWidgetSidebar {
         }
 
         HudSurface.fillRounded(graphics, X, Y, width, height, 6, WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0xF2));
-        graphics.text(font, fit(renderer.getSelectedLayoutName(), width - 62), X + 10, Y + 10, WidgetTheme.TITLE);
+        graphics.text(font, fit(renderer.getSelectedLayoutName(), width - 102), X + 10, Y + 10, WidgetTheme.TITLE);
+        sortCycle.render(graphics, (int) mouseX, (int) mouseY);
         if (!renderer.getSelectedLayout().isEmpty()) graphics.text(font, "...", X + width - 42, Y + 10, WidgetTheme.TEXT_ACCENT);
         graphics.text(font, "<", X + width - 17, Y + 10, WidgetTheme.TEXT_SOFT);
         if (layoutMenu) {
@@ -145,6 +169,12 @@ public final class HudWidgetSidebar {
     }
 
     public boolean mousePressed(double x, double y, int button) {
+        refreshBounds();
+        if (contains(x, y) && !collapsed && sortCycle.mouseClicked(x, y, button)) {
+            searchFocused = false;
+            UiSounds.toggle();
+            return true;
+        }
         if (layoutMenu) {
             int top = Y + 26;
             if (button == 0 && x >= X + 4 && x < X + width - 4 && y >= top + 4 && y < top + layoutMenuHeight() - 4) {
@@ -245,12 +275,21 @@ public final class HudWidgetSidebar {
     private void invalidateSearch() { cachedRevision = -1; scroll = 0; }
 
     private void refreshWidgets() {
-        if (cachedRevision == renderer.getWidgetRegistryRevision()) return;
+        WidgetListSort sort = ConfigManager.get().widgetListSort;
+        if (cachedRevision == renderer.getWidgetRegistryRevision()
+                && cachedLayoutRevision == ConfigManager.getLayoutRevision() && cachedSort == sort) return;
         String query = search.toLowerCase(Locale.ROOT).strip();
+        Comparator<Widget> order = Comparator.comparing(Widget::getDisplayName, String.CASE_INSENSITIVE_ORDER);
+        if (sort != WidgetListSort.ALPHABETICAL) {
+            order = Comparator.<Widget>comparingInt(widget -> renderer.isWidgetAdded(widget)
+                    == (sort == WidgetListSort.ACTIVE_FIRST) ? 0 : 1).thenComparing(order);
+        }
         filtered = renderer.getWidgets().stream()
                 .filter(widget -> !(widget instanceof ru.wilyfox.client.hud.widget.ChatWidget chat) || chat.settings() != null && !chat.settings().deleted && chat.settings().detached)
-                .filter(widget -> widget.getDisplayName().toLowerCase(Locale.ROOT).contains(query)).toList();
+                .filter(widget -> widget.getDisplayName().toLowerCase(Locale.ROOT).contains(query)).sorted(order).toList();
         cachedRevision = renderer.getWidgetRegistryRevision();
+        cachedLayoutRevision = ConfigManager.getLayoutRevision();
+        cachedSort = sort;
         clampScroll();
     }
 
@@ -258,6 +297,7 @@ public final class HudWidgetSidebar {
         var window = Minecraft.getInstance().getWindow();
         width = Math.min(198, Math.max(146, window.getGuiScaledWidth() / 3));
         height = Math.max(142, window.getGuiScaledHeight() - 16);
+        sortCycle.setPosition(X + width - 87, Y + 4);
     }
 
     private void clampScroll() {

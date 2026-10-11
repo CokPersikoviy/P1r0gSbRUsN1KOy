@@ -8,6 +8,7 @@ final class HudConfigSanitizer {
 
     static HudConfig sanitize(HudConfig config) {
         HudConfig sanitized = config != null ? config : new HudConfig();
+        if (sanitized.widgetListSort == null) sanitized.widgetListSort = WidgetListSort.ALPHABETICAL;
 
         if (sanitized.visuals == null) sanitized.visuals = new VisualsConfig();
         sanitized.visuals.sanitize();
@@ -27,6 +28,7 @@ final class HudConfigSanitizer {
         if (sanitized.dailyCreditsTimer == null) sanitized.dailyCreditsTimer = new ResourceTimersConfig();
         sanitized.dailyCreditsTimer.reminderMinutes = Math.clamp(sanitized.dailyCreditsTimer.reminderMinutes, 1, 1440);
         if (sanitized.fishing == null) sanitized.fishing = new FishingConfig();
+        sanitized.fishing.petExperienceOverlayScalePercent = Math.clamp(sanitized.fishing.petExperienceOverlayScalePercent, 50, 300);
         if (sanitized.fishing.nibblesVisibility == null) sanitized.fishing.nibblesVisibility = FishingWidgetVisibility.FISHING_WARP;
         if (sanitized.fishing.nibblesSort == null) sanitized.fishing.nibblesSort = FishingNibblesSort.DIMENSION;
         if (sanitized.fishing.questsVisibility == null) sanitized.fishing.questsVisibility = FishingWidgetVisibility.FISHING_WARP;
@@ -37,6 +39,7 @@ final class HudConfigSanitizer {
         if (sanitized.scoreboard == null) sanitized.scoreboard = new ScoreboardConfig();
         if (sanitized.playerHealthBars == null) sanitized.playerHealthBars = new PlayerHealthBarsConfig();
         if (sanitized.alchemy == null) sanitized.alchemy = new AlchemyConfig();
+        sanitized.alchemy.autoBrewingCostScalePercent = Math.clamp(sanitized.alchemy.autoBrewingCostScalePercent, 50, 300);
         sanitized.alchemy.recipeActionLeadMillis = Math.max(100, Math.min(2_000, sanitized.alchemy.recipeActionLeadMillis));
         if (sanitized.craftRecipe == null) sanitized.craftRecipe = new CraftRecipeConfig();
         if (sanitized.potionTimers == null) sanitized.potionTimers = new PotionTimersConfig();
@@ -146,6 +149,7 @@ final class HudConfigSanitizer {
             }
         }
         if (sanitized.runesBag == null) sanitized.runesBag = new RunesBagConfig();
+        sanitized.runesBag.setEffectOverlayScalePercent = Math.clamp(sanitized.runesBag.setEffectOverlayScalePercent, 50, 300);
         if (sanitized.runesBag.setSelectorKeys == null || sanitized.runesBag.setSelectorKeys.length != 7) {
             sanitized.runesBag.setSelectorKeys = RunesBagConfig.defaultSelectorKeys();
         }

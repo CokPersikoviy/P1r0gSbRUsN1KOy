@@ -21,7 +21,8 @@ final class SocialWire {
             }
         }
     }
-    record Player(String id, String name, String scope, Integer timerCount, boolean protocolOnly) {
+    record Player(String id, String name, String scope, Integer timerCount, boolean protocolOnly, Boolean configAvailable) {
+        Player(String id, String name, String scope, Integer timerCount, boolean protocolOnly) { this(id, name, scope, timerCount, protocolOnly, null); }
         Player(String id, String name) { this(id, name, null, null, false); }
         boolean protocolBadge() { return protocolOnly && timerCount != null && timerCount > 50; }
     }

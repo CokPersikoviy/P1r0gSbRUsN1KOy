@@ -6,6 +6,10 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
+      "ru.wilyfox.client.chat.ChatRepeatsClientTest",
+      "ru.wilyfox.client.chat.BossTimerFiltersClientTest",
+      "ru.wilyfox.client.moduser.ConfigSharingClientTest",
+      "ru.wilyfox.client.chat.ChatDiscordImagesClientTest",
       "ru.wilyfox.MigrationClientTest",
       "ru.wilyfox.client.hud.MainWidgetLayoutClientTest",
       "ru.wilyfox.client.hud.ChatSnapResizeClientTest",

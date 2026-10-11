@@ -113,6 +113,11 @@ public class QuickAccessScreen extends UiSoundScreen {
     }
 
     @Override
+    protected void extractMenuBackground(GuiGraphicsExtractor graphics) {
+        // Only the selector/editor panels have a backdrop; the surrounding world stays clear.
+    }
+
+    @Override
     public void onClose() {
         if (isEditorMode()) {
             Minecraft.getInstance().gui.setScreen(parent);
@@ -133,13 +138,6 @@ public class QuickAccessScreen extends UiSoundScreen {
             itemLayouts.clear();
             sectionLayouts.clear();
 
-            graphics.fill(
-                    0,
-                    0,
-                    this.width,
-                    this.height,
-                    isEditorMode() ? WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0) : backdropColor()
-            );
             HudBlur.beginFrame(graphics); // capture the screen for the frosted panels' blur backdrop
             renderSelectorPanel(graphics, mouseX, mouseY);
             if (hoveredItem != null && hoveredItem != soundHoveredItem) UiSounds.hover();
@@ -681,10 +679,6 @@ public class QuickAccessScreen extends UiSoundScreen {
 
     private int solidBarColor() {
         return WidgetTheme.withAlpha(WidgetTheme.BAR_BG, 0xCC);
-    }
-
-    private int backdropColor() {
-        return WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0x66);
     }
 
     private int disabledOverlayColor() {
