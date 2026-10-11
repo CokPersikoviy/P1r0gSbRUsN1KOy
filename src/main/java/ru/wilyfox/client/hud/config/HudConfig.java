@@ -16,6 +16,7 @@ public class HudConfig {
     public BlocksPerSecondWidgetConfig blocksPerSecondWidget = new BlocksPerSecondWidgetConfig();
     public DailyBlocksConfig dailyBlocks = new DailyBlocksConfig();
     public EstimatedTpsConfig estimatedTps = new EstimatedTpsConfig();
+    public FpsWidgetConfig fpsWidget = new FpsWidgetConfig();
     public FishingConfig fishing = new FishingConfig();
     public BossBarConfig bossBar = new BossBarConfig();
     public ScoreboardConfig scoreboard = new ScoreboardConfig();
@@ -49,6 +50,7 @@ public class HudConfig {
     public Map<String, WidgetLayoutConfig> widgetLayouts = new LinkedHashMap<>();
     public Map<String, LocationWidgetLayoutConfig> locationLayouts = new LinkedHashMap<>();
     public Map<String, WidgetLocationConfig> widgetLocations = new LinkedHashMap<>();
+    public Map<String, WidgetAppearanceConfig> widgetAppearance = new LinkedHashMap<>();
     public Map<String, ChatWidgetConfig> chatWidgets = new LinkedHashMap<>();
     public java.util.List<String> chatTabOrder = new java.util.ArrayList<>();
 }

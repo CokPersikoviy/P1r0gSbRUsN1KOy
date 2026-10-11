@@ -101,30 +101,7 @@ public final class FishingNibblesWidget extends AbstractWidget {
 
     private List<String> buildLines() {
         if (!DiamondWorldProtocolClient.hasFishingNibbles()) {
-            if (!isEditorPreview()) {
-                return List.of();
-            }
-
-            if (ConfigManager.get().fishing.nibblesSort == FishingNibblesSort.DIMENSION) {
-                return List.of(
-                        "- Overworld -",
-                        "City Canal - 100.0%",
-                        "Amber Grot - 150.0%",
-                        "- Nether -",
-                        "Nether Valley - 150.0%",
-                        "- End -",
-                        "Silence - 150.0%",
-                        "Crystal Gorge - 100.0%"
-                );
-            }
-
-            return List.of(
-                    "Amber Grot - 150.0%",
-                    "Nether Valley - 150.0%",
-                    "Silence - 150.0%",
-                    "Crystal Gorge - 100.0%",
-                    "City Canal - 100.0%"
-            );
+            return List.of();
         }
 
         List<String> lines = new ArrayList<>();

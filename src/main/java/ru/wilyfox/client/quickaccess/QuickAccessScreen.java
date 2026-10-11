@@ -816,7 +816,9 @@ public class QuickAccessScreen extends UiSoundScreen {
 
             switch (keyCode) {
                 case GLFW.GLFW_KEY_BACKSPACE -> {
-                    if (cursor > 0) {
+                    if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0) {
+                        value = ""; cursor = 0; changed();
+                    } else if (cursor > 0) {
                         value = value.substring(0, cursor - 1) + value.substring(cursor);
                         cursor--;
                         changed();

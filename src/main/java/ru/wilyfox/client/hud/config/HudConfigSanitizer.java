@@ -12,6 +12,8 @@ final class HudConfigSanitizer {
         if (sanitized.visuals == null) sanitized.visuals = new VisualsConfig();
         sanitized.visuals.sanitize();
         if (sanitized.render == null) sanitized.render = new RenderConfig();
+        if (sanitized.render.timestamp == null) sanitized.render.timestamp = new ChatTimestampConfig();
+        sanitized.render.timestamp.sanitize();
         if (sanitized.render.widgetChrome == null) sanitized.render.widgetChrome = WidgetChrome.FROST;
         if (sanitized.autoMessages == null) sanitized.autoMessages = new AutoMessagesConfig();
         if (sanitized.bossWidget == null) sanitized.bossWidget = new BossWidgetConfig();
@@ -19,6 +21,7 @@ final class HudConfigSanitizer {
         if (sanitized.blocksPerSecondWidget == null) sanitized.blocksPerSecondWidget = new BlocksPerSecondWidgetConfig();
         if (sanitized.dailyBlocks == null) sanitized.dailyBlocks = new DailyBlocksConfig();
         if (sanitized.estimatedTps == null) sanitized.estimatedTps = new EstimatedTpsConfig();
+        if (sanitized.fpsWidget == null) sanitized.fpsWidget = new FpsWidgetConfig();
         if (sanitized.fishing == null) sanitized.fishing = new FishingConfig();
         if (sanitized.fishing.nibblesVisibility == null) sanitized.fishing.nibblesVisibility = FishingWidgetVisibility.FISHING_WARP;
         if (sanitized.fishing.nibblesSort == null) sanitized.fishing.nibblesSort = FishingNibblesSort.DIMENSION;
@@ -64,6 +67,9 @@ final class HudConfigSanitizer {
         if (sanitized.theme.preset == null) sanitized.theme.preset = ThemePreset.LINGONBERRY_PIE;
         if (sanitized.widgetLayouts == null) sanitized.widgetLayouts = new java.util.LinkedHashMap<>();
         sanitized.widgetLayouts.remove("PotionRecipeWidget");
+        if (sanitized.widgetAppearance == null) sanitized.widgetAppearance = new java.util.LinkedHashMap<>();
+        sanitized.widgetAppearance.entrySet().removeIf(entry -> entry.getKey() == null || WidgetCatalog.find(entry.getKey()) == null || entry.getValue() == null);
+        sanitized.widgetAppearance.values().forEach(WidgetAppearanceConfig::sanitize);
         if (sanitized.quickAccess.sections == null) sanitized.quickAccess.sections = QuickAccessConfig.createDefaultSections();
         if (sanitized.quickAccess.sections.isEmpty()) sanitized.quickAccess.sections = QuickAccessConfig.createDefaultSections();
         QuickAccessConfig.sanitizeSections(sanitized.quickAccess.sections);
@@ -191,7 +197,7 @@ final class HudConfigSanitizer {
                 || entry.getKey().equals(WidgetCatalog.CHAT_ALL.key()) || entry.getKey().equals(WidgetCatalog.CHAT_FH.key())) {
             String key = entry.getKey();
             sanitized.mainLayout.widgets.remove(key);
-            sanitized.widgetLayouts.remove(key); sanitized.widgetLocations.remove(key);
+            sanitized.widgetLayouts.remove(key); sanitized.widgetLocations.remove(key); sanitized.widgetAppearance.remove(key);
             for (var layout : sanitized.locationLayouts.values()) { layout.widgets.remove(key); layout.placements.remove(key); }
         }
         return sanitized;

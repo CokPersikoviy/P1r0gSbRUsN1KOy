@@ -106,6 +106,7 @@ public final class ChatDock {
             ConfigManager.get().chatWidgets.remove(key);
         } else settings(key).deleted = true;
         ConfigManager.get().widgetLayouts.remove(key); ConfigManager.get().widgetLocations.remove(key);
+        ConfigManager.get().widgetAppearance.remove(key);
         for (var layout : ConfigManager.get().locationLayouts.values()) layout.placements.remove(key);
         ConfigManager.get().chatTabOrder.remove(key);
         if (key.equals(focusedWindow)) focusedWindow = null;

@@ -122,13 +122,7 @@ public final class FishingQuestsWidget extends AbstractWidget {
         result.sort(Comparator.comparingInt((QuestView view) -> typeOrder(view.type()))
                 .thenComparing(view -> view.lines().getFirst().text()));
 
-        if (!result.isEmpty() || !isEditorPreview()) {
-            return result;
-        }
-        return List.of(new QuestView("NORMAL", List.of(
-                new QuestLine("Catch 20 fish 01:51", WidgetTheme.TEXT_PRIMARY),
-                new QuestLine("Progress: 8/20", WidgetTheme.TEXT_SOFT)
-        )));
+        return result;
     }
 
     private QuestView createView(DwHourlyQuestType type, DwHourlyQuestProgress progress,

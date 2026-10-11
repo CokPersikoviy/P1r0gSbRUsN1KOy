@@ -41,6 +41,8 @@ public final class HudUndoClientTest implements FabricClientGameTest {
                 ConfigManager.get().mainLayout.widgets.add(WidgetCatalog.BOSS_TIMERS.key());
                 ConfigManager.get().locationLayouts.clear(); ConfigManager.get().widgetLayouts.clear();
                 ConfigManager.get().bossWidget.maxBosses = 10;
+                ConfigManager.getWidgetAppearance(widget.getConfigKey()).opacityPercent = 100;
+                ConfigManager.getWidgetAppearance(widget.getConfigKey()).backgroundOpacityPercent = 100;
                 ConfigManager.layoutChanged();
                 renderer.registerWidget(widget); renderer.setEditing(true);
                 client.gui.setScreen(screen);
@@ -62,6 +64,21 @@ public final class HudUndoClientTest implements FabricClientGameTest {
                 expect(renderer.isSettingsOpen(), "Widget context did not open");
             });
             context.waitTicks(3);
+            context.runOnClient(client -> {
+                dragNumber(screen, component(panel, "Widget opacity (%)"), -36);
+                expect(ConfigManager.getWidgetAppearance(widget.getConfigKey()).opacityPercent == 90, "Widget opacity drag did not change");
+                undo(screen);
+                expect(ConfigManager.getWidgetAppearance(widget.getConfigKey()).opacityPercent == 100, "Undo did not restore widget opacity");
+            });
+            context.waitTicks(2);
+            context.runOnClient(client -> {
+                dragNumber(screen, component(panel, "Background opacity (%)"), -36);
+                expect(ConfigManager.getWidgetAppearance(widget.getConfigKey()).backgroundOpacityPercent == 90, "Background opacity drag did not change");
+                expect(ConfigManager.getWidgetAppearance(widget.getConfigKey()).opacityPercent == 100, "Background control changed content opacity");
+                undo(screen);
+                expect(ConfigManager.getWidgetAppearance(widget.getConfigKey()).backgroundOpacityPercent == 100, "Undo did not restore background opacity");
+            });
+            context.waitTicks(2);
             context.runOnClient(client -> {
                 dragNumber(screen, component(panel, "Max bosses"), 28);
                 expect(ConfigManager.get().bossWidget.maxBosses == 17, "Numeric drag did not change the value");

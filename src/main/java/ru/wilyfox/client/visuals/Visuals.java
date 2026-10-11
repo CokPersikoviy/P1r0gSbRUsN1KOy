@@ -68,8 +68,16 @@ public final class Visuals {
 
     public static FogData fog(FogData fog, FogType fluid) {
         var config = ConfigManager.get().visuals;
-        if (fluid != FogType.NONE && !config.fluidFog || fluid == FogType.NONE && config.fogMode == ru.wilyfox.client.hud.config.VisualsConfig.FogMode.NONE) {
+        var render = ConfigManager.get().render;
+        boolean clearSubstance = switch (fluid) {
+            case WATER -> render.clearWater;
+            case LAVA -> render.clearLava;
+            case POWDER_SNOW -> render.clearPowderSnow;
+            default -> false;
+        };
+        if (clearSubstance || fluid != FogType.NONE && !config.fluidFog || fluid == FogType.NONE && config.fogMode == ru.wilyfox.client.hud.config.VisualsConfig.FogMode.NONE) {
             fog.environmentalStart = fog.environmentalEnd = fog.renderDistanceStart = fog.renderDistanceEnd = 1_000_000;
+            fog.skyEnd = fog.cloudEnd = 1_000_000;
         } else if (fluid == FogType.NONE && config.fogMode == ru.wilyfox.client.hud.config.VisualsConfig.FogMode.CUSTOM) {
             fog.environmentalStart *= (float) config.fogDistance; fog.environmentalEnd *= (float) config.fogDistance;
             fog.renderDistanceStart *= (float) config.fogDistance; fog.renderDistanceEnd *= (float) config.fogDistance;

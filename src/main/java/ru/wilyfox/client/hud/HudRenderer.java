@@ -178,6 +178,11 @@ public class HudRenderer {
     };
     private final HudSnapLayoutHost snapLayoutHost = new HudSnapLayoutHost() {
         @Override
+        public WidgetLayoutConfig getStoredPlacement(AbstractWidget widget) {
+            return ConfigManager.getWidgetLayout(widget.getConfigKey());
+        }
+
+        @Override
         public Widget getDraggedWidget() {
             return draggedWidget;
         }
@@ -965,7 +970,7 @@ public class HudRenderer {
             widgetSidebar.toggleVisibility();
             return true;
         }
-        if (editing && widgetSidebar.keyPressed(keyCode)) return true;
+        if (editing && widgetSidebar.keyPressed(keyCode, modifiers)) return true;
         if (editing && keyCode == GLFW.GLFW_KEY_DELETE && selectedWidget != null) {
             boolean removed = removeWidget(selectedWidget);
             if (removed) UiSounds.click();
@@ -1090,7 +1095,8 @@ public class HudRenderer {
     }
 
     private void updateSnappedWidgets() {
-        snapLayoutEngine.updateSnappedWidgets(snapLayoutHost);
+        var window = Minecraft.getInstance().getWindow();
+        snapLayoutEngine.updateSnappedWidgets(snapLayoutHost, window.getGuiScaledWidth(), window.getGuiScaledHeight());
     }
 
     private boolean applyScreenAnchorSnapping(Widget widget, int screenWidth, int screenHeight, boolean shiftHeld) {
@@ -1320,7 +1326,13 @@ public class HudRenderer {
             return false;
         }
 
-        return abstractWidget.getScreenAnchor() != null || abstractWidget.hasWidgetSnap();
+        if (abstractWidget.getScreenAnchor() != null || abstractWidget.hasWidgetSnap()) return true;
+        // Free parents also need tracking: their changing size moves every snapped descendant.
+        for (Widget candidate : widgets) {
+            if (candidate instanceof AbstractWidget child && child.hasWidgetSnap()
+                    && java.util.Objects.equals(child.getSnapTargetKey(), abstractWidget.getConfigKey())) return true;
+        }
+        return false;
     }
 
     private boolean shouldRenderWidget(Widget widget, boolean editingMode) {

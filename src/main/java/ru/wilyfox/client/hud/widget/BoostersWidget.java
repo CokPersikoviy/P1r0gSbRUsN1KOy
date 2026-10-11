@@ -189,9 +189,10 @@ public final class BoostersWidget extends AbstractWidget {
 
     private List<BoosterView> getViews() {
         List<BoosterView> views = new ArrayList<>();
+        boolean empty = !store.hasAnyActive();
         for (BoosterStore.Kind kind : BoosterStore.Kind.values()) {
             BoosterStore.Snapshot snapshot = store.getSnapshot(kind);
-            if (snapshot.hasAny() || isEditorPreview()) {
+            if (snapshot.hasAny() || empty) {
                 views.add(new BoosterView(kindLabel(kind), snapshot));
             }
         }

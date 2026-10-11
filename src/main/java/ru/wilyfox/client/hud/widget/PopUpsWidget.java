@@ -65,7 +65,7 @@ public final class PopUpsWidget extends AbstractWidget {
 
     @Override
     public int getWidth() {
-        if (isEditorPreview() && !hasActiveNotifications()) {
+        if (!hasActiveNotifications()) {
             return Math.round(EMPTY_WIDTH * getScale());
         }
 
@@ -75,7 +75,7 @@ public final class PopUpsWidget extends AbstractWidget {
 
     @Override
     public int getHeight() {
-        if (isEditorPreview() && !hasActiveNotifications()) {
+        if (!hasActiveNotifications()) {
             return Math.round(EMPTY_HEIGHT * getScale());
         }
 
@@ -122,11 +122,13 @@ public final class PopUpsWidget extends AbstractWidget {
         int titleColor = withScaledAlpha(getTitleColor(notification.severity()), alpha);
         int accentColor = withScaledAlpha(getAccentColor(notification.severity()), alpha);
 
-        if (HudSurface.chrome() != WidgetChrome.BARE) {
-            // New-style surface: rounded panel + a single inset severity accent line (fades with the pop-up).
-            HudSurface.fillRounded(context, x, y, width, height, 4, panelColor);
-            int accentInset = HudSurface.nativeRenderer() ? 0 : 4;
-            context.fill(x + accentInset, y, x + width - accentInset, y + 1, accentColor);
+        if (HudSurface.chrome() != WidgetChrome.BARE && ru.wilyfox.client.hud.internal.WidgetRenderScope.backgroundAlpha() > 0) {
+            try (var background = ru.wilyfox.client.hud.internal.WidgetRenderScope.background()) {
+                // New-style surface: rounded panel + a single inset severity accent line (fades with the pop-up).
+                HudSurface.fillRounded(context, x, y, width, height, 4, panelColor);
+                int accentInset = HudSurface.nativeRenderer() ? 0 : 4;
+                context.fill(x + accentInset, y, x + width - accentInset, y + 1, accentColor);
+            }
         }
 
         int textX = x + PADDING_X;

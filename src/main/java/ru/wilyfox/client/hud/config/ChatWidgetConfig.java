@@ -8,6 +8,7 @@ public final class ChatWidgetConfig {
     public int width = 280;
     public int rows = 10;
     public boolean showTitle = true;
+    public ChatWidgetVisibility visibility = ChatWidgetVisibility.ALWAYS;
     public boolean detached;
     /** Built-in identities stay persisted so deleted tabs do not reappear on load. */
     public boolean deleted;
@@ -19,6 +20,7 @@ public final class ChatWidgetConfig {
 
     public void sanitize(ChatTab fallback) {
         if (channel == null) channel = fallback;
+        if (visibility == null) visibility = ChatWidgetVisibility.ALWAYS;
         width = Math.clamp(width, 100, 600);
         rows = Math.clamp(rows, 2, 30);
         if (title == null || title.isBlank()) title = channel.getTitle();

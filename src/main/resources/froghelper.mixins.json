@@ -5,6 +5,7 @@
   "mixins": [
     "ClientPacketListenerMixin",
     "MinecraftProfilerMixin",
+    "FpsMonitorMixin",
     "LevelRendererProfilerMixin",
     "BlockEntityRenderDispatcherProfilerMixin",
     "EntityRenderDispatcherProfilerMixin",
@@ -12,6 +13,7 @@
     "ChatHudMixin",
     "ChatScreenMixin",
     "BackendChatSuggestionsMixin",
+    "ChatSuggestionsLayoutMixin",
     "KeyMappingAccessorMixin",
     "AbstractContainerScreenMixin",
     "ArmorStandMixin",

@@ -12,6 +12,7 @@ public enum WidgetCatalog {
     BLOCK_COUNTER("BlocksPerSecondWidget", "Block Counter", c -> c.blocksPerSecondWidget.active),
     DAILY_BLOCKS("DailyBlocksWidget", "Daily Blocks", c -> c.dailyBlocks.active),
     ESTIMATED_TPS("EstimatedTpsWidget", "Estimated TPS", c -> c.estimatedTps.active),
+    FPS("FpsWidget", "FPS", c -> false),
     BOOSTERS("BoostersWidget", "Boosters", c -> c.boosters.active),
     CRAFT_RECIPE("CraftRecipeWidget", "Craft Recipe", c -> c.craftRecipe.active),
     POTION_TIMERS("PotionTimersWidget", "Potion Cooldowns", c -> c.potionTimers.active),

@@ -95,15 +95,19 @@ public final class EntityInspectWidget extends AbstractWidget {
 
     private void renderCard(GuiGraphicsExtractor context, Minecraft mc, InspectSnapshot snapshot) {
         HudSurface.drawPanel(context, CARD_WIDTH, CARD_HEIGHT);
-        context.fill(0, HEADER_HEIGHT, CARD_WIDTH, HEADER_HEIGHT + 1, WidgetTheme.BAR_BG);
+        try (var background = ru.wilyfox.client.hud.internal.WidgetRenderScope.background()) {
+            context.fill(0, HEADER_HEIGHT, CARD_WIDTH, HEADER_HEIGHT + 1, WidgetTheme.BAR_BG);
+        }
 
         context.text(mc.font, "Entity Inspect", 8, 6, WidgetTheme.TITLE);
         context.text(mc.font, "EntityType: " + snapshot.entityType, 8, HEADER_HEIGHT + 4, WidgetTheme.TEXT_SOFT);
 
         int previewX2 = PREVIEW_BOX_X + PREVIEW_BOX_SIZE;
         int previewY2 = PREVIEW_BOX_Y + PREVIEW_BOX_SIZE;
-        context.fill(PREVIEW_BOX_X, PREVIEW_BOX_Y, previewX2, previewY2, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(PREVIEW_BOX_X, PREVIEW_BOX_Y, previewX2, PREVIEW_BOX_Y + 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        try (var background = ru.wilyfox.client.hud.internal.WidgetRenderScope.background()) {
+            context.fill(PREVIEW_BOX_X, PREVIEW_BOX_Y, previewX2, previewY2, WidgetTheme.WIDGET_PANEL_BG_SOFT);
+            context.fill(PREVIEW_BOX_X, PREVIEW_BOX_Y, previewX2, PREVIEW_BOX_Y + 1, WidgetTheme.WIDGET_ACCENT_LINE);
+        }
 
         WidgetUtils.drawItemIcon(context, snapshot.previewItem, PREVIEW_BOX_X + 34, PREVIEW_BOX_Y + 18);
         context.centeredText(mc.font, snapshot.previewLabel, PREVIEW_BOX_X + PREVIEW_BOX_SIZE / 2, PREVIEW_BOX_Y + 44, WidgetTheme.TEXT_SECONDARY);
@@ -141,8 +145,10 @@ public final class EntityInspectWidget extends AbstractWidget {
 
     private void renderSlotRow(GuiGraphicsExtractor context, Minecraft mc, SlotInfo slot, int y) {
         int rowWidth = CARD_WIDTH - SLOT_X - 8;
-        context.fill(SLOT_X, y - 2, SLOT_X + rowWidth, y + 43, WidgetTheme.WIDGET_PANEL_BG_SOFT);
-        context.fill(SLOT_X, y - 2, SLOT_X + 1, y + 43, WidgetTheme.WIDGET_ACCENT_LINE);
+        try (var background = ru.wilyfox.client.hud.internal.WidgetRenderScope.background()) {
+            context.fill(SLOT_X, y - 2, SLOT_X + rowWidth, y + 43, WidgetTheme.WIDGET_PANEL_BG_SOFT);
+            context.fill(SLOT_X, y - 2, SLOT_X + 1, y + 43, WidgetTheme.WIDGET_ACCENT_LINE);
+        }
 
         context.text(mc.font, slot.label, SLOT_X + 6, y, WidgetTheme.TEXT_SECONDARY);
         context.text(mc.font, slot.material, SLOT_X + 54, y, slot.empty ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_SOFT);

@@ -19,8 +19,6 @@ import java.util.*;
 import java.util.function.Predicate;
 
 public final class ChatTabManager {
-    private static final java.time.format.DateTimeFormatter BACKEND_TIME = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
-            .withZone(java.time.ZoneId.systemDefault());
     private static final ChatTabManager INSTANCE = new ChatTabManager();
     private final Map<ChatTab, Deque<ChatMessageEntry>> messagesByTab = new EnumMap<>(ChatTab.class);
     private final Map<ChatTab, TabState> states = new EnumMap<>(ChatTab.class);
@@ -95,7 +93,7 @@ public final class ChatTabManager {
     synchronized void captureIncoming(GuiMessage message, int limit, boolean chatOpen) { capture(message, limit, chatOpen); }
     private void capture(GuiMessage message, int limit, boolean chatOpen) {
         if (message == null || rebuilding || entries.containsKey(message)) return;
-        var entry = entry(message);
+        var entry = entry(message, true);
         entries.put(message, entry);
         messagesByTab.get(ChatTab.ALL).addLast(entry);
         if (entry.tab() != ChatTab.ALL) messagesByTab.get(entry.tab()).addLast(entry);
@@ -107,11 +105,11 @@ public final class ChatTabManager {
         archiveRevision++;
     }
     private static int increment(int value) { return Math.min(9999, value + 1); }
-    private static ChatMessageEntry entry(GuiMessage message) {
+    private static ChatMessageEntry entry(GuiMessage message, boolean live) {
         String text = ChatTimestampFormatter.stripTimestampPrefix(
                 Formatting.stripMinecraftFormatting(ChatMessageSanitizer.forLogic(message.content().getString()))
                         .replace('\u00a0', ' ')).strip();
-        return new ChatMessageEntry(message, Instant.now(), ChatPrefixRouter.resolve(text), text.toLowerCase(Locale.ROOT));
+        return new ChatMessageEntry(message, Instant.now(), ChatPrefixRouter.resolve(text), text.toLowerCase(Locale.ROOT), live ? System.nanoTime() : 0);
     }
 
     public void setActiveTab(ChatTab tab) {
@@ -244,7 +242,7 @@ public final class ChatTabManager {
         backendMessages.values().forEach(entry -> { entries.put(entry.message(), entry); previous.remove(entry.message()); });
         for (GuiMessage message : accessor.froghelper$getAllMessages().reversed()) {
             var entry = previous.remove(message);
-            if (entry == null) { entry = entry(message); changed = true; }
+            if (entry == null) { entry = entry(message, false); changed = true; }
             entries.put(message, entry);
             messagesByTab.get(ChatTab.ALL).addLast(entry);
             if (entry.tab() != ChatTab.ALL) messagesByTab.get(entry.tab()).addLast(entry);
@@ -305,13 +303,13 @@ public final class ChatTabManager {
         for (var message : messages) {
             if (backendMessages.containsKey(message.id())) continue;
             var content = Component.empty();
-            if (ConfigManager.get().render.chatTimestamps) content.append(Component.literal("[" + BACKEND_TIME.format(Instant.ofEpochMilli(message.sentAt()))
-                    + "] ").withStyle(net.minecraft.ChatFormatting.DARK_GRAY));
+            if (ConfigManager.get().render.chatTimestamps)
+                content.append(ChatTimestampFormatter.createTimestampPrefix(Instant.ofEpochMilli(message.sentAt())));
             content.append(Component.literal(message.name()).withStyle(net.minecraft.ChatFormatting.GREEN))
                     .append(Component.literal(": ").withStyle(net.minecraft.ChatFormatting.GRAY)).append(Component.literal(message.text()));
             var gui = new GuiMessage(client.gui.hud.getGuiTicks(), content, null, GuiMessageSource.SYSTEM_CLIENT, null);
             var entry = new ChatMessageEntry(gui, Instant.ofEpochMilli(message.sentAt()), ChatTab.FH,
-                    (message.name() + ": " + message.text()).toLowerCase(Locale.ROOT));
+                    (message.name() + ": " + message.text()).toLowerCase(Locale.ROOT), live ? System.nanoTime() : 0);
             backendMessages.put(message.id(), entry); entries.put(gui, entry); changed = true;
             if (live && (!chat.isChatFocused() || activeTab != ChatTab.FH)) states.get(ChatTab.FH).unread = increment(states.get(ChatTab.FH).unread);
             if (live && activeTab == ChatTab.FH && scroll > 0 && isVisible(entry)) {

@@ -46,11 +46,14 @@ public final class HudSurface {
     }
 
     public static void drawPanel(GuiGraphicsExtractor context, int x, int y, int w, int h, WidgetChrome chrome, boolean useNative) {
-        if (chrome == WidgetChrome.BARE || w <= 0 || h <= 0) {
+        if (chrome == WidgetChrome.BARE || w <= 0 || h <= 0
+                || ru.wilyfox.client.hud.internal.WidgetRenderScope.backgroundAlpha() <= 0
+                || ru.wilyfox.client.hud.internal.WidgetRenderScope.alpha() <= 0) {
             return;
         }
 
-        try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("hud/surface/drawPanel")) {
+        try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("hud/surface/drawPanel");
+             var background = ru.wilyfox.client.hud.internal.WidgetRenderScope.background()) {
             // The top accent line uses the theme's extrapolated accent colour (per preset / Hard Accent),
             // at its own fixed strength — independent of the BG Opacity slider (which is glass-only).
             int accent = WidgetTheme.ACCENT_LINE;
@@ -79,9 +82,12 @@ public final class HudSurface {
     public static void drawPlaceholderPanel(GuiGraphicsExtractor context, int w, int h) {
         WidgetChrome chrome = chrome();
         if (chrome == WidgetChrome.BARE) {
+            if (ru.wilyfox.client.hud.internal.WidgetRenderScope.backgroundAlpha() <= 0) return;
             int corner = nativeRenderer() ? WidgetMetrics.CHAMFER : WidgetMetrics.RADIUS;
             int outline = WidgetTheme.withAlpha(WidgetTheme.OUTLINE_SOFT, 0x40);
-            strokeEdges(context, 0, 0, w, h, corner, outline, outline);
+            try (var background = ru.wilyfox.client.hud.internal.WidgetRenderScope.background()) {
+                strokeEdges(context, 0, 0, w, h, corner, outline, outline);
+            }
             return;
         }
         drawPanel(context, 0, 0, w, h, chrome, nativeRenderer());

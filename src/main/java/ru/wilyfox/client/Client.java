@@ -211,6 +211,7 @@ public class Client {
                 new EstimatedTpsWidget(100, 130, HudLayer.CONTENT),
                 ScreenAnchor.HOTBAR_LEFT
         );
+        hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.FpsWidget(20, 20, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
         hudRenderer.registerWidget(
                 new BoostersWidget(20, 20, HudLayer.CONTENT, boosterStore),
                 ScreenAnchor.TOP_RIGHT

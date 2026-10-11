@@ -24,6 +24,7 @@ public final class ChatWidgetView {
     private boolean dirty = true, older;
     private long countRevision = -1;
     private int matches;
+    private long activityRevision = -1, latestActivity;
 
     public ChatWidgetView(ChatTabManager store, ChatTab channel) { this.store = store; this.channel = channel; }
     public ChatTab channel() { return channel; }
@@ -49,7 +50,27 @@ public final class ChatWidgetView {
         anchor = null;
         dirty = true;
     }
-    public void reset() { scroll = 0; anchor = null; dirty = true; countRevision = -1; }
+    public void reset() { scroll = 0; anchor = null; dirty = true; countRevision = activityRevision = -1; }
+    public List<GuiMessage> selectionMessages() {
+        var result = new ArrayList<GuiMessage>();
+        store.visitNewest(channel, entry -> { if (matches(entry)) result.add(entry.message()); return true; });
+        return result;
+    }
+    /** Recheck only when messages or filters change; hidden windows never wrap their history. */
+    public long latestActivityNanos() {
+        if (activityRevision != store.archiveRevision()) {
+            long[] latest = {0};
+            store.visitNewest(channel, entry -> {
+                if (entry.receivedNanos() != 0 && matches(entry)) {
+                    latest[0] = entry.receivedNanos();
+                    return false;
+                }
+                return true;
+            });
+            latestActivity = latest[0]; activityRevision = store.archiveRevision();
+        }
+        return latestActivity;
+    }
     public int matchingMessages() {
         if (countRevision != store.archiveRevision()) {
             int[] count = {0};

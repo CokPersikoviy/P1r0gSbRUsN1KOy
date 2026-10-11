@@ -6,6 +6,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RuneLoreTest {
+    @Test void skipsSlotControlsButKeepsRealRunesIncludingMiningRunes() {
+        for (String name : java.util.List.of("Разблокировать слот для шахтёрской руны", "§eРазблокировать слот для шахтерской руны",
+                " Пустой\u00a0слот для руны ", "Заблокированный слот", "Нажмите, чтобы разблокировать слот",
+                "Unlock mining rune slot", "Empty slot", "Locked slot", "Click to unlock", "Поместите руну в слот", "")) {
+            assertTrue(RuneLore.isSlotPlaceholder(name), name);
+        }
+        assertTrue(RuneLore.isSlotPlaceholder(null));
+        for (String name : java.util.List.of("Ветер II", "Железо II", "Валькирия II", "Добытчик II", "§6Шахтёрская руна III", "Mining rune", "Wind II")) {
+            assertFalse(RuneLore.isSlotPlaceholder(name), name);
+        }
+    }
     @Test
     void recognizesBothReferenceLanguagesForSetSelection() {
         assertTrue(RuneLore.isActiveSet("Используется"));

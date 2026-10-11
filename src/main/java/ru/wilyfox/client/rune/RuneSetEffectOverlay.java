@@ -92,13 +92,17 @@ public final class RuneSetEffectOverlay {
             }
 
             ItemStack stack = slot.getItem();
-            if (!stack.is(Items.PAPER)) {
+            if (!isEquippedRune(stack)) {
                 continue;
             }
 
             runes.add(stack.getHoverName().getString());
         }
         return runes;
+    }
+
+    private static boolean isEquippedRune(ItemStack stack) {
+        return stack.is(Items.PAPER) && !RuneLore.isSlotPlaceholder(stack.getHoverName().getString());
     }
 
     /** Feeds {@link RuneSetCooldownStore} (used by the ActiveRunes bar) from the bag's set slots. */
@@ -246,7 +250,7 @@ public final class RuneSetEffectOverlay {
             }
 
             ItemStack stack = slot.getItem();
-            if (!stack.is(Items.PAPER)) {
+            if (!isEquippedRune(stack)) {
                 continue;
             }
 

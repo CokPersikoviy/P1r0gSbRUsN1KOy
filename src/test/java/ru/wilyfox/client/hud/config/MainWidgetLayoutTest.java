@@ -14,6 +14,18 @@ class MainWidgetLayoutTest {
     private final Gson gson = new Gson();
 
     @Test
+    void fpsDefaultsDoNotAutoAddAndColumnSettingsSurviveReload() {
+        var legacy = decode("{\"fpsWidget\":null}");
+        assertTrue(legacy.fpsWidget.horizontal);
+        assertFalse(legacy.mainLayout.widgets.contains("FpsWidget"));
+        legacy.mainLayout.widgets.add("FpsWidget");
+        legacy.fpsWidget.horizontal = false;
+        var restored = decode(gson.toJson(legacy));
+        assertTrue(restored.mainLayout.widgets.contains("FpsWidget"));
+        assertFalse(restored.fpsWidget.horizontal);
+    }
+
+    @Test
     void newInstallHasAnEmptyLayoutDespiteLegacyDefaults() {
         var config = HudConfigSanitizer.sanitize(new HudConfig());
         assertTrue(config.mainLayout.widgets.isEmpty());

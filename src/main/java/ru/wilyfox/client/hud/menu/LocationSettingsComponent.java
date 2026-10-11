@@ -141,7 +141,8 @@ public final class LocationSettingsComponent extends SettingsComponent {
             if (!id.isEmpty()) { var values = new LinkedHashSet<>(getter.get()); values.add(id); update(values); }
             return true;
         }
-        if (key == GLFW.GLFW_KEY_BACKSPACE && !query.isEmpty()) query = query.substring(0, query.offsetByCodePoints(query.length(), -1));
+        if (key == GLFW.GLFW_KEY_BACKSPACE && !query.isEmpty()) query = (mods & GLFW.GLFW_MOD_CONTROL) != 0 ? ""
+                : query.substring(0, query.offsetByCodePoints(query.length(), -1));
         if (key == GLFW.GLFW_KEY_DELETE) query = "";
         optionsKey = null; scroll = 0; return true;
     }

@@ -18,6 +18,7 @@ import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.WidgetCatalog;
 import ru.wilyfox.client.hud.config.WidgetChrome;
 import ru.wilyfox.client.hud.layer.HudLayer;
+import ru.wilyfox.client.hud.internal.WidgetRenderScope;
 import ru.wilyfox.utils.MouseUtils;
 
 /** One independent channel viewport over the original native messages. */
@@ -51,7 +52,20 @@ public final class ChatWidget extends AbstractWidget {
     }
     @Override public int getWidth() { return Math.round(settings().width * scale); }
     @Override public int getHeight() { return Math.round(unscaledHeight() * scale); }
-    @Override public boolean isVisible() { return settings() != null && !settings().deleted && settings().detached && isInLayout(); }
+    @Override public boolean isVisible() {
+        return settings() != null && !settings().deleted && settings().detached && isInLayout() && visibilityAlpha() > 0;
+    }
+    public float visibilityAlpha() {
+        var settings = settings();
+        if (settings == null) return 0;
+        var client = Minecraft.getInstance();
+        var renderer = ru.wilyfox.client.Client.getInstance().getHudRenderer();
+        boolean open = client.gui.screen() instanceof ChatScreen || renderer.isEditing() || renderer.isSettingsOpen()
+                || client.gui.screen() instanceof ru.wilyfox.client.chat.ChatTabSettingsScreen;
+        if (settings.visibility == ru.wilyfox.client.hud.config.ChatWidgetVisibility.ALWAYS || open) return 1;
+        long activity = view().latestActivityNanos();
+        return settings.visibility.alpha(false, activity == 0 ? -1 : Math.max(0, System.nanoTime() - activity));
+    }
     @Override public String getDisplayName() { return "Chat " + settings().title; }
     public boolean isHeader(double x, double y) { return isHovered(x, y) && localY(y) < contentTop(); }
 
@@ -63,11 +77,14 @@ public final class ChatWidget extends AbstractWidget {
         boolean interactive = client.gui.screen() instanceof ChatScreen;
         boolean hovered = interactive && isHovered(MouseUtils.getMouseX(), MouseUtils.getMouseY());
         graphics.pose().pushMatrix();
-        try {
+        float opacity = visibilityAlpha();
+        try (var fade = opacity < 1 ? WidgetRenderScope.fade(opacity) : null) {
             graphics.pose().translate(startX, startY).scale(textScale(), textScale());
             if (HudSurface.chrome() == WidgetChrome.BARE) {
                 int alpha = Math.round(client.options.textBackgroundOpacity().get().floatValue() * 0.5f * 255);
-                graphics.fill(0, 0, width, height, alpha << 24);
+                try (var background = ru.wilyfox.client.hud.internal.WidgetRenderScope.background()) {
+                    if (ru.wilyfox.client.hud.internal.WidgetRenderScope.alpha() > 0) graphics.fill(0, 0, width, height, alpha << 24);
+                }
             } else {
                 HudSurface.drawPanel(graphics, width, height);
             }
@@ -89,6 +106,8 @@ public final class ChatWidget extends AbstractWidget {
                 for (int i = 0; i < lines.size(); i++) {
                     var line = lines.get(i);
                     int y = bottom - (i + 1) * LINE_HEIGHT;
+                    if (interactive && ru.wilyfox.client.chat.ChatMessageSelection.getInstance().isSelected(line.message()))
+                        graphics.fill(PAD, y - 1, width - PAD, y + 9, WidgetTheme.withAlpha(WidgetTheme.ACCENT_LINE, 70));
                     renderer.accept(TextAlignment.LEFT, PAD + 2, y, parameters, line.text());
                     var tag = line.message().tag();
                     if (tag != null) {
@@ -137,9 +156,6 @@ public final class ChatWidget extends AbstractWidget {
         if (line == null) return false;
         String text = ChatMessageCopyExtractor.selectCopiedText(
                 ChatMessageSanitizer.forLogic(line.message().content().getString()), ConfigManager.get().render.fullMessageCopy);
-        if (text.isBlank()) return false;
-        Minecraft.getInstance().keyboardHandler.setClipboard(text);
-        ru.wilyfox.client.popup.PopUpManager.getInstance().notifyChatCopied();
-        return true;
+        return ChatMessageCopyExtractor.copyText(text);
     }
 }

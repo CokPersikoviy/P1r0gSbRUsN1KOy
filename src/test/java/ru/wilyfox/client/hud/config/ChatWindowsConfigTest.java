@@ -13,6 +13,7 @@ class ChatWindowsConfigTest {
             var tab = config.chatWidgets.get(catalog.key());
             assertEquals(catalog.chatChannel(), tab.channel);
             assertFalse(tab.detached);
+            assertEquals(ChatWidgetVisibility.ALWAYS, tab.visibility);
             assertFalse(config.mainLayout.widgets.contains(catalog.key()));
         }
     }
@@ -22,6 +23,7 @@ class ChatWindowsConfigTest {
         config.render.fixedChatWidgetFont = true;
         var tab = new ChatWidgetConfig(ChatTab.CLAN);
         tab.detached = true; tab.title = "Bosses"; tab.textFilter = "Legion"; tab.rows = 7; tab.width = 170;
+        tab.visibility = ChatWidgetVisibility.CHAT_OPEN;
         config.chatWidgets.put(id, tab); config.mainLayout.widgets.add(id);
         var location = new LocationWidgetLayoutConfig(); location.widgets.add(id); location.locationVisibility.add("shaft_1");
         var position = new WidgetLayoutConfig(); position.x = 18; position.scale = 1.2f;
@@ -29,6 +31,7 @@ class ChatWindowsConfigTest {
         var gson = HudConfigCodec.createGson();
         var restored = HudConfigCodec.decode(gson, JsonParser.parseString(gson.toJson(config)));
         assertTrue(restored.chatWidgets.get(id).detached);
+        assertEquals(ChatWidgetVisibility.CHAT_OPEN, restored.chatWidgets.get(id).visibility);
         assertTrue(restored.render.fixedChatWidgetFont);
         assertEquals("Legion", restored.chatWidgets.get(id).textFilter);
         assertEquals(ChatTab.CLAN, restored.chatWidgets.get(id).channel);
@@ -40,6 +43,7 @@ class ChatWindowsConfigTest {
         config.chatWidgets.put("ChatWidgetClan", null);
         for (int i = 0; i < 30; i++) {
             var tab = new ChatWidgetConfig(); tab.rows = Integer.MAX_VALUE; tab.width = -1; tab.title = null; tab.textFilter = null;
+            tab.visibility = null;
             config.chatWidgets.put("ChatWidgetCustom_" + String.format("%08x", i) + "-bbbb-cccc-dddd-eeeeeeeeeeee", tab);
         }
         var repaired = HudConfigSanitizer.sanitize(config);
@@ -47,7 +51,20 @@ class ChatWindowsConfigTest {
         assertEquals(ChatTab.CLAN, repaired.chatWidgets.get("ChatWidgetClan").channel);
         var custom = repaired.chatWidgets.values().stream().filter(tab -> tab.width == 100).findFirst().orElseThrow();
         assertEquals(30, custom.rows); assertEquals(ChatTab.ALL, custom.channel); assertEquals("", custom.textFilter);
+        assertEquals(ChatWidgetVisibility.ALWAYS, custom.visibility);
         assertNull(WidgetCatalog.find("ChatWidgetCustom_bad"));
+    }
+    @Test void transientChatVisibilityHasAnIdleHoldAndFadeAndOpeningAlwaysRevealsHistory() {
+        var mode = ChatWidgetVisibility.CHAT_OPEN;
+        assertEquals(0f, mode.alpha(false, -1));
+        assertEquals(1f, mode.alpha(true, -1));
+        assertEquals(1f, mode.alpha(false, 0));
+        assertEquals(1f, mode.alpha(false, 8_000_000_000L));
+        assertEquals(.5f, mode.alpha(false, 9_000_000_000L));
+        assertEquals(0f, mode.alpha(false, 10_000_000_000L));
+        assertEquals(0f, mode.alpha(false, 20_000_000_000L));
+        assertEquals(1f, mode.alpha(true, 20_000_000_000L));
+        assertEquals(1f, ChatWidgetVisibility.ALWAYS.alpha(false, -1));
     }
     @Test void deletingBuiltInTabsSurvivesReloadAndClearsTheirLayouts() {
         var config = HudConfigSanitizer.sanitize(new HudConfig());

@@ -46,7 +46,7 @@ public final class WidgetLayoutAnimation {
         Entry entry = entries.get(widget);
         // Do not resurrect old quests/popups after they have already disappeared normally.
         // Layout departures retain their previous frame until their fade has finished.
-        if (entry != null && entry.transition.visible()) entry.snapshot.clear();
+        if (entry != null && entry.transition.visible()) entry.clearSnapshot();
     }
     public void editorAdded(Widget widget, long now) {
         Entry entry = entries.computeIfAbsent(widget, ignored -> new Entry(new WidgetTransition(true,
@@ -65,21 +65,23 @@ public final class WidgetLayoutAnimation {
         boolean found = false;
         for (Entry entry : entries.values()) {
             if (entry.editorSize == null || entry.editorSize.present()) continue;
-            if (entry.editorSize.size(now) <= 0) entry.snapshot.clear();
+            if (entry.editorSize.size(now) <= 0) entry.clearSnapshot();
             else if (!entry.snapshot.isEmpty() && entry.snapshotSize > 0) found = true;
         }
         return found;
     }
     public void renderEditor(Widget widget, GuiGraphicsExtractor context, long now, Runnable draw) {
         Entry entry = entries.get(widget);
-        if (entry == null) { draw.run(); return; }
+        if (entry == null) { try (var appearance = WidgetRenderScope.appearance(widget)) { draw.run(); } return; }
         float size = entry.editorSize == null ? 1 : entry.editorSize.size(now);
         if (size <= 0) return;
         float cx = widget.getStartX() + widget.getWidth() / 2f;
         float cy = widget.getStartY() + widget.getHeight() / 2f;
         entry.staging.clear();
+        entry.stagingOpacities.clear();
         context.pose().pushMatrix();
-        try (var scope = new WidgetRenderScope(entry.staging, 1)) {
+        try (var scope = new WidgetRenderScope(entry.staging, 1, null, entry.stagingOpacities);
+             var appearance = WidgetRenderScope.appearance(widget)) {
             try (var profile = ModProfiler.getInstance().scope("hud/animation/editorTransform")) {
                 context.pose().translate(cx, cy).scale(size, size).translate(-cx, -cy);
             }
@@ -87,6 +89,8 @@ public final class WidgetLayoutAnimation {
             try (var profile = ModProfiler.getInstance().scope("hud/animation/snapshot")) {
                 var previous = entry.snapshot; entry.snapshot = entry.staging; entry.staging = previous;
                 entry.staging.clear();
+                var oldOpacities = entry.snapshotOpacities; entry.snapshotOpacities = entry.stagingOpacities; entry.stagingOpacities = oldOpacities;
+                entry.stagingOpacities.clear();
                 entry.snapshotSize = size; entry.snapshotCenterX = cx; entry.snapshotCenterY = cy;
                 ModProfiler.getInstance().incrementCounter("hud/animation/snapshotElements", entry.snapshot.size());
             }
@@ -96,20 +100,22 @@ public final class WidgetLayoutAnimation {
         boolean found = false;
         for (Entry entry : entries.values()) {
             if (entry.transition.visible()) continue;
-            if (entry.transition.alpha(now) <= 0) entry.snapshot.clear();
+            if (entry.transition.alpha(now) <= 0) entry.clearSnapshot();
             else if (!entry.snapshot.isEmpty()) found = true;
         }
         return found;
     }
     public void render(Widget widget, GuiGraphicsExtractor context, DeltaTracker delta, long now) {
         Entry entry = entries.get(widget);
-        if (entry == null) { widget.render(context, delta); return; }
+        if (entry == null) { try (var appearance = WidgetRenderScope.appearance(widget)) { widget.render(context, delta); } return; }
         if (!entry.transition.visible()) return;
         float scale = scale(widget);
         entry.transition.destination(widget.getStartX(), widget.getStartY(), scale);
         entry.staging.clear();
+        entry.stagingOpacities.clear();
         context.pose().pushMatrix();
-        try (var scope = new WidgetRenderScope(entry.staging, entry.transition.alpha(now))) {
+        try (var scope = new WidgetRenderScope(entry.staging, entry.transition.alpha(now), null, entry.stagingOpacities);
+             var appearance = WidgetRenderScope.appearance(widget)) {
             try (var profile = ModProfiler.getInstance().scope("hud/animation/locationTransform")) {
                 context.pose().translate(entry.transition.x(now), entry.transition.y(now));
                 float ratio = entry.transition.scale(now) / scale;
@@ -120,6 +126,8 @@ public final class WidgetLayoutAnimation {
             try (var profile = ModProfiler.getInstance().scope("hud/animation/snapshot")) {
                 var previous = entry.snapshot; entry.snapshot = entry.staging; entry.staging = previous;
                 entry.staging.clear();
+                var oldOpacities = entry.snapshotOpacities; entry.snapshotOpacities = entry.stagingOpacities; entry.stagingOpacities = oldOpacities;
+                entry.stagingOpacities.clear();
                 ModProfiler.getInstance().incrementCounter("hud/animation/snapshotElements", entry.snapshot.size());
             }
         } finally { context.pose().popMatrix(); }
@@ -138,7 +146,7 @@ public final class WidgetLayoutAnimation {
                 if (editor) {
                     if (entry.editorSize == null || entry.editorSize.present() || entry.snapshotSize <= 0) continue;
                     float size = entry.editorSize.size(now);
-                    if (size <= 0) { entry.snapshot.clear(); continue; }
+                    if (size <= 0) { entry.clearSnapshot(); continue; }
                     float ratio = size / entry.snapshotSize;
                     transform = new org.joml.Matrix3x2f().translate(entry.snapshotCenterX, entry.snapshotCenterY)
                             .scale(ratio).translate(-entry.snapshotCenterX, -entry.snapshotCenterY);
@@ -147,16 +155,19 @@ public final class WidgetLayoutAnimation {
                     if (entry.transition.visible()) continue;
                     alpha = entry.transition.alpha(now);
                 }
-                if (alpha <= 0) { entry.snapshot.clear(); continue; }
+                if (alpha <= 0) { entry.clearSnapshot(); continue; }
                 ModProfiler.getInstance().incrementCounter("hud/animation/departureWidgets");
                 ModProfiler.getInstance().incrementCounter("hud/animation/replayedElements", entry.snapshot.size());
                 try (var scope = new WidgetRenderScope(null, alpha, transform)) {
                     for (Object element : entry.snapshot) {
-                        if (element instanceof GuiElementRenderState gui) {
-                            var textures = gui.textureSetup();
-                            if (live(textures.texure0()) && live(textures.texure1()) && live(textures.texure2())) state.addGuiElement(gui);
-                        } else if (element instanceof GuiTextRenderState text) state.addText(text);
-                        else if (element instanceof GuiItemRenderState item) state.addItem(item);
+                        Float elementAlpha = entry.snapshotOpacities.get(element);
+                        try (var elementFade = elementAlpha == null ? null : WidgetRenderScope.fade(elementAlpha)) {
+                            if (element instanceof GuiElementRenderState gui) {
+                                var textures = gui.textureSetup();
+                                if (live(textures.texure0()) && live(textures.texure1()) && live(textures.texure2())) state.addGuiElement(gui);
+                            } else if (element instanceof GuiTextRenderState text) state.addText(text);
+                            else if (element instanceof GuiItemRenderState item) state.addItem(item);
+                        }
                     }
                 }
             }
@@ -173,6 +184,8 @@ public final class WidgetLayoutAnimation {
         WidgetSizeTransition editorSize;
         float snapshotSize = 1, snapshotCenterX, snapshotCenterY;
         List<Object> snapshot = new ArrayList<>(), staging = new ArrayList<>();
+        Map<Object, Float> snapshotOpacities = new IdentityHashMap<>(), stagingOpacities = new IdentityHashMap<>();
+        void clearSnapshot() { snapshot.clear(); snapshotOpacities.clear(); }
         Entry(WidgetTransition transition) { this.transition = transition; }
     }
 }

@@ -98,6 +98,10 @@ public class ConfigManager {
         return CONFIG.widgetLocations.computeIfAbsent(key, ignored -> new WidgetLocationConfig());
     }
 
+    public static WidgetAppearanceConfig getWidgetAppearance(String key) {
+        return CONFIG.widgetAppearance.computeIfAbsent(key, ignored -> new WidgetAppearanceConfig());
+    }
+
     public static synchronized Integer getLastWindowWidth() {
         return CONFIG.lastWindowWidth;
     }

@@ -56,6 +56,8 @@ public abstract class SettingsComponent implements MenuElement {
         return preferredHeight;
     }
 
+    public String getLabel() { return label; }
+
     public int getIndent() {
         return indent;
     }

@@ -46,7 +46,6 @@ public final class HudWidgetSidebar {
         UiSounds.update();
         if (!isShown()) { hoveredSoundWidget = null; return; }
         refreshBounds();
-        refreshWidgets();
         var font = Minecraft.getInstance().font;
         if (collapsed) {
             HudSurface.fillRounded(graphics, X, Y, 96, 24, 5, WidgetTheme.PANEL_BG);
@@ -58,6 +57,12 @@ public final class HudWidgetSidebar {
         graphics.text(font, fit(renderer.getSelectedLayoutName(), width - 62), X + 10, Y + 10, WidgetTheme.TITLE);
         if (!renderer.getSelectedLayout().isEmpty()) graphics.text(font, "...", X + width - 42, Y + 10, WidgetTheme.TEXT_ACCENT);
         graphics.text(font, "<", X + width - 17, Y + 10, WidgetTheme.TEXT_SOFT);
+        if (layoutMenu) {
+            hoveredSoundWidget = null;
+            renderLayoutMenu(graphics);
+            return;
+        }
+        refreshWidgets();
         int searchY = Y + 29;
         HudSurface.fillRounded(graphics, X + 7, searchY, width - 14, 21, 4, WidgetTheme.PANEL_BG_SOFT);
         if (searchFocused) graphics.fill(X + 7, searchY + 20, X + width - 7, searchY + 21, WidgetTheme.ACCENT_LINE);
@@ -106,20 +111,19 @@ public final class HudWidgetSidebar {
                 0, 0, WidgetTheme.TEXT_MUTED);
         graphics.pose().popMatrix();
 
-        if (renderer.getLayoutWidgetCount() == 0 && !layoutMenu) {
+        if (renderer.getLayoutWidgetCount() == 0) {
             int canvasCenter = X + width + (Minecraft.getInstance().getWindow().getGuiScaledWidth() - X - width) / 2;
             int canvasY = Minecraft.getInstance().getWindow().getGuiScaledHeight() / 2;
             graphics.centeredText(font, "Your layout is empty", canvasCenter, canvasY - 10, WidgetTheme.TITLE);
             graphics.centeredText(font, "Add widgets from the panel", canvasCenter, canvasY + 5, WidgetTheme.TEXT_SECONDARY);
         }
-        if (layoutMenu) renderLayoutMenu(graphics);
     }
 
     private int layoutMenuHeight() { return Math.min(height - 30, (ConfigManager.get().locationLayouts.size() + 2) * ROW_HEIGHT + 8); }
     private void renderLayoutMenu(GuiGraphicsExtractor graphics) {
         var font = Minecraft.getInstance().font;
         int top = Y + 26, h = layoutMenuHeight();
-        HudSurface.fillRounded(graphics, X + 4, top, width - 8, h, 4, WidgetTheme.PANEL_BG);
+        HudSurface.fillRounded(graphics, X + 4, top, width - 8, h, 4, WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0xFF));
         graphics.enableScissor(X + 5, top + 4, X + width - 5, top + h - 4);
         var ids = new java.util.ArrayList<>(ConfigManager.get().locationLayouts.keySet());
         for (int i = 0; i < ids.size() + 2; i++) {
@@ -208,7 +212,7 @@ public final class HudWidgetSidebar {
         return true;
     }
 
-    public boolean keyPressed(int key) {
+    public boolean keyPressed(int key, int modifiers) {
         if (isShown() && layoutMenu) {
             if (key == GLFW.GLFW_KEY_ESCAPE) layoutMenu = false;
             return true;
@@ -217,7 +221,8 @@ public final class HudWidgetSidebar {
         if (key == GLFW.GLFW_KEY_ESCAPE || key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
             searchFocused = false;
         } else if (key == GLFW.GLFW_KEY_BACKSPACE && !search.isEmpty()) {
-            search = search.substring(0, search.offsetByCodePoints(search.length(), -1));
+            search = (modifiers & GLFW.GLFW_MOD_CONTROL) != 0 ? ""
+                    : search.substring(0, search.offsetByCodePoints(search.length(), -1));
             invalidateSearch();
         } else if (key == GLFW.GLFW_KEY_DELETE) {
             search = "";

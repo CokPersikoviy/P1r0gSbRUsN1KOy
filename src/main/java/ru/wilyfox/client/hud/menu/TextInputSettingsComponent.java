@@ -16,6 +16,8 @@ public class TextInputSettingsComponent extends SettingsComponent {
     private final int maxLength;
 
     private boolean focused;
+    /** Keep raw input while editing; saving may normalize blanks or trim trailing spaces. */
+    private String editingValue = "";
     private int cursorPosition;
     private long blinkStartedAt = System.currentTimeMillis();
 
@@ -81,6 +83,7 @@ public class TextInputSettingsComponent extends SettingsComponent {
         }
 
         boolean inside = isHovered(mouseX, mouseY);
+        if (inside && !focused) editingValue = getValue();
         focused = inside;
         if (focused) {
             cursorPosition = getValue().length();
@@ -119,7 +122,11 @@ public class TextInputSettingsComponent extends SettingsComponent {
 
         switch (keyCode) {
             case GLFW.GLFW_KEY_BACKSPACE -> {
-                if (cursorPosition > 0 && !value.isEmpty()) {
+                if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0) {
+                    if (!value.isEmpty()) setValue("");
+                    cursorPosition = 0;
+                    blinkStartedAt = System.currentTimeMillis();
+                } else if (cursorPosition > 0 && !value.isEmpty()) {
                     setValue(value.substring(0, cursorPosition - 1) + value.substring(cursorPosition));
                     cursorPosition--;
                 }
@@ -203,11 +210,13 @@ public class TextInputSettingsComponent extends SettingsComponent {
     }
 
     private String getValue() {
+        if (focused) return editingValue;
         String value = getter.get();
         return value == null ? "" : value;
     }
 
     private void setValue(String value) {
+        if (focused) editingValue = value;
         setter.accept(value);
         ConfigManager.save();
     }

@@ -286,7 +286,16 @@ public class QuickAccessEditorScreen extends UiSoundScreen {
     }
 
     private EditBox createTextBox(int x, int y, int width, String initialValue, java.util.function.Consumer<String> onChange) {
-        EditBox box = new EditBox(this.font, x, y, width, 18, Component.empty());
+        EditBox box = new EditBox(this.font, x, y, width, 18, Component.empty()) {
+            @Override public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+                if (isFocused() && event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE
+                        && (event.modifiers() & org.lwjgl.glfw.GLFW.GLFW_MOD_CONTROL) != 0) {
+                    setValue("");
+                    return true;
+                }
+                return super.keyPressed(event);
+            }
+        };
         box.setValue(initialValue == null ? "" : initialValue);
         box.setResponder(value -> {
             onChange.accept(value);

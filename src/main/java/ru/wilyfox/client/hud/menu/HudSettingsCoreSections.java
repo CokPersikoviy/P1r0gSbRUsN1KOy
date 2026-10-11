@@ -41,6 +41,14 @@ final class HudSettingsCoreSections {
         toggle(items, "Show server in TAB", () -> ConfigManager.get().render.showCurrentServerInTab,
                 value -> ConfigManager.get().render.showCurrentServerInTab = value);
 
+        section(items, "Clear substances");
+        toggle(items, "Clear Water", () -> ConfigManager.get().render.clearWater,
+                value -> ConfigManager.get().render.clearWater = value);
+        toggle(items, "Clear Lava", () -> ConfigManager.get().render.clearLava,
+                value -> ConfigManager.get().render.clearLava = value);
+        toggle(items, "Clear Powder Snow", () -> ConfigManager.get().render.clearPowderSnow,
+                value -> ConfigManager.get().render.clearPowderSnow = value);
+
         section(items, "Animation");
         toggle(items, "Static hand", () -> ConfigManager.get().render.staticHand,
                 value -> ConfigManager.get().render.staticHand = value);
@@ -56,6 +64,24 @@ final class HudSettingsCoreSections {
                 value -> ConfigManager.get().render.toneDownChat = value);
         toggle(items, "Chat timestamps", () -> ConfigManager.get().render.chatTimestamps,
                 value -> ConfigManager.get().render.chatTimestamps = value);
+        items.add(new CycleSettingsComponent<>(0, 0, 0, 0, "Timestamp format",
+                () -> ConfigManager.get().render.timestamp.format, value -> ConfigManager.get().render.timestamp.format = value,
+                ru.wilyfox.client.hud.config.ChatTimestampConfig.Format.values(), ru.wilyfox.client.hud.config.ChatTimestampConfig.Format::label)
+                .withVisibility(() -> ConfigManager.get().render.chatTimestamps));
+        items.add(new CycleSettingsComponent<>(0, 0, 0, 0, "Timestamp brackets",
+                () -> ConfigManager.get().render.timestamp.brackets, value -> ConfigManager.get().render.timestamp.brackets = value,
+                ru.wilyfox.client.hud.config.ChatTimestampConfig.Brackets.values(), ru.wilyfox.client.hud.config.ChatTimestampConfig.Brackets::label)
+                .withVisibility(() -> ConfigManager.get().render.chatTimestamps));
+        items.add(toggle("Timestamp theme color", () -> ConfigManager.get().render.timestamp.themeColor,
+                value -> ConfigManager.get().render.timestamp.themeColor = value).withVisibility(() -> ConfigManager.get().render.chatTimestamps));
+        items.add(new ColorPickerSettingsComponent("Timestamp color",
+                () -> ConfigManager.get().render.timestamp.color, value -> ConfigManager.get().render.timestamp.color = value)
+                .withVisibility(() -> ConfigManager.get().render.chatTimestamps && !ConfigManager.get().render.timestamp.themeColor));
+        items.add(toggle("Timestamp bold", () -> ConfigManager.get().render.timestamp.bold,
+                value -> ConfigManager.get().render.timestamp.bold = value).withVisibility(() -> ConfigManager.get().render.chatTimestamps));
+        items.add(toggle("Timestamp italic", () -> ConfigManager.get().render.timestamp.italic,
+                value -> ConfigManager.get().render.timestamp.italic = value).withVisibility(() -> ConfigManager.get().render.chatTimestamps));
+        items.add(new ChatTimestampPreviewSettingsComponent().withVisibility(() -> ConfigManager.get().render.chatTimestamps));
         toggle(items, "Fixed chat widget font", () -> ConfigManager.get().render.fixedChatWidgetFont,
                 value -> ConfigManager.get().render.fixedChatWidgetFont = value);
         toggle(items, "Copy chat by RMB", () -> ConfigManager.get().render.copyChatMessages,

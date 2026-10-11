@@ -27,13 +27,27 @@ public final class ChatMessageCopyExtractor {
     }
 
     public static boolean copyHoveredMessage(ChatComponent chat, double mouseX, double mouseY, boolean fullMessage) {
+        GuiMessage message = hoveredMessage(chat, mouseX, mouseY);
+        if (message == null) return false;
+        return copyText(selectCopiedText(ChatMessageSanitizer.forLogic(
+                Formatting.stripMinecraftFormatting(message.content().getString())), fullMessage));
+    }
+
+    public static boolean copyText(String copied) {
+        if (copied == null || copied.isBlank()) return false;
+        Minecraft.getInstance().keyboardHandler.setClipboard(copied);
+        PopUpManager.getInstance().notifyChatCopied();
+        return true;
+    }
+
+    public static GuiMessage hoveredMessage(ChatComponent chat, double mouseX, double mouseY) {
         if (!(chat instanceof ChatComponentAccessor accessor)) {
-            return false;
+            return null;
         }
 
         List<GuiMessage.Line> visibleMessages = accessor.froghelper$getTrimmedMessages();
         if (visibleMessages.isEmpty()) {
-            return false;
+            return null;
         }
 
         Minecraft minecraft = Minecraft.getInstance();
@@ -41,22 +55,46 @@ public final class ChatMessageCopyExtractor {
         double chatX = mouseX / scale - 4.0;
         int width = (int) Math.ceil(ChatComponent.getWidth(minecraft.options.chatWidth().get()) / scale);
         if (!chat.isChatFocused() || chatX < -4 || chatX > width + 4) {
-            return false;
+            return null;
         }
 
         HoveredLineFinder finder = new HoveredLineFinder(mouseY);
         chat.captureClickableText(finder, minecraft.getWindow().getGuiScaledHeight(),
                 minecraft.gui.hud.getGuiTicks(), ChatComponent.DisplayMode.FOREGROUND);
 
-        String displayedText = ChatMessageSanitizer.forLogic(messageText(visibleMessages, finder.result));
-        String copied = selectCopiedText(displayedText, fullMessage);
-        if (copied.isBlank()) {
-            return false;
-        }
+        for (var line : visibleMessages) if (line.content() == finder.result) return line.parent();
+        return null;
+    }
 
-        minecraft.keyboardHandler.setClipboard(copied);
-        PopUpManager.getInstance().notifyChatCopied();
-        return true;
+    public static List<GuiMessage> displayedMessages(ChatComponent chat) {
+        return ((ChatComponentAccessor) chat).froghelper$getTrimmedMessages().stream().map(GuiMessage.Line::parent).toList();
+    }
+
+    public static void renderSelection(ChatComponent chat, net.minecraft.client.gui.GuiGraphicsExtractor graphics) {
+        var selection = ChatMessageSelection.getInstance();
+        if (!selection.hasSelection()) return;
+        var messages = new java.util.IdentityHashMap<FormattedCharSequence, GuiMessage>();
+        var accessor = (ChatComponentAccessor) chat;
+        var lines = accessor.froghelper$getTrimmedMessages();
+        int first = Math.max(0, accessor.froghelper$getScroll());
+        for (int i = first; i < Math.min(lines.size(), first + chat.getLinesPerPage() + 1); i++) {
+            var line = lines.get(i);
+            messages.put(line.content(), line.parent());
+        }
+        chat.captureClickableText(new ActiveTextCollector() {
+            private Parameters defaults = new Parameters(new Matrix3x2f());
+            @Override public Parameters defaultParameters() { return defaults; }
+            @Override public void defaultParameters(Parameters value) { defaults = value; }
+            @Override public void accept(TextAlignment alignment, int x, int y, Parameters p, FormattedCharSequence text) {
+                if (!selection.isSelected(messages.get(text))) return;
+                var top = p.pose().transformPosition(new Vector2f(x, y - 1));
+                var bottom = p.pose().transformPosition(new Vector2f(x + Minecraft.getInstance().font.width(text), y + 8));
+                graphics.fill((int) Math.floor(top.x), (int) Math.floor(top.y), (int) Math.ceil(bottom.x), (int) Math.ceil(bottom.y),
+                        ru.wilyfox.client.hud.widget.WidgetTheme.withAlpha(ru.wilyfox.client.hud.widget.WidgetTheme.ACCENT_LINE, 70));
+            }
+            @Override public void acceptScrolling(Component text, int x, int y, int left, int right, int color, Parameters p) { }
+        }, Minecraft.getInstance().getWindow().getGuiScaledHeight(), Minecraft.getInstance().gui.hud.getGuiTicks(),
+                ChatComponent.DisplayMode.FOREGROUND);
     }
 
     static String messageText(List<GuiMessage.Line> visibleMessages, FormattedCharSequence selectedLine) {

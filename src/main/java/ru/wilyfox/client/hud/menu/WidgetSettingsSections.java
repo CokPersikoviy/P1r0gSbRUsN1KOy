@@ -37,9 +37,15 @@ final class WidgetSettingsSections {
             items.add(slider("Chat width", () -> config.get().width, value -> config.get().width = value, 100, 600));
             items.add(slider("Chat rows", () -> config.get().rows, value -> config.get().rows = value, 2, 30));
             items.add(toggle("Show chat title", () -> config.get().showTitle, value -> config.get().showTitle = value));
+            items.add(cycle("Widget visibility", () -> config.get().visibility, value -> config.get().visibility = value,
+                    ru.wilyfox.client.hud.config.ChatWidgetVisibility.values(), ru.wilyfox.client.hud.config.ChatWidgetVisibility::title));
             return items;
         }
         switch (widget) {
+            case FPS -> {
+                items.add(toggle("Horizontal layout", () -> ConfigManager.get().fpsWidget.horizontal,
+                        value -> ConfigManager.get().fpsWidget.horizontal = value));
+            }
             case LEVEL_PROGRESS -> {
                 items.add(toggle("Show Level Progress Bar", () -> ConfigManager.get().levelProgress.showBar,
                         value -> ConfigManager.get().levelProgress.showBar = value));

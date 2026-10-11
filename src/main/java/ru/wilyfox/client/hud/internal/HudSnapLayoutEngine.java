@@ -95,11 +95,62 @@ public final class HudSnapLayoutEngine {
     }
 
     public void updateSnappedWidgets(HudSnapLayoutHost host) {
+        updateSnappedWidgets(host, host.getLastScreenWidth(), host.getLastScreenHeight());
+    }
+
+    public void updateSnappedWidgets(HudSnapLayoutHost host, int screenWidth, int screenHeight) {
         Map<String, AbstractWidget> widgetByKey = getAbstractWidgetMap();
         Set<String> visiting = new HashSet<>();
 
+        // Boundary correction is display-only. Rebuild free roots from their saved placement so
+        // a temporary wider child cannot permanently push its entire group across the screen.
+        for (AbstractWidget widget : widgetByKey.values()) {
+            AbstractWidget parent = widgetByKey.get(widget.getSnapTargetKey());
+            if (parent == null || parent.hasWidgetSnap() || parent.getScreenAnchor() != null
+                    || parent == host.getDraggedWidget()) continue;
+            WidgetLayoutConfig stored = host.getStoredPlacement(parent);
+            if (stored == null || screenWidth <= 0 || screenHeight <= 0) continue;
+            int x = stored.xFraction != null ? (int) Math.round(stored.xFraction * screenWidth)
+                    : stored.x != null ? stored.x : parent.getStartX();
+            int y = stored.yFraction != null ? (int) Math.round(stored.yFraction * screenHeight)
+                    : stored.y != null ? stored.y : parent.getStartY();
+            parent.setStartX(clamp(x, 0, Math.max(0, screenWidth - parent.getWidth())));
+            parent.setStartY(clamp(y, 0, Math.max(0, screenHeight - parent.getHeight())));
+        }
+
         for (AbstractWidget widget : widgetByKey.values()) {
             applyStoredWidgetSnap(host, widget, widgetByKey, visiting);
+        }
+        keepSnapGroupsOnScreen(host, widgetByKey, screenWidth, screenHeight);
+    }
+
+    private void keepSnapGroupsOnScreen(HudSnapLayoutHost host, Map<String, AbstractWidget> widgetByKey,
+                                         int screenWidth, int screenHeight) {
+        if (screenWidth <= 0 || screenHeight <= 0) return;
+        Set<AbstractWidget> handled = new HashSet<>();
+        for (AbstractWidget widget : widgetByKey.values()) {
+            if (!widget.hasWidgetSnap() || handled.contains(widget)) continue;
+            var group = HudSnapGroupResolver.getConnectedSnapGroup(widget, widgets);
+            handled.addAll(group);
+            // Do not fight the pointer while the user is dragging this group.
+            if (group.contains(host.getDraggedWidget())) continue;
+            int left = Integer.MAX_VALUE, top = Integer.MAX_VALUE;
+            int right = Integer.MIN_VALUE, bottom = Integer.MIN_VALUE;
+            for (AbstractWidget member : group) {
+                left = Math.min(left, member.getLeft()); top = Math.min(top, member.getTop());
+                right = Math.max(right, member.getRight()); bottom = Math.max(bottom, member.getBottom());
+            }
+            boolean fitsX = right - left <= screenWidth, fitsY = bottom - top <= screenHeight;
+            int dx = fitsX ? clamp(0, -left, screenWidth - right) : 0;
+            int dy = fitsY ? clamp(0, -top, screenHeight - bottom) : 0;
+            for (AbstractWidget member : group) {
+                // Translate a fitting group as a whole, preserving corners and gaps. If one axis
+                // cannot fit, keep each member reachable without deleting its saved snap relation.
+                member.setStartX(fitsX ? member.getStartX() + dx
+                        : clamp(member.getStartX(), 0, Math.max(0, screenWidth - member.getWidth())));
+                member.setStartY(fitsY ? member.getStartY() + dy
+                        : clamp(member.getStartY(), 0, Math.max(0, screenHeight - member.getHeight())));
+            }
         }
     }
 
@@ -241,7 +292,7 @@ public final class HudSnapLayoutEngine {
             repositionForResize(host, widget, screenWidth, screenHeight);
         }
 
-        updateSnappedWidgets(host);
+        updateSnappedWidgets(host, screenWidth, screenHeight);
     }
 
     private void clampWidgetsToScreen(int screenWidth, int screenHeight) {

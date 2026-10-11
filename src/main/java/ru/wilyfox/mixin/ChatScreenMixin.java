@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.wilyfox.client.Client;
 import ru.wilyfox.client.chat.ChatMessageCopyExtractor;
+import ru.wilyfox.client.chat.ChatMessageSelection;
 import ru.wilyfox.client.chat.ChatTabOverlay;
 import ru.wilyfox.client.chat.ChatTabManager;
 import ru.wilyfox.client.chat.ChatOutgoingRouter;
@@ -75,6 +76,7 @@ public abstract class ChatScreenMixin extends Screen {
 
     @Unique
     private void froghelper$toggleSearch() {
+        ChatMessageSelection.getInstance().clear();
         froghelper$searchActive = !froghelper$searchActive;
         if (froghelper$searchActive) {
             froghelper$searchWidget = froghelper$focusedWidget;
@@ -89,10 +91,15 @@ public abstract class ChatScreenMixin extends Screen {
     private void froghelper$chatShortcuts(KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
         froghelper$validateWidgetFocus();
         boolean control = (event.modifiers() & GLFW.GLFW_MOD_CONTROL) != 0;
-        if (control && event.key() == GLFW.GLFW_KEY_F) {
+        if (control && event.key() == GLFW.GLFW_KEY_C && !froghelper$searchActive
+                && ConfigManager.get().render.copyChatMessages && ChatMessageSelection.getInstance().hasSelection()) {
+            ChatMessageCopyExtractor.copyText(ChatMessageSelection.getInstance().copiedText(ConfigManager.get().render.fullMessageCopy));
+            cir.setReturnValue(true);
+        } else if (control && event.key() == GLFW.GLFW_KEY_F) {
             froghelper$toggleSearch();
             cir.setReturnValue(true);
         } else if (control && event.key() == GLFW.GLFW_KEY_TAB) {
+            ChatMessageSelection.getInstance().clear();
             froghelper$focusWidget(null);
             ChatDock.cycle((event.modifiers() & GLFW.GLFW_MOD_SHIFT) != 0);
             ru.wilyfox.client.audio.UiSounds.click();
@@ -117,6 +124,7 @@ public abstract class ChatScreenMixin extends Screen {
 
     @Inject(method = "removed", at = @At("HEAD"))
     private void froghelper$closeSearch(CallbackInfo ci) {
+        ChatMessageSelection.getInstance().clear();
         ChatDock.cancelDrag();
         ChatDock.focusWindow(null);
         froghelper$searchActive = false;
@@ -142,6 +150,7 @@ public abstract class ChatScreenMixin extends Screen {
 
     @Inject(method = "extractRenderState", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/Screen;extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IIF)V"))
     private void froghelper$renderChatWindows(GuiGraphicsExtractor graphics, int x, int y, float delta, CallbackInfo ci) {
+        ChatMessageCopyExtractor.renderSelection(minecraft.gui.hud.getChat(), graphics);
         if (Client.getInstance() != null) Client.getInstance().getHudRenderer().renderChatWindows(graphics);
     }
 
@@ -154,8 +163,10 @@ public abstract class ChatScreenMixin extends Screen {
     private void froghelper$mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
         double mouseX = event.x(), mouseY = event.y();
         int button = event.button();
+        if (button == 0) ChatMessageSelection.getInstance().clear();
         String tab = ChatTabOverlay.getInstance().tabAt(mouseX, mouseY, this.height);
         if (tab != null && (button == 0 || button == 1)) {
+            ChatMessageSelection.getInstance().clear();
             froghelper$focusWidget(null);
             if (button == 0) ChatDock.pressTab(tab, mouseX, mouseY);
             else ChatDock.edit(tab);
@@ -181,10 +192,26 @@ public abstract class ChatScreenMixin extends Screen {
                 if (widget.isHeader(mouseX, mouseY)) ChatDock.pressWindow(widget, mouseX, mouseY);
                 Style style = widget.styleAt(mouseX, mouseY);
                 if (style != null) handleComponentClicked(style, minecraft.hasShiftDown());
-            } else if (widget.isHeader(mouseX, mouseY)) ChatDock.edit(widget.getConfigKey());
-            else if (ConfigManager.get().render.copyChatMessages) widget.copyAt(mouseX, mouseY);
+            } else if (widget.isHeader(mouseX, mouseY)) {
+                ChatMessageSelection.getInstance().clear();
+                ChatDock.edit(widget.getConfigKey());
+            } else if (ConfigManager.get().render.copyChatMessages) {
+                var line = widget.lineAt(mouseX, mouseY);
+                if (line != null) ChatMessageSelection.getInstance().press(froghelper$selectionSource(widget),
+                        widget.view().selectionMessages(), line.message(), minecraft.hasControlDown(), minecraft.hasShiftDown());
+            }
             cir.setReturnValue(true);
             return;
+        }
+        if (button == 1 && ConfigManager.get().render.copyChatMessages) {
+            var chat = minecraft.gui.hud.getChat();
+            var message = ChatMessageCopyExtractor.hoveredMessage(chat, mouseX, mouseY);
+            if (message != null) {
+                ChatMessageSelection.getInstance().press(froghelper$selectionSource(null),
+                        ChatMessageCopyExtractor.displayedMessages(chat), message, minecraft.hasControlDown(), minecraft.hasShiftDown());
+                cir.setReturnValue(true);
+                return;
+            }
         }
         if (button == 0 && mouseY < height - 16) froghelper$focusWidget(null);
         if (client != null && client.getHudRenderer().handleChatClick(mouseX, mouseY, button)) {
@@ -220,12 +247,32 @@ public abstract class ChatScreenMixin extends Screen {
     }
 
     @Override public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dx, double dy) {
+        if (event.button() == 1 && ChatMessageSelection.getInstance().isDragging()) {
+            var client = Client.getInstance();
+            var widget = client == null ? null : client.getHudRenderer().chatWidgetAt(event.x(), event.y());
+            var line = widget == null ? null : widget.lineAt(event.x(), event.y());
+            var message = widget == null ? ChatMessageCopyExtractor.hoveredMessage(minecraft.gui.hud.getChat(), event.x(), event.y())
+                    : line == null ? null : line.message();
+            ChatMessageSelection.getInstance().drag(froghelper$selectionSource(widget), message);
+            return true;
+        }
         if (event.button() == 0 && ChatDock.drag(event.x(), event.y())) return true;
         return super.mouseDragged(event, dx, dy);
     }
     @Override public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+        if (event.button() == 1 && ChatMessageSelection.getInstance().isDragging()) {
+            ChatMessageSelection.getInstance().release();
+            ChatMessageCopyExtractor.copyText(ChatMessageSelection.getInstance().copiedText(ConfigManager.get().render.fullMessageCopy));
+            return true;
+        }
         if (event.button() == 0 && ChatDock.release(event.x(), event.y())) return true;
         return super.mouseReleased(event);
+    }
+
+    @Unique private String froghelper$selectionSource(ChatWidget widget) {
+        if (widget != null) return "widget:" + widget.getConfigKey() + ":" + widget.view().search();
+        var tabs = ChatTabManager.getInstance();
+        return "dock:" + tabs.activeWindow() + ":" + tabs.getActiveTab() + ":" + tabs.search();
     }
 
     @Inject(method = "mouseClicked", at = @At("RETURN"), cancellable = true)

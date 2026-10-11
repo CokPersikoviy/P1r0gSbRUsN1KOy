@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import org.lwjgl.glfw.GLFW;
 
 public class HudSettingsPanel {
     private int x;
@@ -52,6 +54,12 @@ public class HudSettingsPanel {
     private boolean categoryScrollbarDragging = false;
     private int categoryScrollbarDragOffset = 0;
     private final List<Boolean> autoMessageSlotExpanded = new ArrayList<>();
+    private final Map<SettingsCategory, List<SettingsComponent>> searchResults = new EnumMap<>(SettingsCategory.class);
+    private String search = "";
+    private boolean searchFocused;
+    private boolean replaceSearch;
+    private SettingsCategory categoryBeforeSearch;
+    private int scrollBeforeSearch, categoryScrollBeforeSearch;
 
     public boolean isWidgetSettings() { return settingsWidget != null; }
     public boolean isContextSettings() { return settingsWidget != null || settingsLayout != null; }
@@ -75,6 +83,13 @@ public class HudSettingsPanel {
         widgetComponents.add(new LocationSettingsComponent("Location visibility",
                 () -> ConfigManager.getWidgetLocations(placed.getConfigKey()).locationVisibility,
                 value -> ConfigManager.getWidgetLocations(placed.getConfigKey()).selectVisible(value), "Everywhere"));
+        // Resolve live config on every edit so undo's restored snapshot also backs these controls.
+        widgetComponents.add(new DragNumberSettingsComponent(0, 0, 0, 0, "Widget opacity (%)",
+                () -> ConfigManager.getWidgetAppearance(placed.getConfigKey()).opacityPercent,
+                value -> ConfigManager.getWidgetAppearance(placed.getConfigKey()).opacityPercent = value, 0, 100));
+        widgetComponents.add(new DragNumberSettingsComponent(0, 0, 0, 0, "Background opacity (%)",
+                () -> ConfigManager.getWidgetAppearance(placed.getConfigKey()).backgroundOpacityPercent,
+                value -> ConfigManager.getWidgetAppearance(placed.getConfigKey()).backgroundOpacityPercent = value, 0, 100));
         widgetComponents.add(new LocationSettingsComponent("Location hidden",
                 () -> ConfigManager.getWidgetLocations(placed.getConfigKey()).locationHidden,
                 value -> ConfigManager.getWidgetLocations(placed.getConfigKey()).selectHidden(value), "Nowhere"));
@@ -167,7 +182,55 @@ public class HudSettingsPanel {
     }
 
     private List<SettingsComponent> activeComponents() {
-        return isContextSettings() ? widgetComponents : componentsByCategory.getOrDefault(activeCategory, List.of());
+        return isContextSettings() ? widgetComponents : (isSearching() ? searchResults : componentsByCategory)
+                .getOrDefault(activeCategory, List.of());
+    }
+
+    private boolean isSearching() { return !search.isBlank(); }
+
+    private List<SettingsCategory> visibleCategories() {
+        if (!isSearching()) return List.of(SettingsCategory.values());
+        return java.util.Arrays.stream(SettingsCategory.values())
+                .filter(category -> searchResults.getOrDefault(category, List.of()).stream().anyMatch(SettingsComponent::isVisible))
+                .toList();
+    }
+
+    private void updateSearch(String value) {
+        boolean wasSearching = isSearching();
+        String previous = search;
+        search = value.codePoints().filter(codepoint -> !Character.isISOControl(codepoint)).limit(48)
+                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString();
+        if (search.equals(previous)) return;
+        if (!wasSearching && isSearching()) {
+            categoryBeforeSearch = activeCategory;
+            scrollBeforeSearch = scrollOffset;
+            categoryScrollBeforeSearch = categoryScrollOffset;
+        }
+        refreshSearchResults();
+        scrollOffset = 0; categoryScrollOffset = 0;
+        if (wasSearching && !isSearching() && categoryBeforeSearch != null) {
+            activeCategory = categoryBeforeSearch;
+            scrollOffset = scrollBeforeSearch; categoryScrollOffset = categoryScrollBeforeSearch;
+            categoryBeforeSearch = null;
+        }
+        hoveredSoundTarget = null;
+    }
+
+    private void refreshSearchResults() {
+        searchResults.clear();
+        if (!isSearching()) return;
+        String[] words = search.strip().toLowerCase(Locale.ROOT).split("\\s+");
+        for (var category : SettingsCategory.values()) {
+            var matches = componentsByCategory.getOrDefault(category, List.of()).stream()
+                    .filter(component -> !(component instanceof BreakLineSettingsComponent))
+                    .filter(component -> {
+                        String text = (category.getTitle() + " " + component.getLabel()).toLowerCase(Locale.ROOT);
+                        return java.util.Arrays.stream(words).allMatch(text::contains);
+                    }).toList();
+            searchResults.put(category, matches);
+        }
+        var categories = visibleCategories();
+        if (!categories.contains(activeCategory) && !categories.isEmpty()) activeCategory = categories.getFirst();
     }
 
     public void render(GuiGraphicsExtractor context, double mouseX, double mouseY) {
@@ -210,6 +273,16 @@ public class HudSettingsPanel {
 
         context.text(mc.font, "FrogHelper", x + 10, y + 8, WidgetTheme.TITLE);
         context.text(mc.font, "Settings", x + 68, y + 8, WidgetTheme.TEXT_SECONDARY);
+        int searchX = getContentX(), searchY = y + 3, searchWidth = getContentWidth();
+        HudSurface.fillRounded(context, searchX, searchY, searchWidth, 21, 4, WidgetTheme.PANEL_BG_SOFT);
+        if (searchFocused) context.fill(searchX, searchY + 20, searchX + searchWidth, searchY + 21, WidgetTheme.ACCENT_LINE);
+        String label = search.isEmpty() && !searchFocused ? "Search settings..." : search + (searchFocused ? "_" : "");
+        // Keep the end of the query visible, just like the caret in the widget library.
+        if (searchFocused) while (!label.isEmpty() && mc.font.width(label) > searchWidth - 10)
+            label = label.substring(label.offsetByCodePoints(0, 1));
+        else label = mc.font.plainSubstrByWidth(label, searchWidth - 10);
+        context.text(mc.font, label, searchX + 5, searchY + 7,
+                search.isEmpty() && !searchFocused ? WidgetTheme.TEXT_MUTED : WidgetTheme.TEXT_PRIMARY);
     }
 
     private void renderSidebar(GuiGraphicsExtractor context, double mouseX, double mouseY) {
@@ -235,7 +308,7 @@ public class HudSettingsPanel {
                 listY + listHeight
         );
 
-        for (SettingsCategory category : SettingsCategory.values()) {
+        for (SettingsCategory category : visibleCategories()) {
             boolean hovered = mouseX >= sidebarX + 4 && mouseX <= sidebarX + sidebarWidth - 4
                     && mouseY >= tabY && mouseY <= tabY + 20;
             if (hovered && mouseY >= listY && mouseY < listY + listHeight) frameSoundTarget = category;
@@ -284,10 +357,10 @@ public class HudSettingsPanel {
                 .toList();
 
         int innerX = contentX + contentPadding;
-        int innerY = contentY + contentPadding - scrollOffset;
         int innerWidth = contentWidth - contentPadding * 2 - 8;
 
         updateScrollBounds(activeComponents, contentHeight);
+        int innerY = contentY + contentPadding - scrollOffset;
 
         context.enableScissor(
                 contentX + 1,
@@ -310,6 +383,9 @@ public class HudSettingsPanel {
 
             innerY += componentHeight + rowSpacing;
         }
+
+        if (isSearching() && !isContextSettings() && activeComponents.isEmpty())
+            context.text(Minecraft.getInstance().font, "No matches", innerX, contentY + contentPadding, WidgetTheme.TEXT_MUTED);
 
         context.disableScissor();
 
@@ -381,6 +457,7 @@ public class HudSettingsPanel {
         HudSettingsCoreSections.populate(componentsByCategory);
 
         initialized = true;
+        refreshSearchResults();
     }
 
     private void rebuildAutoMessageComponents() {
@@ -476,6 +553,7 @@ public class HudSettingsPanel {
                         this::addAutoMessageSlot
                 )
         );
+        refreshSearchResults();
     }
 
     private void ensureAutoMessageSlotState() {
@@ -516,6 +594,7 @@ public class HudSettingsPanel {
     public void finishInteraction() {
         finishNumberDrag();
         for (SettingsComponent component : activeComponents()) component.onClickOutside();
+        searchFocused = false; replaceSearch = false;
     }
 
     private void finishNumberDrag() {
@@ -533,6 +612,13 @@ public class HudSettingsPanel {
             if (!component.isHovered(mouseX, mouseY)) {
                 component.onClickOutside();
             }
+        }
+        boolean overSearch = !isContextSettings() && mouseX >= getContentX() && mouseX < getContentX() + getContentWidth()
+                && mouseY >= y + 3 && mouseY < y + 24;
+        if (!overSearch) { searchFocused = false; replaceSearch = false; }
+        if (overSearch) {
+            if (button == 0) { searchFocused = true; replaceSearch = false; UiSounds.click(); }
+            return true;
         }
 
         if (!isInside(mouseX, mouseY)) {
@@ -599,6 +685,28 @@ public class HudSettingsPanel {
     }
 
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (!isContextSettings() && searchFocused) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                if (!search.isEmpty()) updateSearch(""); else searchFocused = false;
+                replaceSearch = false;
+            } else if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+                searchFocused = false; replaceSearch = false;
+            } else if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0 && keyCode == GLFW.GLFW_KEY_A) {
+                replaceSearch = true;
+            } else if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0 && keyCode == GLFW.GLFW_KEY_V) {
+                updateSearch((replaceSearch ? "" : search) + Minecraft.getInstance().keyboardHandler.getClipboard());
+                replaceSearch = false;
+            } else if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0 && keyCode == GLFW.GLFW_KEY_C) {
+                Minecraft.getInstance().keyboardHandler.setClipboard(search);
+            } else if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
+                if (replaceSearch || (modifiers & GLFW.GLFW_MOD_CONTROL) != 0) updateSearch("");
+                else if (!search.isEmpty()) updateSearch(search.substring(0, search.offsetByCodePoints(search.length(), -1)));
+                replaceSearch = false;
+            } else if (keyCode == GLFW.GLFW_KEY_DELETE) {
+                updateSearch(""); replaceSearch = false;
+            }
+            return true;
+        }
         for (SettingsComponent component : getInteractiveComponents()) {
             if (component.keyPressed(keyCode, scanCode, modifiers)) {
                 return true;
@@ -613,6 +721,13 @@ public class HudSettingsPanel {
     }
 
     public boolean charTyped(int codePoint, int modifiers) {
+        if (!isContextSettings() && searchFocused) {
+            if (Character.isValidCodePoint(codePoint) && !Character.isISOControl(codePoint)) {
+                updateSearch((replaceSearch ? "" : search) + new String(Character.toChars(codePoint)));
+                replaceSearch = false;
+            }
+            return true;
+        }
         for (SettingsComponent component : getInteractiveComponents()) {
             if (component.charTyped(codePoint, modifiers)) {
                 return true;
@@ -686,11 +801,11 @@ public class HudSettingsPanel {
         int visibleTop = sidebarY + 4;
         int visibleBottom = sidebarY + getSidebarHeight() - 4;
 
-        for (SettingsCategory category : SettingsCategory.values()) {
+        for (SettingsCategory category : visibleCategories()) {
             boolean hovered = mouseX >= sidebarX + 4 && mouseX <= sidebarX + sidebarWidth - 4
                     && mouseY >= tabY && mouseY <= tabY + 20;
 
-            if (hovered && tabY + 20 >= visibleTop && tabY <= visibleBottom) {
+            if (hovered && mouseY >= visibleTop && mouseY < visibleBottom) {
                 if (activeCategory != category) UiSounds.click();
                 activeCategory = category;
                 scrollOffset = 0;
@@ -819,7 +934,7 @@ public class HudSettingsPanel {
     }
 
     private void updateCategoryScrollBounds(int sidebarHeight) {
-        int totalContentHeight = SettingsCategory.values().length * 24;
+        int totalContentHeight = visibleCategories().size() * 24;
         maxCategoryScroll = Math.max(0, totalContentHeight - (sidebarHeight - 12));
         clampCategoryScroll();
     }

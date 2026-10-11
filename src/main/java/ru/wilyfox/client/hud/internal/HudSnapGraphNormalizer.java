@@ -107,9 +107,13 @@ public final class HudSnapGraphNormalizer {
 
     private static AbstractWidget chooseSnapRoot(List<AbstractWidget> component) {
         AbstractWidget bestAnchored = null;
+        AbstractWidget existingRoot = null;
         AbstractWidget bestFree = null;
 
         for (AbstractWidget widget : component) {
+            if (!widget.hasWidgetSnap() && (existingRoot == null || isHigherPrioritySnapRoot(widget, existingRoot))) {
+                existingRoot = widget;
+            }
             if (widget.getScreenAnchor() != null) {
                 if (bestAnchored == null || isHigherPrioritySnapRoot(widget, bestAnchored)) {
                     bestAnchored = widget;
@@ -119,7 +123,9 @@ public final class HudSnapGraphNormalizer {
             }
         }
 
-        return bestAnchored != null ? bestAnchored : bestFree;
+        // Keep a valid tree's original parent direction. Picking the top-left widget again after
+        // auto-sizing or an editor transition makes the group's position depend on its last frame.
+        return bestAnchored != null ? bestAnchored : existingRoot != null ? existingRoot : bestFree;
     }
 
     private static boolean isHigherPrioritySnapRoot(AbstractWidget candidate, AbstractWidget currentBest) {

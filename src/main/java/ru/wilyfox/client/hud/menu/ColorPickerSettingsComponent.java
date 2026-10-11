@@ -202,6 +202,7 @@ public final class ColorPickerSettingsComponent extends SettingsComponent {
 
         switch (keyCode) {
             case GLFW.GLFW_KEY_BACKSPACE -> {
+                if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0) selectAll = true;
                 deleteBeforeCursor();
                 return true;
             }

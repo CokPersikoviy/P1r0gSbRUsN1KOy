@@ -13,6 +13,11 @@ final class HudSettingsVisualsSection {
     private static VisualsConfig c() { return ConfigManager.get().visuals; }
     static void populate(List<SettingsComponent> items) {
         items.add(new CycleSettingsComponent<>(0, 0, 0, 0, "Section", () -> selected, value -> selected = value, Section.values(), HudSettingsVisualsSection::title));
+        items.add(new ActionSettingsComponent("Reset section", () -> reset(selected)));
+        items.add(new ActionSettingsComponent("Reset All Visuals", () -> {
+            ConfigManager.get().visuals = new VisualsConfig();
+            ConfigManager.save();
+        }));
         for (Section section : Section.values()) {
             List<SettingsComponent> rows = new ArrayList<>();
             switch (section) {
@@ -31,6 +36,44 @@ final class HudSettingsVisualsSection {
                 items.add(row.withVisibility(() -> selected == section && original.getAsBoolean()));
             }
         }
+    }
+    private static void reset(Section section) {
+        var defaults = new VisualsConfig();
+        var config = c();
+        switch (section) {
+            case SCREEN -> {
+                config.aspectRatio = defaults.aspectRatio;
+                config.aspectWidth = defaults.aspectWidth; config.aspectHeight = defaults.aspectHeight;
+                config.stretchHand = defaults.stretchHand; config.compactReload = defaults.compactReload;
+            }
+            case CROSSHAIR -> config.crosshair = defaults.crosshair;
+            case HITBOXES -> config.hitboxes = defaults.hitboxes;
+            case HAND -> config.hand = defaults.hand;
+            case CAMERA -> config.camera = defaults.camera;
+            case TAB -> config.tab = defaults.tab;
+            case BLOCK_OUTLINE -> {
+                config.blockOutline = defaults.blockOutline;
+                config.blockMode = defaults.blockMode; config.blockStyle = defaults.blockStyle;
+                config.blockOutlineColor = defaults.blockOutlineColor; config.blockOutlineWidth = defaults.blockOutlineWidth;
+                config.blockFill = defaults.blockFill; config.blockFillColor = defaults.blockFillColor;
+                config.blockThroughWalls = defaults.blockThroughWalls;
+                config.blockAnimation = defaults.blockAnimation; config.blockLinger = defaults.blockLinger; config.blockFade = defaults.blockFade;
+                config.blockRainbow = defaults.blockRainbow; config.blockRainbowSpeed = defaults.blockRainbowSpeed;
+            }
+            case WORLD -> {
+                config.brightnessEnabled = defaults.brightnessEnabled; config.brightness = defaults.brightness;
+                config.skyLightEnabled = defaults.skyLightEnabled; config.skyLightColor = defaults.skyLightColor;
+                config.blockLightEnabled = defaults.blockLightEnabled; config.blockLightColor = defaults.blockLightColor;
+                config.skyColorEnabled = defaults.skyColorEnabled; config.skyColor = defaults.skyColor;
+                config.fogColorEnabled = defaults.fogColorEnabled; config.fogColor = defaults.fogColor;
+                config.cloudColorEnabled = defaults.cloudColorEnabled; config.cloudColor = defaults.cloudColor;
+                config.fogMode = defaults.fogMode; config.fogDistance = defaults.fogDistance; config.fluidFog = defaults.fluidFog;
+                config.timeEnabled = defaults.timeEnabled; config.time = defaults.time;
+                config.weather = defaults.weather;
+                config.shadowStrength = defaults.shadowStrength; config.shadowRadius = defaults.shadowRadius;
+            }
+        }
+        ConfigManager.save();
     }
     private static void screen(List<SettingsComponent> r) {
         r.add(cycle("Aspect ratio", () -> c().aspectRatio, v -> c().aspectRatio = v, AspectRatioPreset.values()));

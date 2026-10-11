@@ -7,6 +7,9 @@ public class RenderConfig {
     public boolean hideHurtCameraShake = false;
     public boolean staticHand = false;
     public boolean hideFireOverlay = false;
+    public boolean clearWater = false;
+    public boolean clearLava = false;
+    public boolean clearPowderSnow = false;
     public boolean hideFirstPersonCosmetics = true;
     public boolean cleanPlayerNames = false;
     public boolean modUserBadge = true;                       // frog badge on FrogHelper users' nametags
@@ -14,6 +17,7 @@ public class RenderConfig {
     public boolean copyChatMessages = true;
     public boolean fullMessageCopy = false;
     public boolean chatTimestamps = true;
+    public ChatTimestampConfig timestamp = new ChatTimestampConfig();
     public boolean fixedChatWidgetFont = false;
     public int extraChatHistoryLines = 200;
     public boolean autoThanks = true;
