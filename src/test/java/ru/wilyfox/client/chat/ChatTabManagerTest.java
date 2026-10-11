@@ -60,6 +60,7 @@ class ChatTabManagerTest {
         manager.captureIncoming(Component.literal("T Fox: trade"), 2);
         assertEquals(2, manager.getMessages(ChatTab.ALL).size());
         assertEquals(0, manager.getMessages(ChatTab.GLOBAL).size());
+        assertEquals(0, manager.unread(ChatTab.GLOBAL));
         assertEquals(1, manager.getMessages(ChatTab.CLAN).size());
         assertEquals(1, manager.getMessages(ChatTab.TRADE).size());
         org.junit.jupiter.api.Assertions.assertSame(manager.getMessages(ChatTab.ALL).getFirst(), manager.getMessages(ChatTab.CLAN).getFirst());

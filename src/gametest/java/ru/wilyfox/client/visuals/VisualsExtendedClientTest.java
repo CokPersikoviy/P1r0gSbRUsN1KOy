@@ -198,12 +198,35 @@ public final class VisualsExtendedClientTest implements FabricClientGameTest {
             expect(VisualsCamera.active() && client.options.getCameraType() == CameraType.THIRD_PERSON_BACK, "Hold freelook did not start");
             VisualsCamera.turn(100, 10000);
             expect(VisualsCamera.pitch() == 90 && client.player.getYRot() == playerYaw, "Freelook rotated the player or exceeded pitch limits");
+            int selectedSlot = client.player.getInventory().getSelectedSlot();
+            c.distance = 4;
+            wheel(client, -1);
+            expect(close(VisualsCamera.zoom(4), 4.5f), "Mouse wheel did not increase freelook distance immediately");
+            wheel(client, 2);
+            expect(close(VisualsCamera.zoom(4), 3.5f), "Mouse wheel did not decrease freelook distance");
+            wheel(client, 100);
+            expect(close(VisualsCamera.zoom(4), .5f), "Freelook zoom exceeded its near limit");
+            wheel(client, -100); wheel(client, -1);
+            expect(close(VisualsCamera.zoom(4), 20), "Freelook zoom exceeded its far limit");
+            expect(client.player.getInventory().getSelectedSlot() == selectedSlot, "Freelook wheel switched hotbar slots");
+            set(window, "focused", false);
+            expect(!VisualsCamera.scroll(client, 1) && c.distance == 20, "Unfocused window changed freelook distance");
+            set(window, "focused", true);
+            client.gui.setScreen(new net.minecraft.client.gui.screens.ChatScreen("", false));
+            expect(!VisualsCamera.scroll(client, 1) && c.distance == 20, "Freelook consumed menu scrolling");
+            client.gui.setScreen(null);
             VisualsCamera.tick(client, false);
             expect(!VisualsCamera.active() && client.options.getCameraType() == CameraType.FIRST_PERSON, "Freelook did not restore previous perspective");
+            expect(!VisualsCamera.scroll(client, 1), "Inactive freelook consumed scrolling");
             c.mode = VisualsConfig.LookMode.TOGGLE; VisualsCamera.tick(client, true); VisualsCamera.tick(client, false);
             expect(VisualsCamera.active(), "Toggle freelook released on key-up");
+            wheel(client, 1);
+            expect(close(VisualsCamera.zoom(4), 19.5f), "Toggle freelook did not retain or adjust its distance");
             c.enabled = false; VisualsCamera.tick(client, false); expect(!VisualsCamera.active(), "Disabled freelook remained active");
         } finally { set(window, "focused", focused); }
+    }
+    private static void wheel(Minecraft client, double amount) {
+        invoke(client.mouseHandler, "onScroll", new Class<?>[]{long.class, double.class, double.class}, client.getWindow().handle(), 0d, amount);
     }
     private static net.minecraft.client.gui.screens.Screen previewScreen(String section) {
         try {

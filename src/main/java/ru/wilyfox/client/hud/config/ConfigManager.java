@@ -159,6 +159,9 @@ public class ConfigManager {
     }
 
     private static void updateWidgetLayout(AbstractWidget widget, int screenW, int screenH) {
+        // Inherited geometry belongs to Main; never persist its child-layout display state.
+        if (HudLayoutResolver.isInherited(CONFIG, widget.getConfigKey(), editorLayout,
+                DiamondWorldProtocolClient.getCurrentGameLocation())) return;
         WidgetLayoutConfig layout = HudLayoutResolver.placementStorage(CONFIG, widget.getConfigKey(), editorLayout,
                 DiamondWorldProtocolClient.getCurrentGameLocation()).computeIfAbsent(widget.getConfigKey(), ignored -> new WidgetLayoutConfig());
         layout.x = widget.getStartX();

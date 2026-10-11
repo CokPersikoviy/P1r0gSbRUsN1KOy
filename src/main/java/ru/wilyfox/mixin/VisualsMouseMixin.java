@@ -3,6 +3,7 @@ package ru.wilyfox.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.minecraft.client.MouseHandler;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.client.player.LocalPlayer;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,8 +25,10 @@ public abstract class VisualsMouseMixin {
    }
 
    @Inject(method = "onScroll", at = @At("HEAD"), cancellable = true)
-   private void froghelper$tabPages(long handle, double xoffset, double yoffset, CallbackInfo ci) {
-      if (VisualsTab.scroll(yoffset != 0.0 ? yoffset : -xoffset)) {
+   private void froghelper$scrollVisuals(long handle, double xoffset, double yoffset, CallbackInfo ci) {
+      var client = Minecraft.getInstance();
+      if (handle != client.getWindow().handle()) return;
+      if (VisualsCamera.scroll(client, yoffset) || VisualsTab.scroll(yoffset != 0.0 ? yoffset : -xoffset)) {
          ci.cancel();
       }
    }

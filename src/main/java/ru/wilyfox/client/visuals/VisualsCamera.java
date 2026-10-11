@@ -10,7 +10,7 @@ import ru.wilyfox.client.hud.config.RunesBagConfig;
 import ru.wilyfox.client.hud.config.VisualsConfig;
 
 public final class VisualsCamera {
-    private static boolean active, wasDown, toggled, hitWasDown;
+    private static boolean active, wasDown, toggled, hitWasDown, distanceChanged;
     private static float yaw, pitch;
     private static CameraType previous;
     private VisualsCamera() {}
@@ -52,6 +52,9 @@ public final class VisualsCamera {
     }
     private static void stop(Minecraft mc) {
         if (active && previous != null) mc.options.setCameraType(previous);
+        // Keep the chosen distance, with one config write after the gesture instead of per wheel event.
+        if (distanceChanged) ConfigManager.save();
+        distanceChanged = false;
         active = false; toggled = false; previous = null;
     }
     public static boolean active() { return active; }
@@ -60,6 +63,14 @@ public final class VisualsCamera {
     public static void turn(double dx, double dy) {
         yaw += (float) (dx * 0.15);
         pitch = Math.clamp(pitch + (float) (dy * 0.15 * (ConfigManager.get().visuals.camera.invertPitch ? -1 : 1)), -90, 90);
+    }
+    public static boolean scroll(Minecraft mc, double amount) {
+        var c = ConfigManager.get().visuals.camera;
+        if (!active || !c.enabled || mc.player == null || mc.gui.screen() != null || !mc.isWindowActive()
+                || amount == 0 || !Double.isFinite(amount)) return false;
+        double distance = Math.clamp(c.distance - amount * .5, .5, 20);
+        if (distance != c.distance) { c.distance = distance; distanceChanged = true; }
+        return true; // Also consume wheel events at the limit; they must not scroll the hotbar.
     }
     public static float zoom(float vanilla) {
         var c = ConfigManager.get().visuals.camera;

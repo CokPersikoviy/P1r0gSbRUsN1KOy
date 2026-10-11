@@ -3,6 +3,7 @@ package ru.wilyfox.client.popup;
 public final class PopUpSource {
     public static final String CHAT_COPY = "chat.copy";
     public static final String PRIVATE_MESSAGE = "chat.private_message";
+    public static final String FH_MESSAGE = "chat.fh_message";
     public static final String BOSS_SPAWN = "boss.spawn";
     public static final String BOSS_CAPTURE = "boss.capture";
     public static final String GAME_EVENT = "game.event";

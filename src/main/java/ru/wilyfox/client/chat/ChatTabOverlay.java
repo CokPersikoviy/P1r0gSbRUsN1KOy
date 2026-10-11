@@ -81,7 +81,7 @@ public final class ChatTabOverlay {
             if (active) {
                 graphics.fill(x, y + TAB_HEIGHT - 1, x + tabWidth, y + TAB_HEIGHT, accentColor);
             }
-            if (ChatDock.isPinned(tab) && ChatTabManager.getInstance().unread(ChatDock.settings(tab).channel) > 0)
+            if (ChatDock.isPinned(tab) && ChatTabManager.getInstance().unread(tab) > 0)
                 graphics.fill(x + 3, y + 2, x + 5, y + 4, WidgetTheme.TEXT_ACCENT);
             if (tab.equals(ChatDock.draggedTabKey())) graphics.fill(x, y, x + 2, y + TAB_HEIGHT, accentColor);
 
@@ -228,7 +228,7 @@ public final class ChatTabOverlay {
     private static String tabTitle(String key) {
         var config = ChatDock.settings(key);
         if (ChatDock.isPinned(key)) return config.title;
-        int unread = ChatTabManager.getInstance().unread(config.channel);
+        int unread = ChatTabManager.getInstance().unread(key);
         boolean narrow = Minecraft.getInstance().getWindow().getGuiScaledWidth() < 400;
         return config.title + (unread == 0 ? "" : narrow ? "·" + (unread > 9 ? "9+" : unread)
                 : " [" + (unread > 99 ? "99+" : unread) + "]");

@@ -41,6 +41,13 @@ public final class WidgetRenderScope implements AutoCloseable {
     }
     /** Background-only fade also covers the blurred backdrop and decorative panel edges. */
     public static WidgetRenderScope background() { return backgroundAlpha() == 1 ? null : fade(backgroundAlpha()); }
+    /** Editor-only styling for references inherited from Main; it never changes saved opacity. */
+    public static WidgetRenderScope editorReference() {
+        var scope = CURRENT.get();
+        return new WidgetRenderScope(scope == null ? null : scope.capture, alpha() * .65f, transform(),
+                scope == null ? null : scope.captureOpacities, backgroundAlpha() * .35f,
+                (scope == null ? 1 : scope.snapshotAlpha) * .65f);
+    }
     /** Preserve a layout animation's capture and transform when a widget also fades its content. */
     public static WidgetRenderScope fade(float multiplier) {
         var scope = CURRENT.get();

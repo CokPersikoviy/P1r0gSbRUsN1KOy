@@ -16,6 +16,29 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class HudSnapLayoutEngineTest {
+    @Test void localWidgetAtScreenEdgeCannotPushAnInheritedReference() {
+        var parent = new TestWidget("Main", 775);
+        var child = new TestWidget("Local", 0);
+        child.setWidgetSnap("Main", WidgetCorner.TOP_LEFT, WidgetCorner.TOP_RIGHT);
+        var host = new TestHost(null, null, parent);
+        var engine = engine(parent, child);
+        for (int i = 0; i < 5; i++) {
+            engine.updateSnappedWidgets(host);
+            assertEquals(775, parent.getStartX()); assertEquals(780, child.getStartX());
+            assertEquals("Main", child.getSnapTargetKey());
+        }
+    }
+
+    @Test void localAnchorCannotReverseTheDependencyIntoMain() {
+        var parent = new TestWidget("Main", 100);
+        var child = new TestWidget("Local", 125);
+        child.setWidgetSnap("Main", WidgetCorner.TOP_LEFT, WidgetCorner.TOP_RIGHT);
+        child.setScreenAnchor(ScreenAnchor.TOP_RIGHT);
+        HudSnapGraphNormalizer.normalize(engine(parent, child).getAbstractWidgetMap(), widget -> widget == parent);
+        assertFalse(parent.hasWidgetSnap()); assertEquals("Main", child.getSnapTargetKey());
+        assertNull(child.getScreenAnchor());
+    }
+
     @Test
     void temporaryGrowthDoesNotPermanentlyMoveAFreeRoot() {
         var parent = new TestWidget("Root", 700);
@@ -197,8 +220,10 @@ class HudSnapLayoutEngineTest {
         private void resizeWidth(int value) { width = value; }
     }
 
-    private record TestHost(Widget dragged, WidgetLayoutConfig stored) implements HudSnapLayoutHost {
-        TestHost(Widget dragged) { this(dragged, null); }
+    private record TestHost(Widget dragged, WidgetLayoutConfig stored, Widget readOnly) implements HudSnapLayoutHost {
+        TestHost(Widget dragged) { this(dragged, null, null); }
+        TestHost(Widget dragged, WidgetLayoutConfig stored) { this(dragged, stored, null); }
+        @Override public boolean isPlacementReadOnly(Widget widget) { return widget == readOnly; }
         @Override public WidgetLayoutConfig getStoredPlacement(AbstractWidget widget) { return stored; }
         @Override public Widget getDraggedWidget() { return dragged; }
         @Override public void setActiveScreenAnchor(ScreenAnchor anchor) {}

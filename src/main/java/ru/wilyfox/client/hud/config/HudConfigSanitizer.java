@@ -22,6 +22,10 @@ final class HudConfigSanitizer {
         if (sanitized.dailyBlocks == null) sanitized.dailyBlocks = new DailyBlocksConfig();
         if (sanitized.estimatedTps == null) sanitized.estimatedTps = new EstimatedTpsConfig();
         if (sanitized.fpsWidget == null) sanitized.fpsWidget = new FpsWidgetConfig();
+        if (sanitized.resourceTimers == null) sanitized.resourceTimers = new ResourceTimersConfig();
+        sanitized.resourceTimers.reminderMinutes = Math.clamp(sanitized.resourceTimers.reminderMinutes, 1, 1440);
+        if (sanitized.dailyCreditsTimer == null) sanitized.dailyCreditsTimer = new ResourceTimersConfig();
+        sanitized.dailyCreditsTimer.reminderMinutes = Math.clamp(sanitized.dailyCreditsTimer.reminderMinutes, 1, 1440);
         if (sanitized.fishing == null) sanitized.fishing = new FishingConfig();
         if (sanitized.fishing.nibblesVisibility == null) sanitized.fishing.nibblesVisibility = FishingWidgetVisibility.FISHING_WARP;
         if (sanitized.fishing.nibblesSort == null) sanitized.fishing.nibblesSort = FishingNibblesSort.DIMENSION;
@@ -178,6 +182,7 @@ final class HudConfigSanitizer {
                 settings.channel = widget.chatChannel();
                 settings.title = widget.chatChannel().getTitle(); settings.textFilter = ""; settings.deleted = false; settings.detached = false;
                 settings.width = 280; settings.rows = 10; settings.showTitle = true;
+                settings.skipOthers = false;
             }
             settings.sanitize(widget.chatChannel());
             if (settings.deleted) settings.detached = false;

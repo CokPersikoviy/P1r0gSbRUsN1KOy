@@ -26,6 +26,8 @@ public final class ChatWidget extends AbstractWidget {
     private static final int PAD = 6, LINE_HEIGHT = 10, TITLE_HEIGHT = 16;
     private final WidgetCatalog catalog;
     private final ChatWidgetView view;
+    private long presentationTime;
+    private float scrollShift;
 
     public ChatWidget(WidgetCatalog catalog, int x, int y) {
         this(catalog.key(), catalog, x, y);
@@ -36,6 +38,7 @@ public final class ChatWidget extends AbstractWidget {
         this.catalog = catalog;
         setConfigKey(key);
         view = new ChatWidgetView(ChatTabManager.getInstance(), catalog.chatChannel());
+        view.window(key);
     }
     public ChatWidgetConfig settings() { return ConfigManager.get().chatWidgets.get(getConfigKey()); }
     public ChatWidgetView view() { view.channel(settings().channel); view.filter(settings().textFilter); return view; }
@@ -48,7 +51,18 @@ public final class ChatWidget extends AbstractWidget {
     private int contentBottom() { return viewportHeight() - PAD; }
     private java.util.List<ChatWidgetView.Line> visibleLines() {
         int rows = viewportRows();
-        return rows == 0 ? java.util.List.of() : view().lines(Minecraft.getInstance().font, viewportWidth() - PAD * 2 - 2, rows);
+        if (rows == 0) { scrollShift = 0; return java.util.List.of(); }
+        var frame = view().presentation(Minecraft.getInstance().font, viewportWidth() - PAD * 2 - 2, rows, presentationTime);
+        scrollShift = frame.shift() * LINE_HEIGHT;
+        return frame.lines();
+    }
+    public void scroll(double amount, boolean fine) {
+        int rows = viewportRows();
+        if (rows == 0 || !Double.isFinite(amount) || amount == 0) return;
+        view().lines(Minecraft.getInstance().font, viewportWidth() - PAD * 2 - 2, rows);
+        // Half a window per wheel notch; Shift moves by one row. Preserve trackpad fractions.
+        view.smoothScroll(amount * (fine ? 1 : Math.max(1, rows / 2.0)), System.nanoTime());
+        view.lines(Minecraft.getInstance().font, viewportWidth() - PAD * 2 - 2, rows);
     }
     @Override public int getWidth() { return Math.round(settings().width * scale); }
     @Override public int getHeight() { return Math.round(unscaledHeight() * scale); }
@@ -72,6 +86,7 @@ public final class ChatWidget extends AbstractWidget {
     @Override public void render(GuiGraphicsExtractor graphics, DeltaTracker delta) {
         if (!isVisible()) return;
         var client = Minecraft.getInstance();
+        presentationTime = System.nanoTime();
         var lines = visibleLines();
         int width = viewportWidth(), height = viewportHeight();
         boolean interactive = client.gui.screen() instanceof ChatScreen;
@@ -99,6 +114,9 @@ public final class ChatWidget extends AbstractWidget {
                 graphics.text(client.font, Component.translatable("froghelper.chat.widget_empty"), PAD,
                         contentTop(), WidgetTheme.TEXT_MUTED);
             } else {
+                graphics.enableScissor(PAD - 1, contentTop(), width - PAD, contentBottom());
+                graphics.pose().pushMatrix();
+                graphics.pose().translate(0, scrollShift);
                 var renderer = graphics.textRenderer(interactive && hovered
                         ? GuiGraphicsExtractor.HoveredTextEffects.TOOLTIP_AND_CURSOR : GuiGraphicsExtractor.HoveredTextEffects.NONE);
                 var parameters = renderer.defaultParameters().withPose(new Matrix3x2f(graphics.pose()));
@@ -113,12 +131,15 @@ public final class ChatWidget extends AbstractWidget {
                     if (tag != null) {
                         graphics.fill(PAD - 1, y, PAD, y + 8, 0xFF000000 | tag.indicatorColor());
                         if (hovered && localX(MouseUtils.getMouseX()) < PAD + 2
-                                && localY(MouseUtils.getMouseY()) >= y && localY(MouseUtils.getMouseY()) < y + LINE_HEIGHT
+                                && localY(MouseUtils.getMouseY()) >= y + scrollShift
+                                && localY(MouseUtils.getMouseY()) < y + scrollShift + LINE_HEIGHT
                                 && tag.text() != null) {
                             graphics.setTooltipForNextFrame(client.font, tag.text(), (int) MouseUtils.getMouseX(), (int) MouseUtils.getMouseY());
                         }
                     }
                 }
+                graphics.pose().popMatrix();
+                graphics.disableScissor();
             }
             if (viewportRows() > 0 && (view.scroll() > 0 || view.hasOlder())) {
                 graphics.fill(width - 3, contentTop(), width - 2, contentBottom(), WidgetTheme.PANEL_BG_SOFT);
@@ -138,19 +159,20 @@ public final class ChatWidget extends AbstractWidget {
         if (localX < PAD || localX >= viewportWidth() - PAD || localY < contentBottom() - viewportRows() * LINE_HEIGHT
                 || localY >= contentBottom()) return null;
         var lines = visibleLines();
-        int index = (int) ((contentBottom() - localY - 1) / LINE_HEIGHT);
+        int index = lineIndex(localY);
         return index >= 0 && index < lines.size() ? lines.get(index) : null;
     }
     public Style styleAt(double x, double y) {
         var line = lineAt(x, y);
         if (line == null) return null;
-        int index = (int) ((contentBottom() - localY(y) - 1) / LINE_HEIGHT);
+        int index = lineIndex(localY(y));
         var finder = new ClickableStyleFinder(Minecraft.getInstance().font, (int) x, (int) y).includeInsertions(true);
-        var parameters = finder.defaultParameters().withPose(new Matrix3x2f().translate(startX, startY).scale(textScale()));
+        var parameters = finder.defaultParameters().withPose(new Matrix3x2f().translate(startX, startY).scale(textScale()).translate(0, scrollShift));
         finder.accept(TextAlignment.LEFT, PAD + 2, contentBottom() - (index + 1) * LINE_HEIGHT,
                 parameters, line.text());
         return finder.result();
     }
+    private int lineIndex(double localY) { return (int) Math.floor((contentBottom() + scrollShift - localY - .001) / LINE_HEIGHT); }
     public boolean copyAt(double x, double y) {
         var line = lineAt(x, y);
         if (line == null) return false;

@@ -122,6 +122,7 @@ public final class PopUpManager {
         return switch (source) {
             case PopUpSource.CHAT_COPY -> ConfigManager.get().popUps.chatCopyEvent;
             case PopUpSource.PRIVATE_MESSAGE -> ConfigManager.get().popUps.privateMessageEvent;
+            case PopUpSource.FH_MESSAGE -> ConfigManager.get().popUps.fhMessageEvent;
             case PopUpSource.BOSS_SPAWN -> ConfigManager.get().popUps.bossSpawnEvent;
             case PopUpSource.BOSS_CAPTURE -> ConfigManager.get().popUps.bossCaptureEvent;
             case PopUpSource.GAME_EVENT -> ConfigManager.get().popUps.gameEvent;

@@ -8,6 +8,7 @@ public class PopUpsConfig {
     public int fadeOutMillis = 220;
     public boolean chatCopyEvent = true;
     public boolean privateMessageEvent = true;
+    public boolean fhMessageEvent = true;
     public boolean bossSpawnEvent = true;
     public boolean bossCaptureEvent = true;
     public boolean gameEvent = true;

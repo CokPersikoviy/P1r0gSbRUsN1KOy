@@ -452,6 +452,12 @@ final class HudSettingsFeatureSections {
         );
 
         componentsByCategory.get(SettingsCategory.POP_UPS).add(
+                new ToggleSettingsComponent(0, 0, 0, 0, "Event: FH message",
+                        () -> ConfigManager.get().popUps.fhMessageEvent,
+                        value -> ConfigManager.get().popUps.fhMessageEvent = value)
+        );
+
+        componentsByCategory.get(SettingsCategory.POP_UPS).add(
                 new ToggleSettingsComponent(
                         0, 0, 0, 0,
                         "Event: Boss spawned",

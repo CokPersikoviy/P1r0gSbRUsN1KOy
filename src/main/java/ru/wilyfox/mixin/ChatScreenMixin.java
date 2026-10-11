@@ -239,8 +239,7 @@ public abstract class ChatScreenMixin extends Screen {
         var client = Client.getInstance();
         var widget = client == null ? null : client.getHudRenderer().chatWidgetAt(x, y);
         if (widget == null) return;
-        widget.view().lines(minecraft.font, widget.settings().width - 14, widget.settings().rows);
-        widget.view().scroll((int) Math.signum(scrollY) * (minecraft.hasShiftDown() ? 1 : 7));
+        widget.scroll(scrollY, minecraft.hasShiftDown());
         if (widget.settings().channel == ru.wilyfox.client.chat.ChatTab.FH && scrollY > 0 && !widget.view().hasOlder())
             ru.wilyfox.client.moduser.BackendSocialClient.requestOlderChat();
         cir.setReturnValue(true);

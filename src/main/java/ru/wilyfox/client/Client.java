@@ -138,6 +138,7 @@ public class Client {
         ru.wilyfox.client.hud.fishing.FishingCastPreview.register();
         DungeonDecorationHighlightRenderHook.register();
         UsefulWorldHighlightRenderHook.register();
+        ru.wilyfox.client.resource.AccountRewardTimerTracker.INSTANCE.register();
         EstimatedTpsMonitor.register();
         KeyBinds.register();
         ru.wilyfox.client.visuals.VisualsCamera.register();
@@ -212,6 +213,8 @@ public class Client {
                 ScreenAnchor.HOTBAR_LEFT
         );
         hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.FpsWidget(20, 20, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
+        hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.RouletteTimerWidget(20, 45, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
+        hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.DailyCreditsTimerWidget(20, 70, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
         hudRenderer.registerWidget(
                 new BoostersWidget(20, 20, HudLayer.CONTENT, boosterStore),
                 ScreenAnchor.TOP_RIGHT

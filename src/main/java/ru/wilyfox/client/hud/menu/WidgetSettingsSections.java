@@ -31,17 +31,32 @@ final class WidgetSettingsSections {
             items.add(new TextInputSettingsComponent(0, 0, 0, 0, "Tab name", () -> config.get().title,
                     value -> config.get().title = value, 20));
             items.add(new TextInputSettingsComponent(0, 0, 0, 0, "Text filter", () -> config.get().textFilter,
-                    value -> config.get().textFilter = value, 128));
-            items.add(cycle("Channel", () -> config.get().channel, value -> config.get().channel = value,
+                    value -> { config.get().textFilter = value; ConfigManager.layoutChanged(); }, 128));
+            items.add(cycle("Channel", () -> config.get().channel, value -> { config.get().channel = value; ConfigManager.layoutChanged(); },
                     ru.wilyfox.client.chat.ChatTab.values(), ru.wilyfox.client.chat.ChatTab::getTitle));
             items.add(slider("Chat width", () -> config.get().width, value -> config.get().width = value, 100, 600));
             items.add(slider("Chat rows", () -> config.get().rows, value -> config.get().rows = value, 2, 30));
             items.add(toggle("Show chat title", () -> config.get().showTitle, value -> config.get().showTitle = value));
             items.add(cycle("Widget visibility", () -> config.get().visibility, value -> config.get().visibility = value,
                     ru.wilyfox.client.hud.config.ChatWidgetVisibility.values(), ru.wilyfox.client.hud.config.ChatWidgetVisibility::title));
+            items.add(toggle("Message sound", () -> config.get().messageSound, value -> config.get().messageSound = value));
+            items.add(toggle("Skip Others", () -> config.get().skipOthers,
+                    value -> { config.get().skipOthers = value; ConfigManager.layoutChanged(); }));
             return items;
         }
         switch (widget) {
+            case DAILY_CREDITS -> {
+                items.add(toggle("Daily credits notifications", () -> ConfigManager.get().dailyCreditsTimer.notifications,
+                        value -> ConfigManager.get().dailyCreditsTimer.notifications = value));
+                items.add(slider("Credits reminder interval (minutes)", () -> ConfigManager.get().dailyCreditsTimer.reminderMinutes,
+                        value -> ConfigManager.get().dailyCreditsTimer.reminderMinutes = value, 1, 1440));
+            }
+            case ROULETTE -> {
+                items.add(toggle("Roulette ready notifications", () -> ConfigManager.get().resourceTimers.notifications,
+                        value -> ConfigManager.get().resourceTimers.notifications = value));
+                items.add(slider("Reminder interval (minutes)", () -> ConfigManager.get().resourceTimers.reminderMinutes,
+                        value -> ConfigManager.get().resourceTimers.reminderMinutes = value, 1, 1440));
+            }
             case FPS -> {
                 items.add(toggle("Horizontal layout", () -> ConfigManager.get().fpsWidget.horizontal,
                         value -> ConfigManager.get().fpsWidget.horizontal = value));

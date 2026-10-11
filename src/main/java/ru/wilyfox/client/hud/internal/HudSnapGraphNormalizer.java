@@ -15,6 +15,10 @@ public final class HudSnapGraphNormalizer {
     }
 
     public static void normalize(Map<String, AbstractWidget> widgetByKey) {
+        normalize(widgetByKey, widget -> false);
+    }
+
+    public static void normalize(Map<String, AbstractWidget> widgetByKey, java.util.function.Predicate<AbstractWidget> readOnly) {
         Map<String, List<SnapEdge>> adjacency = new HashMap<>();
 
         for (AbstractWidget widget : widgetByKey.values()) {
@@ -42,7 +46,7 @@ public final class HudSnapGraphNormalizer {
 
             List<AbstractWidget> component = new ArrayList<>();
             collectSnapComponent(widget, adjacency, visited, component);
-            reorientSnapComponent(component, adjacency);
+            reorientSnapComponent(component, adjacency, readOnly);
         }
     }
 
@@ -70,16 +74,18 @@ public final class HudSnapGraphNormalizer {
         }
     }
 
-    private static void reorientSnapComponent(List<AbstractWidget> component, Map<String, List<SnapEdge>> adjacency) {
+    private static void reorientSnapComponent(List<AbstractWidget> component, Map<String, List<SnapEdge>> adjacency,
+                                             java.util.function.Predicate<AbstractWidget> readOnly) {
         if (component.isEmpty()) {
             return;
         }
 
-        AbstractWidget root = chooseSnapRoot(component);
+        var fixed = component.stream().filter(readOnly).toList();
+        AbstractWidget root = chooseSnapRoot(fixed.isEmpty() ? component : fixed);
         Set<String> visited = new HashSet<>();
         List<AbstractWidget> queue = new ArrayList<>();
 
-        root.clearWidgetSnap();
+        if (!readOnly.test(root)) root.clearWidgetSnap();
         visited.add(root.getConfigKey());
         queue.add(root);
 
@@ -98,8 +104,10 @@ public final class HudSnapGraphNormalizer {
                     continue;
                 }
 
-                neighbor.setScreenAnchor(null);
-                neighbor.setWidgetSnap(current.getConfigKey(), childCorner, parentCorner);
+                if (!readOnly.test(neighbor)) {
+                    neighbor.setScreenAnchor(null);
+                    neighbor.setWidgetSnap(current.getConfigKey(), childCorner, parentCorner);
+                }
                 queue.add(neighbor);
             }
         }

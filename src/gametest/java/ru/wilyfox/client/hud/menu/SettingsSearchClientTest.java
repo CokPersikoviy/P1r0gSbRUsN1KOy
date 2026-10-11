@@ -138,6 +138,35 @@ public final class SettingsSearchClientTest implements FabricClientGameTest {
                 selectVisualSection("SCREEN");
             });
             context.waitTicks(2); context.takeScreenshot("visuals-reset-buttons");
+            context.runOnClient(client -> { selectVisualSection("CAMERA"); setField(panel, "scrollOffset", 100); });
+            context.waitTicks(2);
+            context.runOnClient(client -> {
+                ConfigManager.get().visuals.camera.key = GLFW.GLFW_KEY_F6;
+                ConfigManager.get().visuals.camera.modifiers = GLFW.GLFW_MOD_CONTROL;
+                var bind = components(panel).stream().filter(c -> c.getLabel().equals("Freelook key")).findFirst().orElseThrow();
+                click(screen, bind.getX() + bind.getWidth() - 15, bind.getY() + 10);
+                expect((boolean) field(bind, "listening"), "Keybind row was not armed by the click");
+                expect(screen.keyPressed(new KeyEvent(GLFW.GLFW_KEY_ESCAPE, 0, 0)), "Listening bind did not consume Esc");
+                expect(ConfigManager.get().visuals.camera.key == GLFW.GLFW_KEY_UNKNOWN && ConfigManager.get().visuals.camera.modifiers == 0,
+                        "Esc did not remove the key and modifiers");
+                expect(renderer.isSettingsOpen() && client.gui.screen() == screen, "Esc closed the settings while clearing a bind");
+                screen.keyPressed(new KeyEvent(GLFW.GLFW_KEY_Z, 0, GLFW.GLFW_MOD_CONTROL));
+                expect(ConfigManager.get().visuals.camera.key == GLFW.GLFW_KEY_F6 && ConfigManager.get().visuals.camera.modifiers == GLFW.GLFW_MOD_CONTROL,
+                        "Undo did not restore a cleared bind");
+            });
+            context.waitTicks(2);
+            context.runOnClient(client -> {
+                var bind = components(panel).stream().filter(c -> c.getLabel().equals("Freelook key")).findFirst().orElseThrow();
+                var rightClick = new MouseButtonEvent(bind.getX() + bind.getWidth() - 15, bind.getY() + 10, new MouseButtonInfo(1, 0));
+                screen.mouseClicked(rightClick, false); screen.mouseReleased(rightClick);
+                expect(ConfigManager.get().visuals.camera.key == GLFW.GLFW_KEY_UNKNOWN && ConfigManager.get().visuals.camera.modifiers == 0,
+                        "Right-click did not clear the bind and modifiers");
+                expect(!bind.keyPressed(GLFW.GLFW_KEY_F7, 0, 0), "Clearing left the bind listening for another key");
+                var saved = ConfigManager.snapshot(); ConfigManager.restoreSnapshot(saved);
+                expect(ConfigManager.get().visuals.camera.key == GLFW.GLFW_KEY_UNKNOWN && ConfigManager.get().visuals.camera.modifiers == 0,
+                        "Cleared bind did not survive config reload");
+                System.out.println("Keybind clearing: Esc/right-click, modifiers, menu stays open, undo and config reload passed");
+            });
             System.out.println("Settings search: native input, categories, controls, undo, clipboard, Unicode and scroll restoration passed");
             System.out.println("Visuals reset: all eight sections, all fields, independent settings and Ctrl+Z passed");
         } finally {

@@ -107,7 +107,7 @@ public final class HudWidgetSidebar {
         graphics.pose().pushMatrix();
         graphics.pose().translate(X + 10, Y + height - 15);
         graphics.pose().scale(.8f, .8f);
-        graphics.text(font, renderer.getLayoutWidgetCount() + "/" + renderer.getLibraryWidgetCount(),
+        graphics.text(font, renderer.getEditableWidgetCount() + "/" + renderer.getLibraryWidgetCount(),
                 0, 0, WidgetTheme.TEXT_MUTED);
         graphics.pose().popMatrix();
 

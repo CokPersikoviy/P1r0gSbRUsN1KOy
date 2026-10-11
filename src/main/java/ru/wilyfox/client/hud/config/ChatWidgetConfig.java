@@ -8,6 +8,8 @@ public final class ChatWidgetConfig {
     public int width = 280;
     public int rows = 10;
     public boolean showTitle = true;
+    public boolean messageSound = false;
+    public boolean skipOthers = false;
     public ChatWidgetVisibility visibility = ChatWidgetVisibility.ALWAYS;
     public boolean detached;
     /** Built-in identities stay persisted so deleted tabs do not reappear on load. */

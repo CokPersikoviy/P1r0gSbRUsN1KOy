@@ -8,6 +8,8 @@ import ru.wilyfox.client.hud.config.WidgetLayoutConfig;
 
 public interface HudSnapLayoutHost {
     default WidgetLayoutConfig getStoredPlacement(AbstractWidget widget) { return null; }
+    default boolean isSnapTargetVisible(Widget widget) { return widget.isVisible(); }
+    default boolean isPlacementReadOnly(Widget widget) { return false; }
 
     Widget getDraggedWidget();
 

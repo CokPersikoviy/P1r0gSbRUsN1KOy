@@ -13,11 +13,13 @@
       "ru.wilyfox.client.hud.LocationLayoutsClientTest",
       "ru.wilyfox.client.hud.WidgetAnimationClientTest",
       "ru.wilyfox.client.hud.WidgetOpacityClientTest",
+      "ru.wilyfox.client.hud.InheritedLayoutClientTest",
       "ru.wilyfox.client.profiler.DebugBackgroundProfilerClientTest",
       "ru.wilyfox.client.profiler.AutomaticProfilerClientTest",
       "ru.wilyfox.client.protocol.LocationUpdateClientTest",
       "ru.wilyfox.client.hud.widget.ProtocolGraphClientTest",
       "ru.wilyfox.client.hud.widget.FpsWidgetClientTest",
+      "ru.wilyfox.client.resource.AccountRewardTimersClientTest",
       "ru.wilyfox.client.hud.menu.DragNumberClientTest",
       "ru.wilyfox.client.hud.menu.HudUndoClientTest",
       "ru.wilyfox.client.hud.menu.SettingsSearchClientTest",
@@ -37,6 +39,9 @@
       "ru.wilyfox.client.chat.ChatSelectionClientTest",
       "ru.wilyfox.client.chat.ChatSuggestionsClientTest",
       "ru.wilyfox.client.chat.ChatWidgetVisibilityClientTest",
+      "ru.wilyfox.client.chat.ChatWidgetSoundClientTest",
+      "ru.wilyfox.client.chat.ChatFhPopUpClientTest",
+      "ru.wilyfox.client.chat.ChatSkipOthersClientTest",
       "ru.wilyfox.client.rune.RuneBagClientTest",
       "ru.wilyfox.client.hud.widget.FishingQuestsClientTest",
       "ru.wilyfox.client.hud.fishing.FishingParticlesClientTest",
@@ -47,7 +52,9 @@
       "ru.wilyfox.client.hud.menu.LowHpMessageBuilderClientTest",
       "ru.wilyfox.boss.BossTrackerMemoryClientTest",
       "ru.wilyfox.client.profiler.ProfilerCrashSaveClientTest",
-      "ru.wilyfox.client.chat.ChatWindowsClientTest"
+      "ru.wilyfox.client.chat.ChatWindowsClientTest",
+      "ru.wilyfox.client.chat.ChatSmoothScrollClientTest",
+      "ru.wilyfox.client.chat.ChatUnreadClientTest"
     ]
   },
   "depends": {

@@ -138,7 +138,11 @@ class HudLayoutResolverTest {
         assertSame(mainScoreboard, HudLayoutResolver.placement(config, "ScoreboardWidget", null, "bay"));
         assertSame(config.widgetLayouts, HudLayoutResolver.placementStorage(config, "ScoreboardWidget", null, "bay"));
         assertSame(fishing.placements, HudLayoutResolver.placementStorage(config, BOSS, null, "bay"));
-        assertEquals(Set.of(BOSS, FISH), HudLayoutResolver.widgets(config, "fish", "bay"));
+        assertEquals(Set.of(BOSS, "ScoreboardWidget", FISH), HudLayoutResolver.widgets(config, "fish", "bay"));
+        assertTrue(HudLayoutResolver.isEditorInherited(config, "ScoreboardWidget", "fish"));
+        assertFalse(HudLayoutResolver.isEditorInherited(config, BOSS, "fish"));
+        assertSame(mainScoreboard, HudLayoutResolver.placement(config, "ScoreboardWidget", "fish", "bay"));
+        assertSame(fishing.placements.get(BOSS), HudLayoutResolver.placement(config, BOSS, "fish", "bay"));
         assertEquals(Set.of(BOSS, "ScoreboardWidget"), config.mainLayout.widgets);
         fishing.inheritMainLayout = false;
         assertEquals(Set.of(BOSS, FISH), HudLayoutResolver.widgets(config, null, "bay"));
@@ -162,6 +166,39 @@ class HudLayoutResolverTest {
         loaded = HudConfigCodec.decode(gson, JsonParser.parseString(gson.toJson(loaded)));
         assertFalse(loaded.locationLayouts.get("fish").inheritMainLayout);
         assertEquals(Set.of(FISH), HudLayoutResolver.widgets(loaded, null, "bay"));
+    }
+    @Test void editorReferencesIgnoreOldLocalPlacementAndDoNotBecomeMembers() {
+        var config = fresh(); config.mainLayout.widgets.add(BOSS);
+        var main = placement(12, 1f); config.widgetLayouts.put(BOSS, main);
+        var fishing = add(config, "fish", Set.of("#fishing"), FISH);
+        fishing.inheritMainLayout = true;
+        fishing.placements.put(BOSS, placement(250, 2f));
+        assertEquals(Set.of(BOSS, FISH), HudLayoutResolver.widgets(config, "fish", "market"));
+        assertSame(main, HudLayoutResolver.placement(config, BOSS, "fish", "market"));
+        assertSame(config.widgetLayouts, HudLayoutResolver.placementStorage(config, BOSS, "fish", "market"));
+        assertEquals(Set.of(FISH), fishing.widgets);
+        assertFalse(HudLayoutResolver.isEditorInherited(config, BOSS, ""));
+        assertFalse(HudLayoutResolver.isEditorInherited(config, BOSS, null));
+        fishing.inheritMainLayout = false;
+        assertEquals(Set.of(FISH), HudLayoutResolver.widgets(config, "fish", "market"));
+        assertFalse(HudLayoutResolver.isEditorInherited(config, BOSS, "fish"));
+    }
+    @Test void inheritedSnapTargetsSurviveSavingAndReloading() {
+        var config = fresh(); config.mainLayout.widgets.add(BOSS);
+        var fishing = add(config, "fish", Set.of("#fishing"), FISH);
+        fishing.inheritMainLayout = true;
+        var child = placement(150, 1f);
+        child.snapTarget = BOSS;
+        child.snapOwnCorner = ru.wilyfox.client.hud.widget.WidgetCorner.TOP_LEFT;
+        child.snapTargetCorner = ru.wilyfox.client.hud.widget.WidgetCorner.TOP_RIGHT;
+        fishing.placements.put(FISH, child);
+        var gson = HudConfigCodec.createGson();
+        var loaded = HudConfigCodec.decode(gson, JsonParser.parseString(gson.toJson(config)));
+        assertEquals(BOSS, loaded.locationLayouts.get("fish").placements.get(FISH).snapTarget);
+        assertEquals(Set.of(FISH), loaded.locationLayouts.get("fish").widgets);
+        loaded.locationLayouts.get("fish").inheritMainLayout = false;
+        HudLayoutResolver.sanitize(loaded);
+        assertNull(loaded.locationLayouts.get("fish").placements.get(FISH).snapTarget);
     }
     @Test void selectedLayoutNeverInheritsAnEarlierMatchingLayout() {
         var config = fresh(); config.mainLayout.widgets.add(BOSS);

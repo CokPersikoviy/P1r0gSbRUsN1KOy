@@ -89,9 +89,11 @@ public class ChatHudMixin {
     }
     @Inject(method = "scrollChat", at = @At("RETURN"))
     private void froghelper$olderBackendChat(int amount, CallbackInfo ci) {
-        if (amount <= 0 || ChatTabManager.getInstance().isRebuilding() || ChatTabManager.getInstance().getActiveTab() != ru.wilyfox.client.chat.ChatTab.FH) return;
         var chat = (ChatComponent) (Object) this;
         var accessor = (ru.wilyfox.bridge.ChatComponentAccessor) chat;
+        if (!ChatTabManager.getInstance().isRebuilding() && chat.isChatFocused() && accessor.froghelper$getScroll() == 0)
+            ChatTabManager.getInstance().markActiveRead();
+        if (amount <= 0 || ChatTabManager.getInstance().isRebuilding() || ChatTabManager.getInstance().getActiveTab() != ru.wilyfox.client.chat.ChatTab.FH) return;
         if (accessor.froghelper$getScroll() >= accessor.froghelper$getTrimmedMessages().size() - chat.getLinesPerPage() - 10)
             ru.wilyfox.client.moduser.BackendSocialClient.requestOlderChat();
     }

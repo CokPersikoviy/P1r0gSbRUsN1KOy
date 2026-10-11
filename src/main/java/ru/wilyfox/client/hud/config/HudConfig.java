@@ -17,6 +17,8 @@ public class HudConfig {
     public DailyBlocksConfig dailyBlocks = new DailyBlocksConfig();
     public EstimatedTpsConfig estimatedTps = new EstimatedTpsConfig();
     public FpsWidgetConfig fpsWidget = new FpsWidgetConfig();
+    public ResourceTimersConfig resourceTimers = new ResourceTimersConfig();
+    public ResourceTimersConfig dailyCreditsTimer = new ResourceTimersConfig();
     public FishingConfig fishing = new FishingConfig();
     public BossBarConfig bossBar = new BossBarConfig();
     public ScoreboardConfig scoreboard = new ScoreboardConfig();

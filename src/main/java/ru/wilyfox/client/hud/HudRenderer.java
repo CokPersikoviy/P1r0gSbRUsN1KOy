@@ -29,6 +29,7 @@ import ru.wilyfox.client.hud.internal.HudSnapLayoutEngine;
 import ru.wilyfox.client.hud.internal.HudSnapLayoutHost;
 import ru.wilyfox.client.hud.internal.HudScreenAnchorHelper;
 import ru.wilyfox.client.hud.internal.HudSnapGroupResolver;
+import ru.wilyfox.client.hud.internal.LayoutReferenceWidget;
 import ru.wilyfox.client.hud.indicators.ScreenAnchor;
 import ru.wilyfox.client.hud.indicators.CornerSnapIndicator;
 import ru.wilyfox.client.hud.layer.HudLayer;
@@ -52,6 +53,8 @@ public class HudRenderer {
     private final ru.wilyfox.client.hud.internal.WidgetLayoutAnimation layoutAnimation = new ru.wilyfox.client.hud.internal.WidgetLayoutAnimation();
     private final List<Widget> registeredWidgets = new ArrayList<>();
     private final List<Widget> widgets = new ArrayList<>();
+    private final List<Widget> mainReferenceWidgets = new ArrayList<>();
+    private final Map<String, LayoutReferenceWidget> mainReferences = new HashMap<>();
     private final HudWidgetSidebar widgetSidebar = new HudWidgetSidebar(this);
     private Widget selectedWidget;
     private long widgetRegistryRevision;
@@ -110,6 +113,22 @@ public class HudRenderer {
             HOTBAR_ANCHOR_GAP,
             OFFHAND_SLOT_WIDTH
     );
+    private final HudSnapLayoutEngine mainSnapLayoutEngine = new HudSnapLayoutEngine(
+            mainReferenceWidgets, SCREEN_SNAP_MARGIN, SCREEN_SNAP_DISTANCE, WIDGET_SNAP_DISTANCE,
+            GROUP_GAP, HOTBAR_WIDTH, HOTBAR_HEIGHT, HOTBAR_ANCHOR_GAP, OFFHAND_SLOT_WIDTH);
+    private final HudSnapLayoutHost mainSnapLayoutHost = new HudSnapLayoutHost() {
+        @Override public WidgetLayoutConfig getStoredPlacement(AbstractWidget widget) { return ConfigManager.get().widgetLayouts.get(widget.getConfigKey()); }
+        @Override public Widget getDraggedWidget() { return null; }
+        @Override public void setActiveScreenAnchor(ScreenAnchor anchor) { }
+        @Override public void setActiveDraggedCornerIndicator(CornerSnapIndicator indicator) { }
+        @Override public void setActiveTargetCornerIndicator(CornerSnapIndicator indicator) { }
+        @Override public int getLastScreenWidth() { return lastScreenWidth; }
+        @Override public int getLastScreenHeight() { return lastScreenHeight; }
+        @Override public void setLastScreenWidth(int width) { }
+        @Override public void setLastScreenHeight(int height) { }
+        @Override public boolean isScreenAnchorOccupied(ScreenAnchor anchor, Widget ignored) { return false; }
+        @Override public boolean isCenterSideAnchor(ScreenAnchor anchor) { return HudRenderer.this.isCenterSideAnchor(anchor); }
+    };
     private final HudEditorOverlayHost overlayHost = new HudEditorOverlayHost() {
         @Override
         public ScreenAnchor getActiveScreenAnchor() {
@@ -177,6 +196,8 @@ public class HudRenderer {
         }
     };
     private final HudSnapLayoutHost snapLayoutHost = new HudSnapLayoutHost() {
+        @Override public boolean isSnapTargetVisible(Widget widget) { return editing || widget.isVisible(); }
+        @Override public boolean isPlacementReadOnly(Widget widget) { return usesInheritedMainPlacement(widget); }
         @Override
         public WidgetLayoutConfig getStoredPlacement(AbstractWidget widget) {
             return ConfigManager.getWidgetLayout(widget.getConfigKey());
@@ -281,7 +302,8 @@ public class HudRenderer {
     }
 
     public boolean openWidgetSettings(Widget widget) {
-        if (!editing || !widgets.contains(widget) || !settingsPanel.openWidget(widget, () -> setSettings(false))) return false;
+        if (!editing || !widgets.contains(widget) || isInheritedWidget(widget)
+                || !settingsPanel.openWidget(widget, () -> setSettings(false))) return false;
         pendingLibraryDrag = null;
         draggedWidget = null;
         draggingWidgetGroup = false;
@@ -337,7 +359,8 @@ public class HudRenderer {
         return true;
     }
     private java.util.Set<String> editedWidgetKeys() {
-        return HudLayoutResolver.widgets(ConfigManager.get(), selectedLayout, null);
+        var selected = ConfigManager.get().locationLayouts.get(selectedLayout);
+        return selected == null ? ConfigManager.get().mainLayout.widgets : selected.widgets;
     }
     private void markLayoutApplied() {
         appliedLayoutRevision = ConfigManager.getLayoutRevision();
@@ -369,6 +392,7 @@ public class HudRenderer {
                 }
             }
             for (Widget widget : registeredWidgets) if (WidgetCatalog.find(widgetKey(widget)) == null) widgets.add(widget);
+            updateInheritedMainPositions();
             normalizeWidgetSnapParents();
             var window = Minecraft.getInstance().getWindow();
             updateAnchoredWidgets(window.getGuiScaledWidth(), window.getGuiScaledHeight());
@@ -384,7 +408,9 @@ public class HudRenderer {
         }
     }
     private void applyPlacement(AbstractWidget widget, WidgetLayoutConfig stored) {
-        WidgetLayoutConfig defaults = defaultPlacements.get(widget);
+        applyPlacement(widget, stored, defaultPlacements.get(widget));
+    }
+    private void applyPlacement(AbstractWidget widget, WidgetLayoutConfig stored, WidgetLayoutConfig defaults) {
         if (defaults == null) return;
         widget.setScale(stored != null && stored.scale != null ? stored.scale : defaults.scale);
         widget.setScreenAnchor(stored != null ? stored.anchor : defaults.anchor);
@@ -496,6 +522,11 @@ public class HudRenderer {
     }
 
     public int getLayoutWidgetCount() { return widgets.size(); }
+    public int getEditableWidgetCount() {
+        int count = 0;
+        for (Widget widget : widgets) if (!isInheritedWidget(widget)) count++;
+        return count;
+    }
     public int getRegisteredWidgetCount() { return registeredWidgets.size(); }
     public int getLibraryWidgetCount() {
         int count = 0;
@@ -506,14 +537,21 @@ public class HudRenderer {
     public long getWidgetRegistryRevision() { return widgetRegistryRevision; }
     public Widget getSelectedWidget() { return selectedWidget; }
     public boolean isWidgetDragging() { return draggedWidget != null; }
-    public boolean isWidgetAdded(Widget widget) { return widgets.contains(widget); }
+    public boolean isInheritedWidget(Widget widget) {
+        return editing && HudLayoutResolver.isEditorInherited(ConfigManager.get(), widgetKey(widget), selectedLayout);
+    }
+    private boolean usesInheritedMainPlacement(Widget widget) {
+        return HudLayoutResolver.isInherited(ConfigManager.get(), widgetKey(widget), editing ? selectedLayout : null,
+                editing ? null : DiamondWorldProtocolClient.getCurrentGameLocation());
+    }
+    public boolean isWidgetAdded(Widget widget) { return widgets.contains(widget) && !isInheritedWidget(widget); }
 
     public void selectWidget(Widget widget) {
-        if (widgets.contains(widget)) selectedWidget = widget;
+        if (isWidgetAdded(widget)) selectedWidget = widget;
     }
 
     public void queueWidgetDragFromLibrary(Widget widget, double mouseX, double mouseY) {
-        if (!editing || !widgets.contains(widget)) return;
+        if (!editing || !isWidgetAdded(widget)) return;
         selectedWidget = widget;
         pendingLibraryDrag = widget;
         libraryPressX = mouseX;
@@ -521,14 +559,16 @@ public class HudRenderer {
     }
 
     public boolean addWidget(Widget widget) {
-        if (!registeredWidgets.contains(widget) || widgets.contains(widget)) return false;
+        if (!registeredWidgets.contains(widget) || isWidgetAdded(widget)) return false;
         if (!(widget instanceof AbstractWidget placed)) return false;
         String key = placed.getConfigKey();
         if (WidgetCatalog.find(key) == null) return false;
         if (widget instanceof ru.wilyfox.client.hud.widget.ChatWidget && ru.wilyfox.client.chat.ChatDock.isPinned(key)) return false;
+        boolean inherited = isInheritedWidget(widget);
         editedWidgetKeys().add(key);
         ConfigManager.layoutChanged();
-        widgets.add(widget);
+        if (!widgets.contains(widget)) widgets.add(widget);
+        if (inherited && ConfigManager.getWidgetLayout(key) == null) ConfigManager.captureWidgetLayout(placed);
         var window = Minecraft.getInstance().getWindow();
         int screenWidth = window.getGuiScaledWidth(), screenHeight = window.getGuiScaledHeight();
         WidgetLayoutConfig stored = ConfigManager.getWidgetLayout(key);
@@ -566,7 +606,20 @@ public class HudRenderer {
     }
 
     public boolean removeWidget(Widget widget) {
-        if (!(widget instanceof AbstractWidget placed) || !widgets.contains(widget)) return false;
+        if (!(widget instanceof AbstractWidget placed) || !isWidgetAdded(widget)) return false;
+        var selected = ConfigManager.get().locationLayouts.get(selectedLayout);
+        if (editing && selected != null && selected.inheritMainLayout
+                && ConfigManager.get().mainLayout.widgets.contains(placed.getConfigKey())) {
+            ConfigManager.captureWidgetLayout(placed);
+            selected.widgets.remove(placed.getConfigKey());
+            ConfigManager.layoutChanged();
+            selectedWidget = pendingLibraryDrag = draggedWidget = null;
+            draggingWidgetGroup = false;
+            draggedGroupWidgets.clear(); draggedGroupStates.clear();
+            saveAllWidgetLayouts();
+            refreshLayout();
+            return true;
+        }
         if (editing) {
             layoutAnimation.editorRemoved(widget, System.nanoTime());
             ModProfiler.getInstance().recordClientEvent("widget-remove", placed.getConfigKey() + " layout=" + selectedLayout);
@@ -655,10 +708,7 @@ public class HudRenderer {
 
                     renderedWidgets++;
                     try (ModProfiler.Scope widgetScope = ModProfiler.getInstance().typedScope("widget", widget.getClass().getSimpleName())) {
-                        if (editing) layoutAnimation.renderEditor(widget, context, animationTime, () -> {
-                            if (!widget.isVisible()) renderEmptyWidgetPreview(context, widget);
-                            else widget.render(context, tickCounter);
-                        });
+                        if (editing) renderEditorWidget(widget, context, tickCounter, animationTime);
                         else layoutAnimation.render(widget, context, tickCounter, animationTime);
                     }
                 }
@@ -745,10 +795,7 @@ public class HudRenderer {
             }
 
             if (widget.getLayer() == layer) {
-                if (editing) layoutAnimation.renderEditor(widget, context, animationTime, () -> {
-                    if (!widget.isVisible()) renderEmptyWidgetPreview(context, widget);
-                    else widget.render(context, tickCounter);
-                });
+                if (editing) renderEditorWidget(widget, context, tickCounter, animationTime);
                 else layoutAnimation.render(widget, context, tickCounter, animationTime);
             }
         }
@@ -1067,7 +1114,7 @@ public class HudRenderer {
         for (int i = widgets.size() - 1; i >= 0; i--) {
             Widget widget = widgets.get(i);
 
-            if (!shouldRenderWidget(widget, editing)) {
+            if (isInheritedWidget(widget) || !shouldRenderWidget(widget, editing)) {
                 continue;
             }
 
@@ -1096,7 +1143,37 @@ public class HudRenderer {
 
     private void updateSnappedWidgets() {
         var window = Minecraft.getInstance().getWindow();
+        updateInheritedMainPositions();
         snapLayoutEngine.updateSnappedWidgets(snapLayoutHost, window.getGuiScaledWidth(), window.getGuiScaledHeight());
+    }
+
+    private void updateInheritedMainPositions() {
+        if (widgets.stream().noneMatch(this::usesInheritedMainPlacement)) return;
+        var config = ConfigManager.get();
+        mainReferences.keySet().removeIf(key -> !config.mainLayout.widgets.contains(key));
+        mainReferenceWidgets.clear();
+        for (Widget widget : registeredWidgets) {
+            if (!(widget instanceof AbstractWidget source) || !config.mainLayout.widgets.contains(source.getConfigKey())) continue;
+            var defaults = defaultPlacements.get(source);
+            if (defaults == null) continue;
+            var stored = config.widgetLayouts.get(source.getConfigKey());
+            var reference = mainReferences.computeIfAbsent(source.getConfigKey(), LayoutReferenceWidget::new);
+            reference.measure(source, stored != null && stored.scale != null ? stored.scale : defaults.scale);
+            applyPlacement(reference, stored, defaults);
+            mainReferenceWidgets.add(reference);
+        }
+        // Main is evaluated separately, including roots that have a local override or are hidden here.
+        HudSnapGraphNormalizer.normalize(mainSnapLayoutEngine.getAbstractWidgetMap());
+        var window = Minecraft.getInstance().getWindow();
+        mainSnapLayoutEngine.updateAnchoredWidgets(mainSnapLayoutHost, window.getGuiScaledWidth(), window.getGuiScaledHeight());
+        mainSnapLayoutEngine.updateSnappedWidgets(mainSnapLayoutHost, window.getGuiScaledWidth(), window.getGuiScaledHeight());
+        for (Widget widget : widgets) if (widget instanceof AbstractWidget inherited && usesInheritedMainPlacement(widget)) {
+            var reference = mainReferences.get(inherited.getConfigKey());
+            if (reference == null) continue;
+            inherited.setStartX(reference.getStartX()); inherited.setStartY(reference.getStartY());
+            // Local snap edges may point at this fixed reference; its Main edges live only in Main's graph.
+            inherited.clearWidgetSnap();
+        }
     }
 
     private boolean applyScreenAnchorSnapping(Widget widget, int screenWidth, int screenHeight, boolean shiftHeld) {
@@ -1156,6 +1233,19 @@ public class HudRenderer {
         context.pose().popMatrix();
     }
 
+    private void renderEditorWidget(Widget widget, GuiGraphicsExtractor context, DeltaTracker delta, long now) {
+        layoutAnimation.renderEditor(widget, context, now, () -> {
+            boolean inherited = isInheritedWidget(widget);
+            try (var reference = inherited ? ru.wilyfox.client.hud.internal.WidgetRenderScope.editorReference() : null) {
+                if (!widget.isVisible()) renderEmptyWidgetPreview(context, widget);
+                else widget.render(context, delta);
+            }
+            if (inherited) ru.wilyfox.client.hud.widget.DottedOutlineRenderState.draw(context,
+                    widget.getStartX() - 2, widget.getStartY() - 2, widget.getWidth() + 4, widget.getHeight() + 4,
+                    WidgetTheme.withAlpha(WidgetTheme.OUTLINE_SOFT, 0xA0));
+        });
+    }
+
     private void resolveWidgetOverlap(int screenWidth, int screenHeight) {
         snapLayoutEngine.resolveWidgetOverlap(snapLayoutHost, draggingWidgetGroup, screenWidth, screenHeight);
     }
@@ -1165,7 +1255,7 @@ public class HudRenderer {
     }
 
     private void normalizeWidgetSnapParents() {
-        HudSnapGraphNormalizer.normalize(getAbstractWidgetMap());
+        HudSnapGraphNormalizer.normalize(getAbstractWidgetMap(), this::usesInheritedMainPlacement);
     }
 
     public void finalizeWidgetRegistration() {
@@ -1205,7 +1295,8 @@ public class HudRenderer {
     }
 
     private List<AbstractWidget> getSnappedDescendants(AbstractWidget rootWidget) {
-        return HudSnapGroupResolver.getSnappedDescendants(rootWidget, widgets);
+        return HudSnapGroupResolver.getSnappedDescendants(rootWidget, widgets).stream()
+                .filter(widget -> !usesInheritedMainPlacement(widget)).toList();
     }
 
     private List<AbstractWidget> getConnectedSnapGroup(AbstractWidget startWidget) {
@@ -1327,10 +1418,14 @@ public class HudRenderer {
         }
 
         if (abstractWidget.getScreenAnchor() != null || abstractWidget.hasWidgetSnap()) return true;
+        if (usesInheritedMainPlacement(widget)) return true;
         // Free parents also need tracking: their changing size moves every snapped descendant.
         for (Widget candidate : widgets) {
             if (candidate instanceof AbstractWidget child && child.hasWidgetSnap()
                     && java.util.Objects.equals(child.getSnapTargetKey(), abstractWidget.getConfigKey())) return true;
+            var mainPlacement = ConfigManager.get().widgetLayouts.get(widgetKey(candidate));
+            if (usesInheritedMainPlacement(candidate) && mainPlacement != null
+                    && java.util.Objects.equals(mainPlacement.snapTarget, abstractWidget.getConfigKey())) return true;
         }
         return false;
     }

@@ -15,7 +15,7 @@ import java.util.function.IntSupplier;
 
 /**
  * A rebindable key row: shows the label and the current key; left-click arms "listening" and the
- * next key press is captured; right-click clears the bind; Esc while listening cancels. Keys are
+ * next key press is captured; right-click or Esc while listening clears the bind. Keys are
  * plain GLFW keycodes stored in config — NOT vanilla KeyMappings — so they never shadow other keys.
  */
 public class KeybindSettingsComponent extends SettingsComponent {
@@ -85,10 +85,7 @@ public class KeybindSettingsComponent extends SettingsComponent {
             return false;
         }
         if (button == 1) {
-            modifierSetter.accept(0);
-            setter.accept(GLFW.GLFW_KEY_UNKNOWN); // right-click clears
-            ConfigManager.save();
-            listening = false;
+            clearBind();
             return true;
         }
         if (button == 0) {
@@ -104,16 +101,24 @@ public class KeybindSettingsComponent extends SettingsComponent {
             return false;
         }
         if (modifierBinding && keyCode >= GLFW.GLFW_KEY_LEFT_SHIFT && keyCode <= GLFW.GLFW_KEY_RIGHT_SUPER) return true;
-        if (keyCode != GLFW.GLFW_KEY_ESCAPE) { // Esc cancels without changing the bind
+        if (keyCode != GLFW.GLFW_KEY_ESCAPE) {
             setter.accept(keyCode);
             modifierSetter.accept(modifiers & 7);
             ConfigManager.save();
             UiSounds.play(ru.wilyfox.client.audio.UiSound.SUCCESS);
         } else {
+            clearBind();
             UiSounds.click();
         }
         listening = false;
         return true;
+    }
+
+    private void clearBind() {
+        setter.accept(GLFW.GLFW_KEY_UNKNOWN);
+        modifierSetter.accept(0);
+        listening = false;
+        ConfigManager.save();
     }
 
     private static String keyName(int code) {

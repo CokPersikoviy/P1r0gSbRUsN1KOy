@@ -59,7 +59,9 @@ public final class LocationLayoutsClientTest implements FabricClientGameTest {
                 panel.mousePressed(inherit.getX() + 10, inherit.getY() + 10, 0);
                 expect(ConfigManager.get().locationLayouts.get(id[0]).inheritMainLayout && ConfigManager.getLayoutRevision() > revision,
                         "Inheritance toggle did not enable inheritance and invalidate runtime membership");
-                expect(renderer.getLayoutWidgetCount() == 0, "Inheritance must not copy Main widgets into the editor");
+                renderer.refreshLayout();
+                expect(renderer.getLayoutWidgetCount() == 1 && renderer.getEditableWidgetCount() == 0,
+                        "Inheritance must preview Main without adding owned members to the child editor");
                 try {
                     var saved = HudConfigCodec.decode(gson, JsonParser.parseString(Files.readString(FabricLoader.getInstance().getConfigDir().resolve("froghelper.json"))));
                     expect(saved.locationLayouts.get(id[0]).inheritMainLayout, "Inheritance toggle was not saved");
@@ -90,7 +92,8 @@ public final class LocationLayoutsClientTest implements FabricClientGameTest {
                 ConfigManager.saveWidgetLayout(boss);
                 renderer.addWidget(widget(renderer, "FishingQuestsWidget"));
                 renderer.openWidgetSettings(boss); overlay(renderer, client);
-                var visible = (LocationSettingsComponent) controls(panel(renderer)).get(1);
+                var visible = controls(panel(renderer)).stream().filter(LocationSettingsComponent.class::isInstance)
+                        .map(LocationSettingsComponent.class::cast).toList().get(0);
                 panel(renderer).mousePressed(visible.getX() + 10, visible.getY() + 10, 0); overlay(renderer, client);
                 panel(renderer).mousePressed(visible.getX() + 15, visible.getY() + 80, 0);
                 expect(ConfigManager.getWidgetLocations("BossHudWidget").locationVisibility.equals(Set.of("#fishing")), "Widget location allowlist failed");
@@ -99,7 +102,8 @@ public final class LocationLayoutsClientTest implements FabricClientGameTest {
             context.runOnClient(client -> {
                 var panel = panel(renderer);
                 renderer.onKeyPressed(GLFW.GLFW_KEY_ESCAPE, 0, 0); overlay(renderer, client);
-                var hidden = (LocationSettingsComponent) controls(panel).get(2);
+                var hidden = controls(panel).stream().filter(LocationSettingsComponent.class::isInstance)
+                        .map(LocationSettingsComponent.class::cast).toList().get(1);
                 panel.mousePressed(hidden.getX() + 10, hidden.getY() + 10, 0); overlay(renderer, client);
                 panel.mousePressed(hidden.getX() + 15, hidden.getY() + 99, 0); // All bosses, the second group
                 expect(ConfigManager.getWidgetLocations("BossHudWidget").locationVisibility.isEmpty(), "Hidden and visible lists are not exclusive");

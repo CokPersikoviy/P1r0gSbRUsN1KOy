@@ -9,7 +9,11 @@ public final class HudLayoutResolver {
     public static Set<String> widgets(HudConfig config, String editorLayout, String location) {
         if (editorLayout != null) {
             var selected = config.locationLayouts.get(editorLayout);
-            return selected == null ? config.mainLayout.widgets : selected.widgets;
+            if (selected == null) return config.mainLayout.widgets;
+            if (!selected.inheritMainLayout) return selected.widgets;
+            var widgets = new LinkedHashSet<>(config.mainLayout.widgets);
+            widgets.addAll(selected.widgets);
+            return widgets;
         }
         var selected = runtimeLayout(config, location);
         var widgets = new LinkedHashSet<String>();
@@ -17,10 +21,19 @@ public final class HudLayoutResolver {
         if (selected != null) widgets.addAll(selected.widgets);
         return widgets;
     }
+    public static boolean isEditorInherited(HudConfig config, String key, String editorLayout) {
+        return editorLayout != null && isInherited(config, key, editorLayout, null);
+    }
+    public static boolean isInherited(HudConfig config, String key, String editorLayout, String location) {
+        var selected = editorLayout == null ? runtimeLayout(config, location) : config.locationLayouts.get(editorLayout);
+        return selected != null && selected.inheritMainLayout && config.mainLayout.widgets.contains(key)
+                && !selected.widgets.contains(key);
+    }
     public static WidgetLayoutConfig placement(HudConfig config, String key, String editorLayout, String location) {
         if (editorLayout != null) {
             var selected = config.locationLayouts.get(editorLayout);
-            return selected == null ? config.widgetLayouts.get(key) : selected.placements.get(key);
+            return selected == null || isEditorInherited(config, key, editorLayout)
+                    ? config.widgetLayouts.get(key) : selected.placements.get(key);
         }
         var selected = runtimeLayout(config, location);
         if (selected != null && selected.widgets.contains(key)) {
@@ -33,7 +46,8 @@ public final class HudLayoutResolver {
     public static Map<String, WidgetLayoutConfig> placementStorage(HudConfig config, String key, String editorLayout, String location) {
         if (editorLayout != null) {
             var selected = config.locationLayouts.get(editorLayout);
-            return selected == null ? config.widgetLayouts : selected.placements;
+            return selected == null || isEditorInherited(config, key, editorLayout)
+                    ? config.widgetLayouts : selected.placements;
         }
         var selected = runtimeLayout(config, location);
         return selected != null && selected.widgets.contains(key) ? selected.placements : config.widgetLayouts;
@@ -58,7 +72,8 @@ public final class HudLayoutResolver {
                 if (placement.scale != null) placement.scale = Float.isFinite(placement.scale) ? Math.clamp(placement.scale, .5f, 3f) : 1f;
                 if (placement.xFraction != null) placement.xFraction = Double.isFinite(placement.xFraction) ? Math.clamp(placement.xFraction, 0, 1) : null;
                 if (placement.yFraction != null) placement.yFraction = Double.isFinite(placement.yFraction) ? Math.clamp(placement.yFraction, 0, 1) : null;
-                if (placement.snapTarget != null && !layout.widgets.contains(placement.snapTarget)) {
+                if (placement.snapTarget != null && !layout.widgets.contains(placement.snapTarget)
+                        && !(layout.inheritMainLayout && config.mainLayout.widgets.contains(placement.snapTarget))) {
                     placement.snapTarget = null; placement.snapOwnCorner = null; placement.snapTargetCorner = null;
                 }
                 placement.hiddenInGameplay = null;

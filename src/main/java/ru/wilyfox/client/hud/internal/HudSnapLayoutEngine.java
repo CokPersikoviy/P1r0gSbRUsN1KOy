@@ -107,7 +107,7 @@ public final class HudSnapLayoutEngine {
         for (AbstractWidget widget : widgetByKey.values()) {
             AbstractWidget parent = widgetByKey.get(widget.getSnapTargetKey());
             if (parent == null || parent.hasWidgetSnap() || parent.getScreenAnchor() != null
-                    || parent == host.getDraggedWidget()) continue;
+                    || parent == host.getDraggedWidget() || host.isPlacementReadOnly(parent)) continue;
             WidgetLayoutConfig stored = host.getStoredPlacement(parent);
             if (stored == null || screenWidth <= 0 || screenHeight <= 0) continue;
             int x = stored.xFraction != null ? (int) Math.round(stored.xFraction * screenWidth)
@@ -134,6 +134,14 @@ public final class HudSnapLayoutEngine {
             handled.addAll(group);
             // Do not fight the pointer while the user is dragging this group.
             if (group.contains(host.getDraggedWidget())) continue;
+            if (group.stream().anyMatch(host::isPlacementReadOnly)) {
+                // A local widget can snap to Main, but reaching a screen edge must not move Main.
+                for (AbstractWidget member : group) if (!host.isPlacementReadOnly(member)) {
+                    member.setStartX(clamp(member.getStartX(), 0, Math.max(0, screenWidth - member.getWidth())));
+                    member.setStartY(clamp(member.getStartY(), 0, Math.max(0, screenHeight - member.getHeight())));
+                }
+                continue;
+            }
             int left = Integer.MAX_VALUE, top = Integer.MAX_VALUE;
             int right = Integer.MIN_VALUE, bottom = Integer.MIN_VALUE;
             for (AbstractWidget member : group) {
@@ -197,7 +205,7 @@ public final class HudSnapLayoutEngine {
 
     public void applyWidgetSnapping(HudSnapLayoutHost host, int screenWidth, int screenHeight) {
         Widget draggedWidget = host.getDraggedWidget();
-        SnapCandidate horizontal = findBestHorizontalSnap(draggedWidget);
+        SnapCandidate horizontal = findBestHorizontalSnap(host, draggedWidget);
         if (horizontal != null) {
             draggedWidget.setStartX(horizontal.getSnappedStartX());
             draggedWidget.setStartY(horizontal.getSnappedStartY());
@@ -213,7 +221,7 @@ public final class HudSnapLayoutEngine {
             return;
         }
 
-        SnapCandidate vertical = findBestVerticalSnap(draggedWidget);
+        SnapCandidate vertical = findBestVerticalSnap(host, draggedWidget);
         if (vertical != null) {
             draggedWidget.setStartX(vertical.getSnappedStartX());
             draggedWidget.setStartY(vertical.getSnappedStartY());
@@ -315,7 +323,7 @@ public final class HudSnapLayoutEngine {
             Map<String, AbstractWidget> widgetByKey,
             Set<String> visiting
     ) {
-        if (widget == null || widget == host.getDraggedWidget() || !widget.hasWidgetSnap()) {
+        if (widget == null || widget == host.getDraggedWidget() || host.isPlacementReadOnly(widget) || !widget.hasWidgetSnap()) {
             return;
         }
 
@@ -500,11 +508,11 @@ public final class HudSnapLayoutEngine {
                 && first.getBottom() > second.getTop();
     }
 
-    private SnapCandidate findBestHorizontalSnap(Widget dragged) {
+    private SnapCandidate findBestHorizontalSnap(HudSnapLayoutHost host, Widget dragged) {
         SnapCandidate best = null;
 
         for (Widget other : widgets) {
-            if (other == dragged || !other.isVisible()) {
+            if (other == dragged || !host.isSnapTargetVisible(other)) {
                 continue;
             }
 
@@ -570,11 +578,11 @@ public final class HudSnapLayoutEngine {
         return best;
     }
 
-    private SnapCandidate findBestVerticalSnap(Widget dragged) {
+    private SnapCandidate findBestVerticalSnap(HudSnapLayoutHost host, Widget dragged) {
         SnapCandidate best = null;
 
         for (Widget other : widgets) {
-            if (other == dragged || !other.isVisible()) {
+            if (other == dragged || !host.isSnapTargetVisible(other)) {
                 continue;
             }
 

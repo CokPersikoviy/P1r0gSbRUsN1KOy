@@ -58,7 +58,6 @@ public final class UsefulWorldHighlightRenderHook {
     private static final String PROFILER_PREFIX = "render/UsefulWorldHighlightRenderHook";
     private static final int GOLDEN_CRYSTAL_MODEL_ID = 271;
     private static final int ENTITY_SCAN_INTERVAL_TICKS = 10;
-    private static final int GOLDEN_CRYSTAL_DISCOVERY_RETENTION_TICKS = 100;
     private static final int BLOCK_SCAN_REFRESH_TICKS = 100;
     private static final long WORLD_CONTEXT_WAIT_NANOS = 1_000_000_000L;
     private static final int DIRTY_CHUNK_RESCAN_LIMIT = 2;
@@ -81,7 +80,7 @@ public final class UsefulWorldHighlightRenderHook {
     private static final List<ColoredBox> BLOCK_BOXES = new ArrayList<>();
     private static final List<ColoredBox> ENTITY_BOXES = new ArrayList<>();
     private static final GoldenCrystalDiscoveryTracker GOLDEN_CRYSTAL_TRACKER =
-            new GoldenCrystalDiscoveryTracker(GOLDEN_CRYSTAL_DISCOVERY_RETENTION_TICKS);
+            new GoldenCrystalDiscoveryTracker();
     private static final Map<Long, ChunkScanResult> BLOCK_CHUNK_CACHE = new HashMap<>();
     private static final Map<Long, Long> DIRTY_CHUNK_MARK_TIMES = new HashMap<>();
     private static final Set<Long> DIRTY_CHUNK_KEYS = new HashSet<>();
@@ -137,6 +136,7 @@ public final class UsefulWorldHighlightRenderHook {
         ClientEntityEvents.ENTITY_UNLOAD.register((entity, level) -> markEntityDirty(entity));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             clearCache();
+            GOLDEN_CRYSTAL_TRACKER.clear();
             cachedLevel = null;
             lastServerInfo = null;
             lastGameLocation = null;
@@ -286,6 +286,7 @@ public final class UsefulWorldHighlightRenderHook {
 
         if (contextChanged) {
             clearCache();
+            GOLDEN_CRYSTAL_TRACKER.clear();
             count("worldContext/contextChanged");
         }
 
@@ -649,14 +650,14 @@ public final class UsefulWorldHighlightRenderHook {
                     }
                 }
             }
-            publishNewGoldenCrystals(goldenCrystalPositions, mc.level.getGameTime());
+            publishNewGoldenCrystals(goldenCrystalPositions);
             count("collectNearbyEntities/highlighted", highlightedEntities);
             count("collectNearbyEntities/goldenCrystals", goldenCrystalPositions.size());
         }
     }
 
-    private static void publishNewGoldenCrystals(Map<Long, BlockPos> positions, long gameTime) {
-        Set<Long> discovered = GOLDEN_CRYSTAL_TRACKER.update(positions.keySet(), gameTime);
+    private static void publishNewGoldenCrystals(Map<Long, BlockPos> positions) {
+        Set<Long> discovered = GOLDEN_CRYSTAL_TRACKER.update(positions.keySet());
         for (long positionKey : discovered) {
             BlockPos position = positions.get(positionKey);
             if (position == null) {
@@ -677,7 +678,7 @@ public final class UsefulWorldHighlightRenderHook {
         CACHED_BOXES.clear();
         BLOCK_BOXES.clear();
         ENTITY_BOXES.clear();
-        GOLDEN_CRYSTAL_TRACKER.clear();
+        // Discovery memory belongs to the location, not these short-lived render caches.
         BLOCK_CHUNK_CACHE.clear();
         DIRTY_CHUNK_MARK_TIMES.clear();
         DIRTY_CHUNK_KEYS.clear();
