@@ -26,8 +26,8 @@ public final class ChatUnreadClientTest implements FabricClientGameTest {
                     tab.textFilter = ""; tab.skipOthers = false;
                 }
                 custom[0] = ChatDock.create(); custom[1] = ChatDock.create();
-                var fox = ChatDock.settings(custom[0]); fox.title = "Fox"; fox.channel = ChatTab.GLOBAL; fox.textFilter = "fox";
-                var wolf = ChatDock.settings(custom[1]); wolf.title = "Wolf"; wolf.channel = ChatTab.GLOBAL; wolf.textFilter = "wolf";
+                var fox = ChatDock.settings(custom[0]); fox.title = "Fox"; fox.channel = ChatTab.GLOBAL; fox.textFilter = "(?i).*fox.*";
+                var wolf = ChatDock.settings(custom[1]); wolf.title = "Wolf"; wolf.channel = ChatTab.GLOBAL; wolf.textFilter = "(?i).*wolf.*";
                 ConfigManager.layoutChanged();
                 client.gui.hud.getChat().clearMessages(false); ChatDock.select(fh);
                 client.gui.hud.getChat().addServerSystemMessage(Component.literal("G Wolf: one"));
@@ -65,7 +65,7 @@ public final class ChatUnreadClientTest implements FabricClientGameTest {
             context.runOnClient(client -> {
                 var chat = client.gui.hud.getChat(); chat.clearMessages(false); ChatDock.select(fh);
                 String clan = ChatDock.key(ChatTab.CLAN);
-                ChatDock.settings(clan).textFilter = "exclusive"; ChatDock.settings(clan).skipOthers = true;
+                ChatDock.settings(clan).regexFilter = true; ChatDock.settings(clan).textFilter = ".*exclusive.*"; ChatDock.settings(clan).skipOthers = true;
                 ConfigManager.layoutChanged();
                 chat.addServerSystemMessage(Component.literal("C Fox: exclusive"));
                 chat.addServerSystemMessage(Component.literal("G Wolf: visible in ALL"));
@@ -73,10 +73,10 @@ public final class ChatUnreadClientTest implements FabricClientGameTest {
                 ChatDock.select(all);
                 check(store.unread(clan) == 1 && store.unread(all) == 0, "ALL read an exclusive message it cannot display");
                 // Refiltering must recalculate both custom badges, without transferring read status.
-                ChatDock.settings(custom[0]).textFilter = "missing"; ConfigManager.layoutChanged();
+                ChatDock.settings(custom[0]).textFilter = ".*missing.*"; ConfigManager.layoutChanged();
                 ChatDock.select(fh); chat.addServerSystemMessage(Component.literal("G Fox: new message"));
                 check(store.unread(custom[0]) == 0, "Changed filter left a stale badge");
-                ChatDock.settings(custom[0]).textFilter = "fox"; ConfigManager.layoutChanged();
+                ChatDock.settings(custom[0]).textFilter = "(?i).*fox.*"; ConfigManager.layoutChanged();
                 check(store.unread(custom[0]) == 1, "Changed filter failed to count matching unread history");
                 for (int i = 0; i < 105; i++) chat.addServerSystemMessage(Component.literal("T Trader: eviction " + i));
                 check(store.unread(custom[0]) == 0 && store.unread(global) == 0 && store.unread(clan) == 0,

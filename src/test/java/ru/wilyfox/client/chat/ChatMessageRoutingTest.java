@@ -17,7 +17,7 @@ class ChatMessageRoutingTest {
         return c;
     }
     private void tab(HudConfig c, String key, ChatTab channel, boolean skip, String filter) {
-        var tab = new ChatWidgetConfig(channel); tab.skipOthers = skip; tab.textFilter = filter;
+        var tab = new ChatWidgetConfig(channel); tab.skipOthers = skip; tab.textFilter = filter; tab.regexFilter = false;
         c.chatWidgets.put(key, tab); c.chatTabOrder.add(key);
     }
     @Test void matchingExclusiveTabBypassesAllAndLaterTabsButKeepsEarlierRecipients() {
@@ -78,5 +78,25 @@ class ChatMessageRoutingTest {
         c = HudConfigCodec.decode(gson, gson.toJsonTree(c));
         assertTrue(c.chatWidgets.get(WidgetCatalog.CHAT_CLAN.key()).skipOthers);
         assertFalse(c.chatWidgets.get(ALL).skipOthers); assertFalse(c.chatWidgets.get(FH).skipOthers);
+    }
+    @Test void regexRoutingUsesFullOriginalTextAndSharesExclusiveRuleWithAll() {
+        var c = config(); var tab = c.chatWidgets.get("exclusive"); tab.regexFilter = true;
+        tab.textFilter = "(?iu)^(?!.*:).*(заш[её]л|выш[её]л).*";
+        var routing = new ChatMessageRouting(c);
+        assertTrue(routing.accepts("exclusive", ChatTab.CLAN, "Fox ЗАШЁЛ на сервер"));
+        assertFalse(routing.accepts(ALL, ChatTab.CLAN, "Fox ЗАШЁЛ на сервер"));
+        assertFalse(routing.accepts("after", ChatTab.CLAN, "Fox ЗАШЁЛ на сервер"));
+        assertTrue(routing.accepts("before", ChatTab.CLAN, "Fox ЗАШЁЛ на сервер"));
+        assertFalse(routing.accepts("exclusive", ChatTab.CLAN, "Fox: я вышел"));
+        assertTrue(routing.accepts(ALL, ChatTab.CLAN, "Fox: я вышел"));
+        assertFalse(routing.accepts("exclusive", ChatTab.TRADE, "Fox вышел"));
+        tab.textFilter = "(?-i).*Dragon.*";
+        routing = new ChatMessageRouting(c);
+        assertTrue(routing.accepts("exclusive", ChatTab.CLAN, "Fox Dragon"));
+        assertFalse(routing.accepts("exclusive", ChatTab.CLAN, "Fox dragon"));
+        tab.textFilter = "[";
+        routing = new ChatMessageRouting(c);
+        assertTrue(routing.accepts(ALL, ChatTab.CLAN, "anything"));
+        assertFalse(routing.accepts("exclusive", ChatTab.CLAN, "anything"));
     }
 }

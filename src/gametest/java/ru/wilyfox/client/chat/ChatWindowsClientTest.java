@@ -137,7 +137,7 @@ public final class ChatWindowsClientTest implements FabricClientGameTest {
                 check(((ChatComponentAccessor) client.gui.hud.getChat()).froghelper$getScroll() == windowScroll, "Redocking lost window scroll");
                 custom[0] = ChatDock.create();
                 check(custom[0] != null && ChatDock.tabs().contains(custom[0]), "New tab must initially be docked");
-                var config = ChatDock.settings(custom[0]); config.title = "Dragons"; config.channel = ChatTab.CLAN; config.textFilter = "DRAGON";
+                var config = ChatDock.settings(custom[0]); config.title = "Dragons"; config.channel = ChatTab.CLAN; config.textFilter = "(?i).*DRAGON.*";
                 ChatDock.select(custom[0]);
                 check(ChatTabManager.getInstance().matchingMessages() == 1, "Custom native tab filter wrong");
                 ChatDock.pressTab(custom[0], 50, dockY); ChatDock.drag(230, 30); ChatDock.release(230, 30);

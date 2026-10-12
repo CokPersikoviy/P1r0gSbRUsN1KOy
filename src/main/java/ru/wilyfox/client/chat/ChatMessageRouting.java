@@ -14,7 +14,7 @@ public final class ChatMessageRouting {
         for (String key : config.chatTabOrder) {
             var tab = config.chatWidgets.get(key);
             if (tab == null || tab.deleted) continue;
-            var rule = new Rule(index++, tab.channel, tab.textFilter.strip().toLowerCase(Locale.ROOT));
+            var rule = new Rule(index++, tab.channel, ChatTextFilter.compile(tab.textFilter, tab.regexFilter));
             rules.put(key, rule);
             if (tab.skipOthers && !key.equals(WidgetCatalog.CHAT_ALL.key()) && !key.equals(WidgetCatalog.CHAT_FH.key())) stops.add(rule);
         }
@@ -22,25 +22,28 @@ public final class ChatMessageRouting {
 
     public boolean hasStops() { return !stops.isEmpty(); }
 
-    public boolean accepts(String key, ChatTab channel, String normalizedText) {
+    public boolean accepts(String key, ChatTab channel, String text) {
+        return accepts(key, channel, text, null);
+    }
+    public boolean accepts(String key, ChatTab channel, String text, String normalizedText) {
         Rule destination = rules.get(key);
-        if (destination == null || !destination.matches(channel, normalizedText)) return false;
+        if (destination == null || !destination.matches(channel, text, normalizedText)) return false;
         for (Rule stop : stops) {
             // ALL is a catch-all view, so exclusive messages bypass it even though it is pinned first.
             if (key.equals(WidgetCatalog.CHAT_ALL.key())) {
-                if (stop.matches(channel, normalizedText)) return false;
+                if (stop.matches(channel, text, normalizedText)) return false;
                 continue;
             }
             if (stop.index >= destination.index) break;
-            if (stop.matches(channel, normalizedText)) return false;
+            if (stop.matches(channel, text, normalizedText)) return false;
         }
         return true;
     }
 
-    private record Rule(int index, ChatTab channel, String filter) {
-        boolean matches(ChatTab incoming, String text) {
+    private record Rule(int index, ChatTab channel, ChatTextFilter filter) {
+        boolean matches(ChatTab incoming, String text, String normalizedText) {
             return (channel == incoming || channel == ChatTab.ALL && incoming != ChatTab.FH)
-                    && (filter.isEmpty() || text.contains(filter));
+                    && filter.matches(text, normalizedText);
         }
     }
 }

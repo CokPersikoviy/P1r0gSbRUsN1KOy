@@ -40,8 +40,9 @@ final class WidgetSettingsSections {
             }
             items.add(new TextInputSettingsComponent(0, 0, 0, 0, "Tab name", () -> config.get().title,
                     value -> config.get().title = value, 20));
-            items.add(new TextInputSettingsComponent(0, 0, 0, 0, "Text filter", () -> config.get().textFilter,
-                    value -> { config.get().textFilter = value; ConfigManager.layoutChanged(); }, 128));
+            items.add(toggle("Regex filter", () -> config.get().regexFilter,
+                    value -> { config.get().regexFilter = value; ConfigManager.layoutChanged(); }));
+            items.add(new ChatFilterSettingsComponent(config));
             items.add(cycle("Channel", () -> config.get().channel, value -> { config.get().channel = value; ConfigManager.layoutChanged(); },
                     ru.wilyfox.client.chat.ChatTab.values(), ru.wilyfox.client.chat.ChatTab::getTitle));
             items.add(slider("Chat width", () -> config.get().width, value -> config.get().width = value, 100, 600));

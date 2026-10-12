@@ -25,7 +25,7 @@ class WidgetSettingsSectionsTest {
             var controls = WidgetSettingsSections.create(widget);
             if (widget.chatChannel() != null) {
                 assertEquals(widget == WidgetCatalog.CHAT_FH ? Set.of("Chat width", "Chat rows", "Show chat title", "Show input bar", "Widget visibility", "Message sound")
-                        : Set.of("Tab name", "Text filter", "Channel", "Chat width", "Chat rows", "Show chat title", "Widget visibility", "Message sound", "Skip Others"),
+                        : Set.of("Tab name", "Regex filter", "Text filter", "Channel", "Chat width", "Chat rows", "Show chat title", "Widget visibility", "Message sound", "Skip Others"),
                         new HashSet<>(controls.stream().map(control -> control.label).toList()));
                 continue;
             }

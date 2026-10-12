@@ -114,5 +114,8 @@
   "froghelper.chat.fh_input_hint": "Message in FH…",
   "froghelper.chat.image_clipboard": "Paste image",
   "froghelper.chat.clipboard_failed": "Could not read clipboard image. Copy it again or use a PNG/JPEG file.",
-  "froghelper.chat.clipboard_empty": "No supported clipboard image. Paste images is available on Windows."
+  "froghelper.chat.clipboard_empty": "No supported clipboard image. Paste images is available on Windows.",
+  "froghelper.chat.filter_invalid": "Invalid regex: %s. This tab will not match messages until corrected.",
+  "froghelper.chat.filter_regex_help": "Java regex matches the whole message, without colors or timestamp. Use .*word.* for contains, (one|two) for OR and (?iu) to ignore case, including Cyrillic. Blank allows all messages in the channel. Expensive matches are skipped.",
+  "froghelper.chat.filter_text_help": "Plain text contains, ignoring case. Enable Regex filter for regular expressions. Blank allows all messages in the channel."
 }

@@ -16,7 +16,6 @@ import net.minecraft.util.FormattedCharSequence;
 import ru.wilyfox.bridge.ChatComponentAccessor;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.profiler.ModProfiler;
-import ru.wilyfox.utils.Formatting;
 
 import java.time.Instant;
 import java.util.*;
@@ -39,7 +38,7 @@ public final class ChatTabManager {
     private final Predicate<GuiMessage> visibleFilter = this::isVisible;
     private ChatTab activeTab = ChatTab.ALL;
     private String activeWindow;
-    private String activeWindowFilter = "";
+    private ChatTextFilter activeWindowFilter = ChatTextFilter.EMPTY;
     private boolean emptyDock;
     private final Map<String, TabState> windowStates = new HashMap<>();
     private boolean rebuilding, registered, restoringView;
@@ -67,7 +66,7 @@ public final class ChatTabManager {
         return routing;
     }
     public boolean routesTo(String key, ChatMessageEntry entry) {
-        return key == null || routing().accepts(key, entry.tab(), entry.searchText());
+        return key == null || routing().accepts(key, entry.tab(), entry.filterText(), entry.searchText());
     }
 
     private ChatTabManager() {
@@ -89,7 +88,7 @@ public final class ChatTabManager {
         windowStates.computeIfAbsent(key, ignored -> new TabState()).scroll = scroll;
     }
     private TabState viewState() { return activeWindow == null ? states.get(activeTab) : windowStates.computeIfAbsent(activeWindow, ignored -> new TabState()); }
-    private String windowFilter() {
+    private ChatTextFilter windowFilter() {
         return activeWindowFilter;
     }
     public boolean isRebuilding() { return rebuilding; }
@@ -110,7 +109,7 @@ public final class ChatTabManager {
                 if (window.getValue().deleted) continue;
                 int count = 0;
                 for (var entry : messagesByTab.get(window.getValue().channel)) {
-                    if (entry.receivedNanos() != 0 && isDisplayMessage(entry.message()) && rules.accepts(window.getKey(), entry.tab(), entry.searchText())
+                    if (entry.receivedNanos() != 0 && isDisplayMessage(entry.message()) && rules.accepts(window.getKey(), entry.tab(), entry.filterText(), entry.searchText())
                             && readReceipts.unread(window.getKey(), entry.message())) count = Math.min(9999, count + 1);
                 }
                 unreadCounts.put(window.getKey(), count);
@@ -192,18 +191,14 @@ public final class ChatTabManager {
                     || !ConfigManager.isWidgetInCurrentLayout(window.getKey())) continue;
             // ALL contains server chat; FH has its own separate backend archive.
             if (config.channel != entry.tab() && !(config.channel == ChatTab.ALL && entry.tab() != ChatTab.FH)) continue;
-            String filter = config.textFilter.strip().toLowerCase(Locale.ROOT);
-            if (!filter.isEmpty() && !entry.searchText().contains(filter)) continue;
             if (!routesTo(window.getKey(), entry)) continue;
             ru.wilyfox.client.audio.UiSounds.toggle();
             return; // One message may match several windows: play only once.
         }
     }
     private static ChatMessageEntry entry(GuiMessage message, boolean live) {
-        String text = ChatTimestampFormatter.stripTimestampPrefix(
-                Formatting.stripMinecraftFormatting(ChatMessageSanitizer.forLogic(message.content().getString()))
-                        .replace('\u00a0', ' ')).strip();
-        return new ChatMessageEntry(message, Instant.now(), ChatPrefixRouter.resolve(text), text.toLowerCase(Locale.ROOT), live ? System.nanoTime() : 0);
+        String text = ChatMessageEntry.plainText(message.content());
+        return new ChatMessageEntry(message, Instant.now(), ChatPrefixRouter.resolve(text), text.toLowerCase(Locale.ROOT), live ? System.nanoTime() : 0, text);
     }
 
     public int repeatCount(GuiMessage message) {
@@ -249,9 +244,8 @@ public final class ChatTabManager {
     public void selectWindow(String key) {
         var config = ConfigManager.get().chatWidgets.get(key);
         if (config != null && !config.deleted) {
-            String filter = config.textFilter.strip().toLowerCase(Locale.ROOT);
-            boolean changed = !filter.equals(activeWindowFilter);
-            activeWindowFilter = filter;
+            boolean changed = !activeWindowFilter.same(config.textFilter, config.regexFilter);
+            if (changed) activeWindowFilter = ChatTextFilter.compile(config.textFilter, config.regexFilter);
             if (changed && Objects.equals(key, activeWindow) && config.channel == activeTab) {
                 revision++; rebuildVanillaChat(); markActiveRead();
             } else select(config.channel, key);
@@ -267,7 +261,7 @@ public final class ChatTabManager {
         old.newMessages = accessor.froghelper$getNewMessageSinceScroll();
         activeTab = tab;
         activeWindow = key;
-        if (key == null) activeWindowFilter = "";
+        if (key == null) activeWindowFilter = ChatTextFilter.EMPTY;
         revision++;
         rebuildVanillaChat();
         markActiveRead();
@@ -356,13 +350,13 @@ public final class ChatTabManager {
     }
     public boolean shouldDisplayInActiveTab(Component component) {
         if (emptyDock) return false;
-        String text = ChatTimestampFormatter.stripTimestampPrefix(Formatting.stripMinecraftFormatting(
-                ChatMessageSanitizer.forLogic(component.getString())));
+        String text = ChatMessageEntry.plainText(component);
+        String normalized = text.toLowerCase(Locale.ROOT);
         return (activeTab == ChatTab.ALL || ChatPrefixRouter.resolve(text) == activeTab)
-                && (search.isEmpty() || text.toLowerCase(Locale.ROOT).contains(search))
-                && (windowFilter().isEmpty() || text.toLowerCase(Locale.ROOT).contains(windowFilter()))
+                && (search.isEmpty() || normalized.contains(search))
+                && windowFilter().matches(text, normalized)
                 && (!registered || routing().accepts(activeWindow == null ? ChatDock.key(activeTab) : activeWindow,
-                        ChatPrefixRouter.resolve(text), text.toLowerCase(Locale.ROOT)));
+                        ChatPrefixRouter.resolve(text), text, normalized));
     }
     public boolean isVisible(GuiMessage message) {
         var known = entries.get(message);
@@ -370,7 +364,7 @@ public final class ChatTabManager {
     }
     private boolean isVisible(ChatMessageEntry entry) {
         return isDisplayMessage(entry.message()) && !emptyDock && (activeTab == ChatTab.ALL && entry.tab() != ChatTab.FH || entry.tab() == activeTab) && (search.isEmpty() || entry.searchText().contains(search))
-                && (windowFilter().isEmpty() || entry.searchText().contains(windowFilter()))
+                && windowFilter().matches(entry.filterText(), entry.searchText())
                 && (!registered || routesTo(activeWindow == null ? ChatDock.key(activeTab) : activeWindow, entry));
     }
 
@@ -470,10 +464,10 @@ public final class ChatTabManager {
             if (previous != null && previous.component().equals(content)
                     && previous.timestamp().equals(Instant.ofEpochMilli(message.sentAt()))) continue;
             var gui = new GuiMessage(previous != null ? previous.message().addedTime() : client.gui.hud.getGuiTicks(), content, null, GuiMessageSource.SYSTEM_CLIENT, null);
+            String filterText = (message.fromDiscord() ? "Discord " : "") + message.name() + ": " + message.text() + message.images().stream()
+                    .map(image -> " " + image.name()).collect(java.util.stream.Collectors.joining());
             var entry = new ChatMessageEntry(gui, Instant.ofEpochMilli(message.sentAt()), ChatTab.FH,
-                    ((message.fromDiscord() ? "Discord " : "") + message.name() + ": " + message.text() + message.images().stream()
-                            .map(image -> " " + image.name()).collect(java.util.stream.Collectors.joining())).toLowerCase(Locale.ROOT),
-                    previous != null ? previous.receivedNanos() : live ? System.nanoTime() : 0);
+                    filterText.toLowerCase(Locale.ROOT), previous != null ? previous.receivedNanos() : live ? System.nanoTime() : 0, filterText);
             if (previous != null) {
                 entries.remove(previous.message()); forgetWrapped(previous.message());
                 readReceipts.replace(previous.message(), gui);

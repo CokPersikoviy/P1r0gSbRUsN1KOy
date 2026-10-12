@@ -45,7 +45,7 @@ public final class ChatWidget extends AbstractWidget {
         view.window(key);
     }
     public ChatWidgetConfig settings() { return ConfigManager.get().chatWidgets.get(getConfigKey()); }
-    public ChatWidgetView view() { view.channel(settings().channel); view.filter(settings().textFilter); return view; }
+    public ChatWidgetView view() { view.channel(settings().channel); view.filter(settings().textFilter, settings().regexFilter); return view; }
     private int contentTop() { return PAD + (settings().showTitle ? TITLE_HEIGHT : 0); }
     public boolean hasInputBar() { return settings() != null && settings().channel == ChatTab.FH && settings().showInput; }
     public String inputDraft() { return inputDraft; }

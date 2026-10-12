@@ -33,7 +33,7 @@ public final class ChatWidgetSoundClientTest implements FabricClientGameTest {
                 String key = ChatDock.key(ChatTab.CLAN);
                 var window = ChatDock.settings(key);
                 window.deleted = false; window.detached = true; window.channel = ChatTab.CLAN;
-                window.textFilter = "dragon"; window.visibility = ChatWidgetVisibility.CHAT_OPEN;
+                window.regexFilter = true; window.textFilter = ".*dragon.*"; window.visibility = ChatWidgetVisibility.CHAT_OPEN;
                 ConfigManager.get().mainLayout.widgets.add(key); ConfigManager.layoutChanged();
                 client.getSoundManager().addListener(listener);
                 var chat = client.gui.hud.getChat();
@@ -54,7 +54,7 @@ public final class ChatWidgetSoundClientTest implements FabricClientGameTest {
 
                 String custom = "ChatWidgetCustom_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
                 var second = new ChatWidgetConfig(ChatTab.CLAN);
-                second.detached = true; second.messageSound = true; second.textFilter = "dragon";
+                second.detached = true; second.messageSound = true; second.textFilter = ".*dragon.*";
                 ConfigManager.get().chatWidgets.put(custom, second); ConfigManager.get().mainLayout.widgets.add(custom);
                 ConfigManager.get().chatTabOrder.add(custom);
                 ConfigManager.layoutChanged();
@@ -69,7 +69,7 @@ public final class ChatWidgetSoundClientTest implements FabricClientGameTest {
                 chat.addServerSystemMessage(Component.literal("C Fox: dragon docked"));
                 expect(sounds[0] == 2, "Docked tab still alerted as a widget");
 
-                second.channel = ChatTab.FH; second.textFilter = "ping";
+                second.channel = ChatTab.FH; second.textFilter = ".*ping.*";
                 ConfigManager.get().mainLayout.widgets.add(custom); ConfigManager.layoutChanged();
                 long id = System.currentTimeMillis();
                 store.acceptBackendMessages(List.of(new BackendChatMessage(id, "Fox", "ping history", id)), false);

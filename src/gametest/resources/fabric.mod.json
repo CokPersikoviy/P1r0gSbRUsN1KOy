@@ -6,6 +6,7 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
+      "ru.wilyfox.client.chat.ChatRegexClientTest",
       "ru.wilyfox.client.chat.ClipboardImageClientTest",
       "ru.wilyfox.client.moduser.ChatInputClientTest",
       "ru.wilyfox.client.hud.menu.GameplayUtilitiesClientTest",

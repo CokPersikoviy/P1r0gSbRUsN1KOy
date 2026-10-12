@@ -17,7 +17,7 @@ public final class ChatWidgetView {
     private String windowKey;
     private long routingRevision = -1;
     private String query = "";
-    private String filter = "";
+    private ChatTextFilter filter = ChatTextFilter.EMPTY;
     private int scroll, width = -1, rows = -1;
     private Font font;
     private long archiveRevision = -1, cacheRevision = -1;
@@ -59,11 +59,13 @@ public final class ChatWidgetView {
         if (!query.equals(normalized)) { query = normalized; reset(); }
     }
     public void filter(String value) {
-        String normalized = value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
-        if (!filter.equals(normalized)) { filter = normalized; reset(); }
+        filter(value, false);
+    }
+    public void filter(String value, boolean regex) {
+        if (!filter.same(value, regex)) { filter = ChatTextFilter.compile(value, regex); reset(); }
     }
     private boolean matches(ChatMessageEntry entry) {
-        return store.isDisplayMessage(entry.message()) && (query.isEmpty() || entry.searchText().contains(query)) && (filter.isEmpty() || entry.searchText().contains(filter))
+        return store.isDisplayMessage(entry.message()) && (query.isEmpty() || entry.searchText().contains(query)) && filter.matches(entry.filterText(), entry.searchText())
                 && store.routesTo(windowKey, entry);
     }
     public void scroll(int delta) {

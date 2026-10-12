@@ -17,9 +17,11 @@ public final class ChatWidgetConfig {
     public boolean deleted;
     public String title = "";
     public String textFilter = "";
+    /** Missing in legacy JSON: keep the old literal filter until the user enables regex. */
+    public boolean regexFilter;
 
     public ChatWidgetConfig() {}
-    public ChatWidgetConfig(ChatTab channel) { this.channel = channel; }
+    public ChatWidgetConfig(ChatTab channel) { this.channel = channel; regexFilter = true; }
 
     public void sanitize(ChatTab fallback) {
         if (channel == null) channel = fallback;
