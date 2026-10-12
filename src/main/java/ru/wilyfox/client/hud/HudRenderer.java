@@ -573,7 +573,7 @@ public class HudRenderer {
         if (!(widget instanceof AbstractWidget placed)) return false;
         String key = placed.getConfigKey();
         if (WidgetCatalog.find(key) == null) return false;
-        if (widget instanceof ru.wilyfox.client.hud.widget.ChatWidget && ru.wilyfox.client.chat.ChatDock.isPinned(key)) return false;
+        if (widget instanceof ru.wilyfox.client.hud.widget.ChatWidget && !ru.wilyfox.client.chat.ChatDock.canDetach(key)) return false;
         boolean inherited = isInheritedWidget(widget);
         editedWidgetKeys().add(key);
         ConfigManager.layoutChanged();

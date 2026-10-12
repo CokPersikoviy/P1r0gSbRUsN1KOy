@@ -8,6 +8,7 @@ public final class ChatWidgetConfig {
     public int width = 280;
     public int rows = 10;
     public boolean showTitle = true;
+    public boolean showInput = true; // Used by FH windows; missing legacy field also defaults to enabled.
     public boolean messageSound = false;
     public boolean skipOthers = false;
     public ChatWidgetVisibility visibility = ChatWidgetVisibility.ALWAYS;

@@ -117,6 +117,7 @@ public final class BackendSocialClient {
     private record PendingRoster(long generation, List<SocialWire.Player> players, boolean timerSharing, boolean chatSharing, long receivedAt) {}
     public static void sendChat(String text) { DEFAULT.chat.send(text, DEFAULT.accessToken); }
     public static void sendChatImage(Path path, String text) { DEFAULT.chat.sendImage(path, text, DEFAULT.accessToken); }
+    public static void sendChatImage(byte[] bytes, String text) { DEFAULT.chat.sendImage(bytes, text, DEFAULT.accessToken); }
     public static CompletableFuture<byte[]> downloadChatImage(long id, String attachment) {
         var client = DEFAULT;
         if (!diagnosticAuthorizationReady() || id <= 0 || attachment == null || !attachment.matches("0|[0-9]{17,20}"))
@@ -124,7 +125,7 @@ public final class BackendSocialClient {
         long attempt = client.generation;
         var request = HttpRequest.newBuilder(client.backend.resolve("/v1/chat/" + id + "/image/" + attachment))
                 .timeout(Duration.ofSeconds(30)).header("Authorization", "Bearer " + client.accessToken).GET().build();
-        return HTTP.sendAsync(request, ignored -> new LimitedBodySubscriber(ru.wilyfox.client.chat.FhImages.MAX_BYTES)).thenApply(response -> {
+        return HTTP.sendAsync(request, ignored -> new LimitedBodySubscriber(ru.wilyfox.client.chat.FhImages.MAX_DOWNLOAD_BYTES)).thenApply(response -> {
             if (attempt != client.generation || response.statusCode() != 200) throw new java.util.concurrent.CompletionException(new IOException("FH image unavailable"));
             return response.body();
         });

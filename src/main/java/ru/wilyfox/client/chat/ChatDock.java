@@ -92,11 +92,13 @@ public final class ChatDock {
     }
     public static boolean canEdit(String key) {
         var settings = settings(key);
-        return settings != null && !settings.deleted && !isPinned(key);
+        return settings != null && !settings.deleted && canDetach(key);
     }
     public static boolean isPinned(String key) { return key(ChatTab.ALL).equals(key) || key(ChatTab.FH).equals(key); }
+    public static boolean canDetach(String key) { return key != null && !key(ChatTab.ALL).equals(key); }
+    public static boolean canDelete(String key) { return canEdit(key) && !isPinned(key); }
     public static void delete(String key) {
-        if (!canEdit(key)) return;
+        if (!canDelete(key)) return;
         cancelDrag();
         boolean selected = selectedKey().equals(key);
         dock(key);
@@ -116,7 +118,7 @@ public final class ChatDock {
         ConfigManager.save();
     }
     public static void detach(String key, int x, int y) {
-        if (settings(key) == null || settings(key).deleted || isPinned(key)) return;
+        if (settings(key) == null || settings(key).deleted || !canDetach(key)) return;
         int scroll = ChatTabManager.getInstance().windowScroll(key);
         settings(key).detached = true;
         ConfigManager.get().mainLayout.widgets.add(key);
@@ -141,7 +143,7 @@ public final class ChatDock {
     }
     public static void pressTab(String key, double x, double y) {
         cancelDrag(); if (!selectedKey().equals(key)) UiSounds.click();
-        select(key); if (isPinned(key)) return;
+        select(key); if (!canDetach(key)) return;
         pressed = key; pressX = pointerX = x; pressY = y; originallyDocked = true;
         previewOrder = List.copyOf(ConfigManager.get().chatTabOrder);
     }
@@ -158,6 +160,7 @@ public final class ChatDock {
         if (!moving && Math.hypot(x - pressX, y - pressY) < 6) return true;
         if (dragging == null) {
             if (ChatTabOverlay.getInstance().isDockRow(y)) {
+                if (isPinned(pressed)) return true;
                 moving = true;
                 ChatTabOverlay.getInstance().updateTabDrag(pressed, x);
                 return true;

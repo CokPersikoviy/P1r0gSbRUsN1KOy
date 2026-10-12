@@ -14,6 +14,7 @@ import ru.wilyfox.client.chat.ChatPrefixRouter;
 import ru.wilyfox.client.chat.ChatTab;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.utility.PlayerNameFormatter;
+import ru.wilyfox.client.clan.PlayerClanStorage;
 import java.util.List;
 
 public final class SocialClientTest implements FabricClientGameTest {
@@ -22,12 +23,15 @@ public final class SocialClientTest implements FabricClientGameTest {
             context.runOnClient(client -> {
                 var config = ConfigManager.get();
                 boolean clean = config.render.cleanPlayerNames;
+                boolean cleanClan = config.render.cleanNamesShowClan;
+                String previousClan = PlayerClanStorage.getClan("Fox");
                 boolean badge = config.render.modUserBadge;
                 boolean timestamps = config.render.chatTimestamps;
                 boolean toned = config.render.toneDownChat;
                 try {
                     config.render.modUserBadge = true;
                     config.render.cleanPlayerNames = true;
+                    config.render.cleanNamesShowClan = false;
                     config.render.chatTimestamps = false;
                     config.render.toneDownChat = false;
                     PresenceStore.replace(List.of("Fox"));
@@ -37,6 +41,20 @@ public final class SocialClientTest implements FabricClientGameTest {
                         throw new AssertionError("Clean names must retain the visual backend badge");
                     }
                     if (!original.getString().equals("[VIP] OtherNickname")) throw new AssertionError("Player identity component mutated");
+                    PlayerClanStorage.update("Fox", "Nexus");
+                    config.render.cleanNamesShowClan = true;
+                    if (!ModUserBadge.strip(PlayerNameFormatter.apply(original, "Fox")).getString().equals("[Nexus] Fox")) {
+                        throw new AssertionError("Clean clan option must retain the clan, profile name and badge without server ranks");
+                    }
+                    config.render.cleanNamesShowClan = false;
+                    if (!ModUserBadge.strip(PlayerNameFormatter.apply(original, "Fox")).getString().equals("Fox")) {
+                        throw new AssertionError("Disabling clean clan option must hide the clan immediately");
+                    }
+                    config.render.cleanNamesShowClan = true;
+                    if (!ModUserBadge.strip(PlayerNameFormatter.apply(original, "ClanlessPlayer")).getString().equals("ClanlessPlayer")) {
+                        throw new AssertionError("Unknown clans must not add empty brackets");
+                    }
+                    config.render.cleanNamesShowClan = false;
                     Component chat = ChatMessageDecorator.decorate(Component.literal("C Fox: helloⒻ"));
                     if (!chat.getString().contains("\uf8ff") || ChatPrefixRouter.resolve(chat.getString()) != ChatTab.CLAN
                             || !ChatMessageSanitizer.forLogic(chat).getString().equals("C Fox: helloⒻ")) {
@@ -49,6 +67,8 @@ public final class SocialClientTest implements FabricClientGameTest {
                 } finally {
                     PresenceStore.clear();
                     config.render.cleanPlayerNames = clean;
+                    config.render.cleanNamesShowClan = cleanClan;
+                    PlayerClanStorage.update("Fox", previousClan);
                     config.render.modUserBadge = badge;
                     config.render.chatTimestamps = timestamps;
                     config.render.toneDownChat = toned;

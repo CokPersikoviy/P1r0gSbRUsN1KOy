@@ -215,6 +215,10 @@ public class Client {
                 ScreenAnchor.HOTBAR_LEFT
         );
         hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.FpsWidget(20, 20, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
+        var imageWidget = new ru.wilyfox.client.hud.widget.ImageWidget(20, 40, HudLayer.CONTENT);
+        hudRenderer.registerWidget(imageWidget, ScreenAnchor.TOP_LEFT);
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(imageWidget::tick);
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> imageWidget.release());
         hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.MiningStatisticsWidget(20, 95, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
         hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.RouletteTimerWidget(20, 45, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
         hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.DailyCreditsTimerWidget(20, 70, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);

@@ -183,7 +183,8 @@ public final class ChatWindowsClientTest implements FabricClientGameTest {
             context.runOnClient(client -> {
                 client.gui.screen().onClose(); ChatDock.delete(custom[0]); custom[0] = null;
                 for (var tab : ChatTab.values()) ChatDock.detach(ChatDock.key(tab), 12, 20);
-                check(ChatDock.tabs().equals(java.util.List.of(ChatDock.key(ChatTab.ALL), ChatDock.key(ChatTab.FH))), "Pinned tabs must remain docked");
+                check(ChatDock.tabs().equals(java.util.List.of(ChatDock.key(ChatTab.ALL))), "Only ALL must remain docked");
+                ChatDock.dock(ChatDock.key(ChatTab.FH));
                 client.gui.hud.getChat().addServerSystemMessage(Component.literal("G Fox: empty dock still archives"));
                 check(!((ChatComponentAccessor) client.gui.hud.getChat()).froghelper$getTrimmedMessages().isEmpty(), "Pinned ALL must keep native messages visible");
                 ChatDock.dock(ChatDock.key(ChatTab.ALL)); ChatDock.select(ChatDock.key(ChatTab.ALL));

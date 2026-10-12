@@ -25,6 +25,7 @@
     "VisualsCameraMixin",
     "VisualsEnvironmentMixin",
     "VisualsFogMixin",
+    "AutoSprintMixin",
     "VisualsBlockOutlineMixin",
     "GuiScoreboardMixin",
     "GuiGraphicsExtractorMixin",

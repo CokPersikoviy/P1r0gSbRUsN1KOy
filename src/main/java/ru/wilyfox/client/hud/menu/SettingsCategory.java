@@ -16,6 +16,7 @@ public enum SettingsCategory {
     WIDGET("Widget"),
     RUNES_BAG_KEYBINDS("Runes Bag Keybinds"),
     CLICKER("Clicker"),
+    LEVEL_CALCULATOR("Level Calculator"),
     CONFIGS("Configs");
 
     private final String title;

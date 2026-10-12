@@ -13,6 +13,9 @@ import ru.wilyfox.client.chat.ChatMessageCopyExtractor;
 import ru.wilyfox.client.chat.ChatMessageSanitizer;
 import ru.wilyfox.client.chat.ChatTabManager;
 import ru.wilyfox.client.chat.ChatWidgetView;
+import ru.wilyfox.client.chat.ChatInputMode;
+import ru.wilyfox.client.chat.ChatTab;
+import ru.wilyfox.bridge.ChatInputHost;
 import ru.wilyfox.client.hud.config.ChatWidgetConfig;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.WidgetCatalog;
@@ -28,6 +31,7 @@ public final class ChatWidget extends AbstractWidget {
     private final ChatWidgetView view;
     private long presentationTime;
     private float scrollShift;
+    private String inputDraft = "";
 
     public ChatWidget(WidgetCatalog catalog, int x, int y) {
         this(catalog.key(), catalog, x, y);
@@ -43,12 +47,26 @@ public final class ChatWidget extends AbstractWidget {
     public ChatWidgetConfig settings() { return ConfigManager.get().chatWidgets.get(getConfigKey()); }
     public ChatWidgetView view() { view.channel(settings().channel); view.filter(settings().textFilter); return view; }
     private int contentTop() { return PAD + (settings().showTitle ? TITLE_HEIGHT : 0); }
-    private int unscaledHeight() { return contentTop() + settings().rows * LINE_HEIGHT + PAD; }
+    public boolean hasInputBar() { return settings() != null && settings().channel == ChatTab.FH && settings().showInput; }
+    public String inputDraft() { return inputDraft; }
+    public void inputDraft(String value) { inputDraft = value == null ? "" : value; }
+    private int inputHeight() { return hasInputBar() ? 18 : 0; }
+    private int unscaledHeight() { return contentTop() + settings().rows * LINE_HEIGHT + PAD + inputHeight(); }
     private float textScale() { return ConfigManager.get().render.fixedChatWidgetFont ? 1.0f : scale; }
     private int viewportWidth() { return ConfigManager.get().render.fixedChatWidgetFont ? getWidth() : settings().width; }
     private int viewportHeight() { return ConfigManager.get().render.fixedChatWidgetFont ? getHeight() : unscaledHeight(); }
-    private int viewportRows() { return Math.max(0, (viewportHeight() - contentTop() - PAD) / LINE_HEIGHT); }
-    private int contentBottom() { return viewportHeight() - PAD; }
+    private int viewportRows() { return Math.max(0, (viewportHeight() - contentTop() - PAD - inputHeight()) / LINE_HEIGHT); }
+    private int contentBottom() { return viewportHeight() - PAD - inputHeight(); }
+    private int inputTop() { return contentBottom() + 4; }
+    public boolean isInputBar(double x, double y) {
+        return hasInputBar() && isHovered(x, y) && localX(x) >= PAD && localX(x) < viewportWidth() - PAD
+                && localY(y) >= inputTop() && localY(y) < viewportHeight() - PAD;
+    }
+    /** Native editing uses the same text scale as the viewport, including the fixed-font option. */
+    public float inputScale() { return textScale(); }
+    public int inputX() { return Math.round(startX + (PAD + ChatInputMode.FH.width(Minecraft.getInstance().font) + 3) * textScale()); }
+    public int inputY() { return Math.round(startY + (inputTop() + 2) * textScale()); }
+    public int inputWidth() { return Math.max(1, (int) Math.floor(((viewportWidth() - PAD) * textScale() + startX - inputX()) / textScale())); }
     private java.util.List<ChatWidgetView.Line> visibleLines() {
         int rows = viewportRows();
         if (rows == 0) { scrollShift = 0; return java.util.List.of(); }
@@ -145,6 +163,16 @@ public final class ChatWidget extends AbstractWidget {
                 graphics.fill(width - 3, contentTop(), width - 2, contentBottom(), WidgetTheme.PANEL_BG_SOFT);
                 int thumbY = view.scroll() == 0 ? contentBottom() - 8 : contentTop();
                 graphics.fill(width - 3, thumbY, width - 2, thumbY + 8, WidgetTheme.TEXT_MUTED);
+            }
+            if (hasInputBar()) {
+                graphics.fill(PAD, inputTop(), width - PAD, height - PAD, WidgetTheme.PANEL_BG_SOFT);
+                ChatInputMode.FH.render(graphics, client.font, PAD, inputTop());
+                boolean editingInput = client.gui.screen() instanceof ChatInputHost host
+                        && getConfigKey().equals(host.froghelper$inlineInputKey());
+                if (!editingInput) graphics.text(client.font,
+                        client.font.plainSubstrByWidth(inputDraft.isEmpty() ? Component.translatable("froghelper.chat.fh_input_hint").getString() : inputDraft,
+                                Math.max(0, width - PAD * 2 - ChatInputMode.FH.width(client.font) - 4)),
+                        PAD + ChatInputMode.FH.width(client.font) + 4, inputTop() + 2, WidgetTheme.TEXT_MUTED);
             }
         } finally {
             graphics.disableScissor();

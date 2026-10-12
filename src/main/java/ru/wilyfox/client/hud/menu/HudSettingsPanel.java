@@ -110,7 +110,7 @@ public class HudSettingsPanel {
         widgetComponents.add(new ActionSettingsComponent("Release connection / anchor", () -> {
             placed.clearWidgetSnap(); placed.setScreenAnchor(null); ConfigManager.captureWidgetLayout(placed);
         }).withVisibility(() -> placed.hasWidgetSnap() || placed.getScreenAnchor() != null));
-        if (catalog.chatChannel() != null) widgetComponents.add(new ActionSettingsComponent("Delete tab", () -> {
+        if (catalog.chatChannel() != null && ru.wilyfox.client.chat.ChatDock.canDelete(placed.getConfigKey())) widgetComponents.add(new ActionSettingsComponent("Delete tab", () -> {
             ru.wilyfox.client.chat.ChatDock.delete(placed.getConfigKey()); closeWidget();
         }));
         scrollOffset = 0;

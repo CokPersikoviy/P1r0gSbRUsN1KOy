@@ -30,6 +30,7 @@ class PlayerNameFormatterTest {
         Component serverName = Component.literal("Nickname").withStyle(ChatFormatting.GREEN);
 
         assertFalse(new RenderConfig().cleanPlayerNames);
+        assertFalse(new RenderConfig().cleanNamesShowClan);
         assertSame(serverName, PlayerNameFormatter.baseName(serverName, "RealPlayer", false));
     }
 

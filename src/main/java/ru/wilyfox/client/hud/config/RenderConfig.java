@@ -7,11 +7,14 @@ public class RenderConfig {
     public boolean hideHurtCameraShake = false;
     public boolean staticHand = false;
     public boolean hideFireOverlay = false;
+    public boolean antiBlind = false;
+    public boolean autoSprint = false;
     public boolean clearWater = false;
     public boolean clearLava = false;
     public boolean clearPowderSnow = false;
     public boolean hideFirstPersonCosmetics = true;
     public boolean cleanPlayerNames = false;
+    public boolean cleanNamesShowClan = false;
     public boolean modUserBadge = true;                       // frog badge on FrogHelper users' nametags
     public boolean toneDownChat = false;
     public boolean copyChatMessages = true;

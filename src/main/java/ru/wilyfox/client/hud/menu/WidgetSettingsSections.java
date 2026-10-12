@@ -28,6 +28,16 @@ final class WidgetSettingsSections {
         var items = new ArrayList<SettingsComponent>();
         if (widget.chatChannel() != null) {
             Supplier<ru.wilyfox.client.hud.config.ChatWidgetConfig> config = () -> ConfigManager.get().chatWidgets.get(key);
+            if (widget == WidgetCatalog.CHAT_FH) {
+                items.add(slider("Chat width", () -> config.get().width, value -> config.get().width = value, 100, 600));
+                items.add(slider("Chat rows", () -> config.get().rows, value -> config.get().rows = value, 2, 30));
+                items.add(toggle("Show chat title", () -> config.get().showTitle, value -> config.get().showTitle = value));
+                items.add(toggle("Show input bar", () -> config.get().showInput, value -> config.get().showInput = value));
+                items.add(cycle("Widget visibility", () -> config.get().visibility, value -> config.get().visibility = value,
+                        ru.wilyfox.client.hud.config.ChatWidgetVisibility.values(), ru.wilyfox.client.hud.config.ChatWidgetVisibility::title));
+                items.add(toggle("Message sound", () -> config.get().messageSound, value -> config.get().messageSound = value));
+                return items;
+            }
             items.add(new TextInputSettingsComponent(0, 0, 0, 0, "Tab name", () -> config.get().title,
                     value -> config.get().title = value, 20));
             items.add(new TextInputSettingsComponent(0, 0, 0, 0, "Text filter", () -> config.get().textFilter,
@@ -45,6 +55,13 @@ final class WidgetSettingsSections {
             return items;
         }
         switch (widget) {
+            case IMAGE -> {
+                items.add(slider("Image width", () -> ConfigManager.get().imageWidget.width, value -> ConfigManager.get().imageWidget.width = value, 40, 600));
+                items.add(slider("Image height", () -> ConfigManager.get().imageWidget.height, value -> ConfigManager.get().imageWidget.height = value, 40, 600));
+                items.add(toggle("Keep image aspect ratio", () -> ConfigManager.get().imageWidget.keepAspectRatio, value -> ConfigManager.get().imageWidget.keepAspectRatio = value));
+                items.add(toggle("Animate GIF", () -> ConfigManager.get().imageWidget.animateGif, value -> ConfigManager.get().imageWidget.animateGif = value));
+                items.add(new ActionSettingsComponent("Clear image", () -> { ConfigManager.get().imageWidget.asset = ""; ConfigManager.save(); }));
+            }
             case MINING_STATISTICS -> MiningStatisticsSettings.populate(items);
             case DAILY_CREDITS -> {
                 items.add(toggle("Daily credits notifications", () -> ConfigManager.get().dailyCreditsTimer.notifications,

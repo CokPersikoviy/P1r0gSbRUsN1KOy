@@ -62,7 +62,7 @@ final class BackendChatClient {
         boolean catchingUp = announced.get() > cursor;
         if (reading != null || now < lastRead + 600 || now < retryReadAt
                 || now < nextRead && !catchingUp && !olderRequested && !refreshRecent.get()) return;
-        if (initial && !catchingUp && !olderRequested && !resync && !refreshRecent.get() && store.getActiveTab() != ChatTab.FH) return;
+        if (initial && !catchingUp && !olderRequested && !resync && !refreshRecent.get() && !viewingFh()) return;
         boolean older = initial && !catchingUp && olderRequested;
         boolean recent = initial && !catchingUp && !older && !resync && refreshRecent.getAndSet(false);
         olderRequested = false;
@@ -94,7 +94,7 @@ final class BackendChatClient {
                         boolean moreNew = initial && !older && page.hasMore();
                         if (recent) moreNew = false;
                         // Check a bounded recent page after a tail read, to recover late Discord metadata.
-                        if (initial && !older && !recent && !moreNew && store.getActiveTab() == ChatTab.FH) refreshRecent.set(true);
+                        if (initial && !older && !recent && !moreNew && viewingFh()) refreshRecent.set(true);
                         initial = true;
                         if (moreNew) announced.accumulateAndGet(cursor + 1, Math::max);
                         nextRead = System.currentTimeMillis() + (moreNew || announced.get() > cursor || !recent && refreshRecent.get() ? 600 : 10_000);
@@ -104,6 +104,13 @@ final class BackendChatClient {
                         nextRead = retryReadAt = System.currentTimeMillis() + 10_000;
                     }
                 }));
+    }
+    private static boolean viewingFh() {
+        if (ChatTabManager.getInstance().getActiveTab() == ChatTab.FH) return true;
+        String key = ru.wilyfox.client.hud.config.WidgetCatalog.CHAT_FH.key();
+        var config = ru.wilyfox.client.hud.config.ConfigManager.get().chatWidgets.get(key);
+        return config != null && config.detached && !config.deleted
+                && ru.wilyfox.client.hud.config.ConfigManager.isWidgetInCurrentLayout(key);
     }
     void send(String input, String bearer) {
         String text = input == null ? "" : input.strip();
@@ -139,6 +146,16 @@ final class BackendChatClient {
                 }));
     }
     void sendImage(java.nio.file.Path path, String input, String bearer) {
+        sendImage(() -> ru.wilyfox.client.chat.FhImages.read(path), input, bearer);
+    }
+    void sendImage(byte[] bytes, String input, String bearer) {
+        if (bytes == null || bytes.length == 0 || bytes.length > ru.wilyfox.client.chat.FhImages.MAX_BYTES) {
+            feedback("froghelper.chat.image_send_failed"); return;
+        }
+        byte[] snapshot = bytes.clone();
+        sendImage(() -> { ru.wilyfox.client.chat.FhImages.dimensions(snapshot); return snapshot; }, input, bearer);
+    }
+    private void sendImage(java.util.concurrent.Callable<byte[]> source, String input, String bearer) {
         String text = input == null ? "" : input.strip();
         if (!enabled || bearer == null) { feedback("froghelper.chat.fh_unavailable"); return; }
         if (sending != null || System.currentTimeMillis() < nextSend) { feedback("froghelper.chat.fh_busy"); return; }
@@ -150,8 +167,8 @@ final class BackendChatClient {
         nextSend = System.currentTimeMillis() + 3100;
         String nonce = UUID.randomUUID().toString();
         sending = ru.wilyfox.client.chat.FhImages.supply(() -> {
-            try { return ru.wilyfox.client.chat.FhImages.read(path); }
-            catch (java.io.IOException | RuntimeException error) { throw new java.util.concurrent.CompletionException(error); }
+            try { return source.call(); }
+            catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
         }).thenCompose(bytes -> {
             if (attempt != generation) return CompletableFuture.<HttpResponse<byte[]>>failedFuture(new IllegalStateException("Session changed"));
             var request = HttpRequest.newBuilder(backend.resolve("/v1/chat/image?nonce=" + nonce + "&text="

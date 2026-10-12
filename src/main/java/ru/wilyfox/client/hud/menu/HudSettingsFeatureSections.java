@@ -7,6 +7,7 @@ import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.config.LowHpMessageElement;
 import ru.wilyfox.client.hud.config.ThemePreset;
 import ru.wilyfox.client.quickaccess.QuickAccessScreen;
+import ru.wilyfox.client.calculator.LevelCalculatorScreen;
 
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,11 @@ final class HudSettingsFeatureSections {
             Map<SettingsCategory, List<SettingsComponent>> componentsByCategory,
             Runnable rebuildAutoMessageComponents
     ) {
+        componentsByCategory.get(SettingsCategory.LEVEL_CALCULATOR).add(new ActionSettingsComponent(
+                "Open level calculator", () -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.gui.setScreen(new LevelCalculatorScreen(minecraft.gui.screen()));
+                }));
         componentsByCategory.get(SettingsCategory.RUNES_BAG_KEYBINDS).add(
                 new DragNumberSettingsComponent(0, 0, 0, 0, "Rune set stats scale %",
                         () -> ConfigManager.get().runesBag.setEffectOverlayScalePercent,

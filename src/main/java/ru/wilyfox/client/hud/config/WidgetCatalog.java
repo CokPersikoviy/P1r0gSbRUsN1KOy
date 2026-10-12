@@ -14,6 +14,7 @@ public enum WidgetCatalog {
     MINING_STATISTICS("MiningStatisticsWidget", "Mining Statistics", c -> false),
     ESTIMATED_TPS("EstimatedTpsWidget", "Estimated TPS", c -> c.estimatedTps.active),
     FPS("FpsWidget", "FPS", c -> false),
+    IMAGE("ImageWidget", "Image", c -> false),
     ROULETTE("RouletteTimerWidget", "Roulette Timer", c -> false),
     DAILY_CREDITS("DailyCreditsTimerWidget", "Daily Credits Timer", c -> false),
     BOOSTERS("BoostersWidget", "Boosters", c -> c.boosters.active),

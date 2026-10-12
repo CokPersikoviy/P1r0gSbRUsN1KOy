@@ -6,6 +6,15 @@ import ru.wilyfox.client.chat.ChatTab;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ChatWindowsConfigTest {
+    @Test void legacyFhDefaultsToInlineInputAndExplicitOptOutSurvivesReload() {
+        var gson = HudConfigCodec.createGson();
+        var legacy = HudConfigCodec.decode(gson, com.google.gson.JsonParser.parseString(
+                "{\"chatWidgets\":{\"ChatWidgetFH\":{\"channel\":\"FH\",\"detached\":true}}}"));
+        var key = WidgetCatalog.CHAT_FH.key();
+        assertTrue(legacy.chatWidgets.get(key).showInput);
+        legacy.chatWidgets.get(key).showInput = false;
+        assertFalse(HudConfigCodec.decode(gson, gson.toJsonTree(legacy)).chatWidgets.get(key).showInput);
+    }
     @Test void defaultTabsAreDockedAndNeverAddedByLegacyMigration() {
         var config = HudConfigCodec.decode(HudConfigCodec.createGson(), JsonParser.parseString("{}"));
         assertEquals(7, config.chatWidgets.size());
@@ -118,7 +127,7 @@ class ChatWindowsConfigTest {
         var restored = HudConfigCodec.decode(HudConfigCodec.createGson(), JsonParser.parseString("{\"chatTabOrder\":null}"));
         assertEquals(java.util.List.of("ChatWidgetAll", "ChatWidgetFH", "ChatWidgetGlobal", "ChatWidgetTrade", "ChatWidgetLocal", "ChatWidgetClan", "ChatWidgetPrivate"), restored.chatTabOrder);
     }
-    @Test void pinnedTabsCannotBeDetachedDeletedOrPlacedByAnOldConfig() {
+    @Test void fixedTabsKeepIdentityAndOnlyFhCanPersistDetachedPlacement() {
         var config = HudConfigSanitizer.sanitize(new HudConfig());
         for (var key : java.util.List.of("ChatWidgetAll", "ChatWidgetFH")) {
             var tab = config.chatWidgets.get(key); tab.deleted = true; tab.detached = true; tab.title = "Changed"; tab.channel = ChatTab.CLAN;
@@ -130,9 +139,10 @@ class ChatWindowsConfigTest {
         var repaired = HudConfigSanitizer.sanitize(config);
         assertEquals(java.util.List.of("ChatWidgetAll", "ChatWidgetFH"), repaired.chatTabOrder.subList(0, 2));
         for (var key : java.util.List.of("ChatWidgetAll", "ChatWidgetFH")) {
-            assertFalse(repaired.chatWidgets.get(key).detached); assertFalse(repaired.chatWidgets.get(key).deleted);
-            assertFalse(repaired.mainLayout.widgets.contains(key)); assertFalse(repaired.locationLayouts.get(key).widgets.contains(key));
-            assertFalse(repaired.widgetLayouts.containsKey(key)); assertFalse(repaired.locationLayouts.get(key).placements.containsKey(key));
+            boolean fh = key.equals("ChatWidgetFH");
+            assertEquals(fh, repaired.chatWidgets.get(key).detached); assertFalse(repaired.chatWidgets.get(key).deleted);
+            assertEquals(fh, repaired.mainLayout.widgets.contains(key)); assertEquals(fh, repaired.locationLayouts.get(key).widgets.contains(key));
+            assertEquals(fh, repaired.widgetLayouts.containsKey(key)); assertEquals(fh, repaired.locationLayouts.get(key).placements.containsKey(key));
         }
         assertEquals(ChatTab.ALL, repaired.chatWidgets.get("ChatWidgetAll").channel);
         assertEquals(ChatTab.FH, repaired.chatWidgets.get("ChatWidgetFH").channel);

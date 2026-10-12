@@ -36,6 +36,9 @@ final class HudSettingsCoreSections {
                 value -> ConfigManager.get().render.hideFirstPersonCosmetics = value);
         toggle(items, "Clean player names (TAB / nametags)", () -> ConfigManager.get().render.cleanPlayerNames,
                 value -> ConfigManager.get().render.cleanPlayerNames = value);
+        items.add(toggle("Show clan in clean names", () -> ConfigManager.get().render.cleanNamesShowClan,
+                value -> ConfigManager.get().render.cleanNamesShowClan = value)
+                .withVisibility(() -> ConfigManager.get().render.cleanPlayerNames));
         toggle(items, "FrogHelper Badge On Nametags", () -> ConfigManager.get().render.modUserBadge,
                 value -> ConfigManager.get().render.modUserBadge = value);
         toggle(items, "Hide block particles", () -> ConfigManager.get().render.hideBlockBreakParticles,
@@ -46,6 +49,8 @@ final class HudSettingsCoreSections {
                 value -> ConfigManager.get().render.hideHurtCameraShake = value);
         toggle(items, "Hide fire overlay", () -> ConfigManager.get().render.hideFireOverlay,
                 value -> ConfigManager.get().render.hideFireOverlay = value);
+        toggle(items, "AntiBlind", () -> ConfigManager.get().render.antiBlind,
+                value -> ConfigManager.get().render.antiBlind = value);
         toggle(items, "Show server in TAB", () -> ConfigManager.get().render.showCurrentServerInTab,
                 value -> ConfigManager.get().render.showCurrentServerInTab = value);
 
@@ -68,6 +73,8 @@ final class HudSettingsCoreSections {
                 value -> ConfigManager.get().render.usefulItemsHighlight = value).withWarningTooltip("Performance sensitive"));
 
         section(items, "Utility");
+        toggle(items, "AutoSprint", () -> ConfigManager.get().render.autoSprint,
+                value -> ConfigManager.get().render.autoSprint = value);
         toggle(items, "Tone-down chat", () -> ConfigManager.get().render.toneDownChat,
                 value -> ConfigManager.get().render.toneDownChat = value);
         toggle(items, "Chat timestamps", () -> ConfigManager.get().render.chatTimestamps,

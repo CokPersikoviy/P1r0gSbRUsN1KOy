@@ -5,14 +5,32 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.concurrent.*;
 import javax.imageio.ImageIO;
+import javax.imageio.stream.MemoryCacheImageInputStream;
 
 /** One decoder, one opened image, no history-wide texture cache or render-thread I/O. */
 public final class FhImages {
     public static final int MAX_BYTES = 4 * 1024 * 1024;
+    public static final int MAX_DOWNLOAD_BYTES = GifAnimation.MAX_BYTES;
     public static final ExecutorService IO = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new ArrayBlockingQueue<>(4), task -> {
         var thread = new Thread(task, "FH chat images"); thread.setDaemon(true); return thread;
     });
     private FhImages() {}
+    public static boolean isGif(byte[] bytes) {
+        return bytes.length >= 6 && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F'
+                && bytes[3] == '8' && (bytes[4] == '7' || bytes[4] == '9') && bytes[5] == 'a';
+    }
+    static NativeImage gifPixels(GifAnimation.Frame frame) {
+        var source = frame.pixels(); NativeImage result = null;
+        try {
+            int sample = Math.max(1, (int) Math.ceil(Math.max(source.getWidth(), source.getHeight()) / 1280d));
+            int width = (source.getWidth() + sample - 1) / sample, height = (source.getHeight() + sample - 1) / sample;
+            result = new NativeImage(width, height, false);
+            for (int y = 0; y < height; y++) for (int x = 0; x < width; x++)
+                result.setPixel(x, y, source.getRGB(x * sample, y * sample));
+            return result;
+        } catch (RuntimeException failure) { if (result != null) result.close(); throw failure; }
+        finally { source.flush(); }
+    }
     public static <T> CompletableFuture<T> supply(java.util.function.Supplier<T> task) {
         try { return CompletableFuture.supplyAsync(task, IO); }
         catch (RejectedExecutionException busy) { return CompletableFuture.failedFuture(busy); }
@@ -24,7 +42,7 @@ public final class FhImages {
     }
     public static int[] dimensions(byte[] bytes) throws IOException {
         if (bytes.length == 0 || bytes.length > MAX_BYTES) throw new IOException("Image exceeds size limit");
-        try (var stream = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
+        try (var stream = new MemoryCacheImageInputStream(new ByteArrayInputStream(bytes))) {
             var readers = ImageIO.getImageReaders(stream);
             if (!readers.hasNext()) throw new IOException("PNG or JPEG required");
             var reader = readers.next();
@@ -46,7 +64,7 @@ public final class FhImages {
         dimensions(bytes); // Check the header before allowing STB to allocate pixels.
         // NativeImage.read in 26.2 validates a PNG header, despite STB's JPEG support.
         if ((bytes[0] & 0xFF) != 0x89) {
-            try (var stream = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
+            try (var stream = new MemoryCacheImageInputStream(new ByteArrayInputStream(bytes))) {
                 var reader = ImageIO.getImageReaders(stream).next();
                 NativeImage result = null;
                 try {

@@ -15,7 +15,7 @@ public final class PlayerNameFormatter {
     public static Component apply(Component serverName, String playerName) {
         RenderConfig config = ConfigManager.get().render;
         Component result = baseName(serverName, playerName, config.cleanPlayerNames);
-        if (!config.cleanPlayerNames) {
+        if (!config.cleanPlayerNames || config.cleanNamesShowClan) {
             result = PlayerClanNameFormatter.apply(result, playerName);
         }
         if (config.modUserBadge && PresenceStore.isKnown(playerName)) {

@@ -10,6 +10,7 @@ class WidgetSettingsSectionsTest {
         var expected = Map.ofEntries(
                 Map.entry(WidgetCatalog.LEVEL_PROGRESS, 1), Map.entry(WidgetCatalog.ESTIMATED_TPS, 1),
                 Map.entry(WidgetCatalog.FPS, 1),
+                Map.entry(WidgetCatalog.IMAGE, 5),
                 Map.entry(WidgetCatalog.MINING_STATISTICS, 41),
                 Map.entry(WidgetCatalog.ROULETTE, 2),
                 Map.entry(WidgetCatalog.DAILY_CREDITS, 2),
@@ -23,14 +24,15 @@ class WidgetSettingsSectionsTest {
         for (var widget : WidgetCatalog.values()) {
             var controls = WidgetSettingsSections.create(widget);
             if (widget.chatChannel() != null) {
-                assertEquals(Set.of("Tab name", "Text filter", "Channel", "Chat width", "Chat rows", "Show chat title", "Widget visibility", "Message sound", "Skip Others"),
+                assertEquals(widget == WidgetCatalog.CHAT_FH ? Set.of("Chat width", "Chat rows", "Show chat title", "Show input bar", "Widget visibility", "Message sound")
+                        : Set.of("Tab name", "Text filter", "Channel", "Chat width", "Chat rows", "Show chat title", "Widget visibility", "Message sound", "Skip Others"),
                         new HashSet<>(controls.stream().map(control -> control.label).toList()));
                 continue;
             }
             assertEquals(expected.getOrDefault(widget, 0), controls.size(), widget.title());
             for (var control : controls) assertTrue(labels.add(control.label), "Duplicated control: " + control.label);
         }
-        assertEquals(87, labels.size());
+        assertEquals(92, labels.size());
     }
 
     @Test void globalMenuKeepsAppearanceAndGameplayFeaturesWithoutWidgetContentDuplicates() {

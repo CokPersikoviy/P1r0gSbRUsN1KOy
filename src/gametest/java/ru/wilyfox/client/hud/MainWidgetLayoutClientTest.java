@@ -134,13 +134,16 @@ public final class MainWidgetLayoutClientTest implements FabricClientGameTest {
                 renderer.addWidget(find(renderer, "PopUpsWidget"));
                 renderer.addWidget(find(renderer, "LevelProgressWidget"));
                 for (Widget widget : renderer.getWidgets()) renderer.addWidget(widget);
-                expect(renderer.getLayoutWidgetCount() == renderer.getRegisteredWidgetCount() - 2, "Rapid add lost a widget");
+                long eligible = renderer.getWidgets().stream().filter(widget ->
+                        !(widget instanceof ru.wilyfox.client.hud.widget.ChatWidget chat)
+                                || ru.wilyfox.client.chat.ChatDock.canDetach(chat.getConfigKey())).count();
+                expect(renderer.getLayoutWidgetCount() == eligible, "Rapid add lost a widget");
                 long elapsedMs = (System.nanoTime() - started) / 1_000_000;
                 System.out.println("Adding all widgets around Protocol Graph took " + elapsedMs + " ms");
                 expect(elapsedMs < 5000, "Adding widgets blocked the client for over five seconds");
                 for (Widget widget : renderer.getWidgets()) {
                     if (widget instanceof ru.wilyfox.client.hud.widget.ChatWidget chat
-                            && ru.wilyfox.client.chat.ChatDock.isPinned(chat.getConfigKey())) {
+                            && !ru.wilyfox.client.chat.ChatDock.canEdit(chat.getConfigKey())) {
                         expect(!renderer.openWidgetSettings(widget) && !renderer.isSettingsOpen(), "ALL tab must have no editable context menu");
                         continue;
                     }

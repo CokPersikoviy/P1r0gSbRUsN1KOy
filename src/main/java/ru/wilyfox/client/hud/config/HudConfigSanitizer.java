@@ -28,6 +28,8 @@ final class HudConfigSanitizer {
         if (sanitized.dailyBlocks == null) sanitized.dailyBlocks = new DailyBlocksConfig();
         if (sanitized.estimatedTps == null) sanitized.estimatedTps = new EstimatedTpsConfig();
         if (sanitized.fpsWidget == null) sanitized.fpsWidget = new FpsWidgetConfig();
+        if (sanitized.imageWidget == null) sanitized.imageWidget = new ImageWidgetConfig();
+        sanitized.imageWidget.sanitize();
         if (sanitized.resourceTimers == null) sanitized.resourceTimers = new ResourceTimersConfig();
         sanitized.resourceTimers.reminderMinutes = Math.clamp(sanitized.resourceTimers.reminderMinutes, 1, 1440);
         if (sanitized.dailyCreditsTimer == null) sanitized.dailyCreditsTimer = new ResourceTimersConfig();
@@ -190,8 +192,10 @@ final class HudConfigSanitizer {
             var settings = sanitized.chatWidgets.computeIfAbsent(widget.key(), ignored -> new ChatWidgetConfig(widget.chatChannel()));
             if (widget == WidgetCatalog.CHAT_ALL || widget == WidgetCatalog.CHAT_FH) {
                 settings.channel = widget.chatChannel();
-                settings.title = widget.chatChannel().getTitle(); settings.textFilter = ""; settings.deleted = false; settings.detached = false;
-                settings.width = 280; settings.rows = 10; settings.showTitle = true;
+                settings.title = widget.chatChannel().getTitle(); settings.textFilter = ""; settings.deleted = false;
+                if (widget == WidgetCatalog.CHAT_ALL) {
+                    settings.detached = false; settings.width = 280; settings.rows = 10; settings.showTitle = true;
+                }
                 settings.skipOthers = false;
             }
             settings.sanitize(widget.chatChannel());
@@ -209,7 +213,7 @@ final class HudConfigSanitizer {
         sanitized.chatTabOrder = new java.util.ArrayList<>(order);
         HudLayoutResolver.sanitize(sanitized);
         for (var entry : sanitized.chatWidgets.entrySet()) if (entry.getValue().deleted
-                || entry.getKey().equals(WidgetCatalog.CHAT_ALL.key()) || entry.getKey().equals(WidgetCatalog.CHAT_FH.key())) {
+                || entry.getKey().equals(WidgetCatalog.CHAT_ALL.key())) {
             String key = entry.getKey();
             sanitized.mainLayout.widgets.remove(key);
             sanitized.widgetLayouts.remove(key); sanitized.widgetLocations.remove(key); sanitized.widgetAppearance.remove(key);

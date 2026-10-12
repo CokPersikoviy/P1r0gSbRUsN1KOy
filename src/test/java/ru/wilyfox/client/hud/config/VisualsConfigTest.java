@@ -22,6 +22,8 @@ class VisualsConfigTest {
         assertFalse(config.visuals.skyColorEnabled);
         assertFalse(config.visuals.fogColorEnabled);
         assertTrue(config.render.staticHand);
+        assertFalse(config.render.autoSprint);
+        assertFalse(config.render.antiBlind);
     }
     @Test void presetsAndCustomValuesUseSafeRatios() {
         var config = new VisualsConfig();

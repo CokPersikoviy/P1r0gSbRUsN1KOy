@@ -18,6 +18,7 @@ public class HudConfig {
     public MiningStatisticsConfig miningStatistics = new MiningStatisticsConfig();
     public EstimatedTpsConfig estimatedTps = new EstimatedTpsConfig();
     public FpsWidgetConfig fpsWidget = new FpsWidgetConfig();
+    public ImageWidgetConfig imageWidget = new ImageWidgetConfig();
     public ResourceTimersConfig resourceTimers = new ResourceTimersConfig();
     public ResourceTimersConfig dailyCreditsTimer = new ResourceTimersConfig();
     public FishingConfig fishing = new FishingConfig();
