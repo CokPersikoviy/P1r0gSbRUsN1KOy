@@ -31,7 +31,8 @@ public final class ClearSubstancesClientTest implements FabricClientGameTest {
         try (var world = context.worldBuilder().create()) {
             context.runOnClient(client -> {
                 ConfigManager.get().render = new RenderConfig();
-                ConfigManager.get().visuals = new VisualsConfig();
+                // The removed global switch in old configs must no longer override Render.
+                ConfigManager.get().visuals = new com.google.gson.Gson().fromJson("{\"fluidFog\":false}", VisualsConfig.class);
                 var camera = client.gameRenderer.mainCamera();
                 var fogRenderer = (FogRenderer) field(client.gameRenderer, "fogRenderer");
                 BlockPos center = BlockPos.containing(camera.position());

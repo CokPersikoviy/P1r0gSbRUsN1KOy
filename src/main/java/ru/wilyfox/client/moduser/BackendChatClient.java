@@ -14,13 +14,16 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Bounded pages, shared session credentials, coalesced websocket notifications. Client-thread state. */
 final class BackendChatClient {
     private final URI backend;
     private final HttpClient http;
     private final AtomicLong announced = new AtomicLong();
-    private long cursor, oldest, resetRevision = -1, nextRead, nextSend, generation, lastRead;
+    private volatile long cursor;
+    private final AtomicBoolean refreshRecent = new AtomicBoolean();
+    private long oldest, resetRevision = -1, nextRead, nextSend, generation, lastRead, retryReadAt;
     private boolean initial, olderAvailable, olderRequested, enabled, resync = true;
     private String account;
     private CompletableFuture<?> reading, sending;
@@ -33,11 +36,16 @@ final class BackendChatClient {
                 if (m.id() <= previous) throw new IllegalArgumentException("Unordered chat page"); previous = m.id(); }
         }
     }
-    void changed(long value) { if (value <= 0) throw new IllegalArgumentException(); announced.accumulateAndGet(value, Math::max); }
+    void changed(long value) {
+        if (value <= 0) throw new IllegalArgumentException();
+        if (value <= cursor) refreshRecent.set(true);
+        announced.accumulateAndGet(value, Math::max);
+    }
     void reset() {
         generation++; enabled = false; resync = true;
         if (reading != null) reading.cancel(true); if (sending != null) sending.cancel(true);
-        reading = sending = null; nextRead = nextSend = lastRead = 0;
+        reading = sending = null; nextRead = nextSend = lastRead = retryReadAt = 0;
+        refreshRecent.set(false);
     }
     void older() { if (enabled && olderAvailable && oldest > 0) olderRequested = true; }
     void tick(boolean ready, String bearer, String name) {
@@ -47,15 +55,18 @@ final class BackendChatClient {
         if (!java.util.Objects.equals(account, name)) { store.clearBackendMessages(); account = name; }
         if (resetRevision != store.backendResetRevision()) {
             resetRevision = store.backendResetRevision(); cursor = oldest = 0; initial = false;
-            olderAvailable = olderRequested = false; announced.set(0); nextRead = 0;
+            olderAvailable = olderRequested = false; announced.set(0); nextRead = retryReadAt = 0;
+            refreshRecent.set(false);
         }
         long now = System.currentTimeMillis();
         boolean catchingUp = announced.get() > cursor;
-        if (reading != null || now < lastRead + 600 || now < nextRead && !catchingUp && !olderRequested) return;
-        if (initial && !catchingUp && !olderRequested && !resync && store.getActiveTab() != ChatTab.FH) return;
+        if (reading != null || now < lastRead + 600 || now < retryReadAt
+                || now < nextRead && !catchingUp && !olderRequested && !refreshRecent.get()) return;
+        if (initial && !catchingUp && !olderRequested && !resync && !refreshRecent.get() && store.getActiveTab() != ChatTab.FH) return;
         boolean older = initial && !catchingUp && olderRequested;
+        boolean recent = initial && !catchingUp && !older && !resync && refreshRecent.getAndSet(false);
         olderRequested = false;
-        String query = "?media=1" + (older ? "&before=" + oldest : initial && cursor > 0 ? "&after=" + cursor : "");
+        String query = "?media=1" + (older ? "&before=" + oldest : initial && cursor > 0 && !recent ? "&after=" + cursor : "");
         long attempt = generation;
         var request = HttpRequest.newBuilder(backend.resolve("/v1/chat" + query)).timeout(Duration.ofSeconds(8))
                 .header("Authorization", "Bearer " + bearer).GET().build();
@@ -66,22 +77,31 @@ final class BackendChatClient {
                     if (attempt != generation) return;
                     reading = null;
                     try {
-                        if (error != null || response.statusCode() != 200) { nextRead = System.currentTimeMillis() + 10_000; return; }
+                        if (error != null || response.statusCode() != 200) {
+                            if (recent) refreshRecent.set(true);
+                            nextRead = retryReadAt = System.currentTimeMillis() + 10_000;
+                            return;
+                        }
                         var page = SocialWire.JSON.fromJson(new String(response.body(), StandardCharsets.UTF_8), Page.class);
                         page.validate(SocialWire.responseTime(response.headers(), System.currentTimeMillis()));
                         resync = false;
                         if (older && page.messages().stream().anyMatch(m -> m.id() >= oldest)
-                                || !older && initial && page.messages().stream().anyMatch(m -> m.id() <= cursor)) throw new IllegalArgumentException();
+                                || !older && !recent && initial && page.messages().stream().anyMatch(m -> m.id() <= cursor)) throw new IllegalArgumentException();
+                        retryReadAt = 0;
                         store.acceptBackendMessages(page.messages(), initial && !older);
                         for (var m : page.messages()) { cursor = Math.max(cursor, m.id()); oldest = oldest == 0 ? m.id() : Math.min(oldest, m.id()); }
                         if (older || !initial) olderAvailable = page.hasMore();
                         boolean moreNew = initial && !older && page.hasMore();
+                        if (recent) moreNew = false;
+                        // Check a bounded recent page after a tail read, to recover late Discord metadata.
+                        if (initial && !older && !recent && !moreNew && store.getActiveTab() == ChatTab.FH) refreshRecent.set(true);
                         initial = true;
                         if (moreNew) announced.accumulateAndGet(cursor + 1, Math::max);
-                        nextRead = System.currentTimeMillis() + (moreNew || announced.get() > cursor ? 600 : 10_000);
+                        nextRead = System.currentTimeMillis() + (moreNew || announced.get() > cursor || !recent && refreshRecent.get() ? 600 : 10_000);
                     } catch (RuntimeException invalid) {
+                        if (recent) refreshRecent.set(true);
                         ru.wilyfox.FrogHelper.LOGGER.warn("FH chat history rejected: {}", invalid.getMessage());
-                        nextRead = System.currentTimeMillis() + 10_000;
+                        nextRead = retryReadAt = System.currentTimeMillis() + 10_000;
                     }
                 }));
     }

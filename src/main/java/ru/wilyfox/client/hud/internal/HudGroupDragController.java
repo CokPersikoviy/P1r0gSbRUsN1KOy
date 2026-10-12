@@ -33,7 +33,7 @@ public final class HudGroupDragController {
                     widget.getStartY() - rootWidget.getStartY(),
                     widget.getSnapTargetKey(),
                     widget.getSnapOwnCorner(),
-                    widget.getSnapTargetCorner()
+                    widget.getSnapTargetCorner(), widget.getSnapOffsetX(), widget.getSnapOffsetY()
             ));
             widget.clearWidgetSnap();
         }
@@ -56,7 +56,7 @@ public final class HudGroupDragController {
                 continue;
             }
 
-            widget.setWidgetSnap(state.snapTargetKey(), state.snapOwnCorner(), state.snapTargetCorner());
+            widget.setWidgetSnap(state.snapTargetKey(), state.snapOwnCorner(), state.snapTargetCorner(), state.offsetSnapX(), state.offsetSnapY());
         }
 
         draggedGroupWidgets.clear();
@@ -88,7 +88,10 @@ public final class HudGroupDragController {
             int offsetY,
             String snapTargetKey,
             WidgetCorner snapOwnCorner,
-            WidgetCorner snapTargetCorner
+            WidgetCorner snapTargetCorner, int offsetSnapX, int offsetSnapY
     ) {
+        public GroupDragState(int offsetX, int offsetY, String target, WidgetCorner own, WidgetCorner other) {
+            this(offsetX, offsetY, target, own, other, 0, 0);
+        }
     }
 }

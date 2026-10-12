@@ -75,7 +75,7 @@ public final class Visuals {
             case POWDER_SNOW -> render.clearPowderSnow;
             default -> false;
         };
-        if (clearSubstance || fluid != FogType.NONE && !config.fluidFog || fluid == FogType.NONE && config.fogMode == ru.wilyfox.client.hud.config.VisualsConfig.FogMode.NONE) {
+        if (clearSubstance || fluid == FogType.NONE && config.fogMode == ru.wilyfox.client.hud.config.VisualsConfig.FogMode.NONE) {
             fog.environmentalStart = fog.environmentalEnd = fog.renderDistanceStart = fog.renderDistanceEnd = 1_000_000;
             fog.skyEnd = fog.cloudEnd = 1_000_000;
         } else if (fluid == FogType.NONE && config.fogMode == ru.wilyfox.client.hud.config.VisualsConfig.FogMode.CUSTOM) {

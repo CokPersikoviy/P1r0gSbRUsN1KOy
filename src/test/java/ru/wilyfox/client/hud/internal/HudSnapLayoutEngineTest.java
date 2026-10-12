@@ -186,7 +186,7 @@ class HudSnapLayoutEngineTest {
         child.setWidgetSnap("Root", WidgetCorner.TOP_LEFT, WidgetCorner.TOP_RIGHT);
         var engine = engine(root, child);
 
-        engine.applyWidgetSnapping(new TestHost(root), 800, 600);
+        dragAndCommit(root, root, child);
 
         assertFalse(root.hasWidgetSnap(), "Attaching root to child would create a two-widget cycle");
         assertEquals("Root", child.getSnapTargetKey());
@@ -198,11 +198,76 @@ class HudSnapLayoutEngineTest {
         TestWidget child = new TestWidget("Child", 125);
         var engine = engine(root, child);
 
-        engine.applyWidgetSnapping(new TestHost(child), 800, 600);
+        dragAndCommit(child, root, child);
 
         assertEquals("Root", child.getSnapTargetKey());
         assertEquals(125, child.getStartX());
         assertEquals(100, child.getStartY());
+    }
+
+    private static void dragAndCommit(AbstractWidget dragged, Widget... widgets) {
+        var controller = new HudDragSnapController();
+        var config = new ru.wilyfox.client.hud.config.HudSnapConfig();
+        config.screenTargets = false;
+        controller.begin(dragged, List.of(dragged), List.of(widgets), 800, 600);
+        controller.move(dragged.getStartX(), dragged.getStartY(), 1, config, false);
+        assertFalse(dragged.hasWidgetSnap(), "Live alignment must not commit a relation");
+        controller.commit(config);
+    }
+
+    @Test void arbitraryDockOffsetsSurviveNormalizationAndRepeatedLayoutUpdates() {
+        var parent = new TestWidget("Parent", 100); parent.resizeWidth(100);
+        var child = new TestWidget("Child", 208); child.setStartY(102);
+        var config = new ru.wilyfox.client.hud.config.HudSnapConfig();
+        config.screenTargets = false; config.gap = 8;
+        var controller = new HudDragSnapController();
+        controller.begin(child, List.of(child), List.of(parent, child), 800, 600);
+        controller.move(208, 102, 1, config, false);
+        controller.commit(config);
+        assertEquals(3, child.getSnapOffsetX());
+        int x = child.getStartX(), y = child.getStartY();
+        var engine = engine(parent, child);
+        for (int i = 0; i < 10; i++) {
+            HudSnapGraphNormalizer.normalize(engine.getAbstractWidgetMap());
+            engine.updateSnappedWidgets(new TestHost(null));
+            assertEquals(x, child.getStartX()); assertEquals(y, child.getStartY());
+        }
+    }
+
+    @Test void alignmentOnlyDoesNotCreateADockAndOffsetsFollowResizedScreen() {
+        var parent = new TestWidget("Parent", 100); var child = new TestWidget("Child", 125);
+        var config = new ru.wilyfox.client.hud.config.HudSnapConfig();
+        config.behavior = ru.wilyfox.client.hud.config.HudSnapConfig.Behavior.ALIGN_ONLY;
+        var controller = new HudDragSnapController();
+        controller.begin(child, List.of(child), List.of(parent, child), 800, 600);
+        controller.move(125, 100, 1, config, false); controller.commit(config);
+        assertFalse(child.hasWidgetSnap()); assertNull(child.getScreenAnchor());
+        child.setScreenAnchor(ScreenAnchor.BOTTOM_RIGHT); child.setAnchorOffsets(-10, -15);
+        engine(child).applyStoredScreenAnchor(child, ScreenAnchor.BOTTOM_RIGHT, 800, 600);
+        assertEquals(762, child.getStartX()); assertEquals(565, child.getStartY());
+        engine(child).applyStoredScreenAnchor(child, ScreenAnchor.BOTTOM_RIGHT, 1000, 800);
+        assertEquals(962, child.getStartX()); assertEquals(765, child.getStartY());
+        assertEquals(-10, child.getAnchorOffsetX()); assertEquals(-15, child.getAnchorOffsetY());
+    }
+
+    @Test void refreshedGeometryFollowsLiveResizeWithoutLosingThePointerOrHeldGuide() {
+        var parent = new TestWidget("Parent", 100); parent.resizeWidth(100);
+        var child = new TestWidget("Child", 208);
+        var controller = new HudDragSnapController();
+        var config = new ru.wilyfox.client.hud.config.HudSnapConfig();
+        config.screenTargets = config.edgeAlignment = config.centerAlignment = false;
+        var widgets = List.<Widget>of(parent, child);
+        controller.begin(child, List.of(child), widgets, 800, 600); controller.move(208, 100, 1, config, false);
+        assertEquals(205, child.getStartX());
+        parent.resizeWidth(110);
+        controller.refresh(widgets, 800, 600, 1, config, false);
+        assertEquals(215, child.getStartX());
+        assertEquals(210, controller.result().horizontal().line());
+        controller.refresh(widgets, 1000, 800, 1, config, true);
+        assertEquals(208, child.getStartX()); assertNull(controller.result().horizontal());
+        parent.resizeWidth(150);
+        controller.refresh(widgets, 1000, 800, 1, config, false);
+        assertEquals(208, child.getStartX()); assertNull(controller.result().horizontal());
     }
 
     private static HudSnapLayoutEngine engine(Widget... widgets) {

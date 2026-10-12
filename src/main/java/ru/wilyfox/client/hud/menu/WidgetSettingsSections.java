@@ -45,6 +45,7 @@ final class WidgetSettingsSections {
             return items;
         }
         switch (widget) {
+            case MINING_STATISTICS -> MiningStatisticsSettings.populate(items);
             case DAILY_CREDITS -> {
                 items.add(toggle("Daily credits notifications", () -> ConfigManager.get().dailyCreditsTimer.notifications,
                         value -> ConfigManager.get().dailyCreditsTimer.notifications = value));

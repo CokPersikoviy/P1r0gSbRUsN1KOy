@@ -69,6 +69,7 @@ public final class HudLayoutResolver {
             if (layout.placements == null) layout.placements = new LinkedHashMap<>();
             layout.placements.entrySet().removeIf(entry -> WidgetCatalog.find(entry.getKey()) == null || entry.getValue() == null);
             for (var placement : layout.placements.values()) {
+                placement.sanitizeOffsets();
                 if (placement.scale != null) placement.scale = Float.isFinite(placement.scale) ? Math.clamp(placement.scale, .5f, 3f) : 1f;
                 if (placement.xFraction != null) placement.xFraction = Double.isFinite(placement.xFraction) ? Math.clamp(placement.xFraction, 0, 1) : null;
                 if (placement.yFraction != null) placement.yFraction = Double.isFinite(placement.yFraction) ? Math.clamp(placement.yFraction, 0, 1) : null;

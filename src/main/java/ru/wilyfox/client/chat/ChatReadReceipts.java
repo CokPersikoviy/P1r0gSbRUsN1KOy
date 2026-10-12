@@ -19,6 +19,10 @@ final class ChatReadReceipts<T> {
         return before != receipt.bits;
     }
     void forget(T message) { messages.remove(message); }
+    void replace(T previous, T updated) {
+        var receipt = messages.remove(previous);
+        if (receipt != null) messages.put(updated, receipt);
+    }
     void forgetWindow(String key) {
         Long mask = windows.remove(key);
         if (mask != null) messages.values().forEach(receipt -> receipt.bits &= ~mask);

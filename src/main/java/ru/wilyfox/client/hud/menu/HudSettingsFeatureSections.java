@@ -323,6 +323,11 @@ final class HudSettingsFeatureSections {
                 )
         );
 
+        componentsByCategory.get(SettingsCategory.CLICKER).add(new CycleSettingsComponent<>(0, 0, 0, 0,
+                "Clicker activation", () -> ConfigManager.get().clicker.activation,
+                value -> ConfigManager.get().clicker.activation = value,
+                ru.wilyfox.client.hud.config.ClickerConfig.Activation.values(),
+                value -> value == ru.wilyfox.client.hud.config.ClickerConfig.Activation.HOLD ? "Hold" : "Toggle"));
         componentsByCategory.get(SettingsCategory.CLICKER).add(
                 new DragNumberSettingsComponent(
                         0, 0, 0, 0,

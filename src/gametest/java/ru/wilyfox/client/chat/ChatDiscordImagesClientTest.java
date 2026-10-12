@@ -22,8 +22,10 @@ public final class ChatDiscordImagesClientTest implements FabricClientGameTest {
                 chat.clearBackendMessages(); ConfigManager.get().render.chatTimestamps = false;
                 ChatDock.select(ChatDock.key(ChatTab.FH)); client.gui.setScreen(new ChatScreen("caption", false));
                 long now = System.currentTimeMillis();
+                chat.acceptBackendMessages(List.of(new BackendChatMessage(1, "Лиса 🐸", "Картинка", now, "discord", List.of())), false);
                 chat.acceptBackendMessages(List.of(new BackendChatMessage(1, "Лиса 🐸", "Картинка", now, "discord",
                         List.of(new BackendChatMessage.Attachment("1558934610765807800", "frog.png", 32, 16)))), false);
+                check(chat.getMessages(ChatTab.FH).size() == 1, "Late attachment duplicated the FH message");
                 var entry = chat.getMessages(ChatTab.FH).getLast();
                 check(entry.message().content().getString().equals("\uF8FE Лиса 🐸: Картинка [frog.png]"), "Discord badge, identity or image link missing");
                 var badge = entry.message().content().getSiblings().getFirst();

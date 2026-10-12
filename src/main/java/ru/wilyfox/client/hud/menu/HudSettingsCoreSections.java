@@ -130,6 +130,21 @@ final class HudSettingsCoreSections {
 
         slider(items, "BG Opacity", () -> ConfigManager.get().theme.widgetBackgroundOpacityPercent,
                 value -> ConfigManager.get().theme.widgetBackgroundOpacityPercent = value, 0, 50);
+        section(items, "Snapping");
+        toggle(items, "Widget snapping", () -> ConfigManager.get().snapping.enabled, value -> ConfigManager.get().snapping.enabled = value);
+        cycle(items, "Snap behavior", () -> ConfigManager.get().snapping.behavior,
+                value -> ConfigManager.get().snapping.behavior = value,
+                ru.wilyfox.client.hud.config.HudSnapConfig.Behavior.values(), ru.wilyfox.client.hud.config.HudSnapConfig.Behavior::title);
+        slider(items, "Capture distance (screen px)", () -> ConfigManager.get().snapping.capturePixels,
+                value -> { ConfigManager.get().snapping.capturePixels = value; ConfigManager.get().snapping.sanitize(); }, 2, 24);
+        slider(items, "Release distance (screen px)", () -> ConfigManager.get().snapping.releasePixels,
+                value -> { ConfigManager.get().snapping.releasePixels = value; ConfigManager.get().snapping.sanitize(); }, 2, 48);
+        slider(items, "New connection gap", () -> ConfigManager.get().snapping.gap, value -> ConfigManager.get().snapping.gap = value, 0, 30);
+        toggle(items, "Snap guides", () -> ConfigManager.get().snapping.showGuides, value -> ConfigManager.get().snapping.showGuides = value);
+        toggle(items, "Screen / hotbar targets", () -> ConfigManager.get().snapping.screenTargets, value -> ConfigManager.get().snapping.screenTargets = value);
+        toggle(items, "Align widget edges", () -> ConfigManager.get().snapping.edgeAlignment, value -> ConfigManager.get().snapping.edgeAlignment = value);
+        toggle(items, "Align centers", () -> ConfigManager.get().snapping.centerAlignment, value -> ConfigManager.get().snapping.centerAlignment = value);
+        toggle(items, "Equal spacing", () -> ConfigManager.get().snapping.equalSpacing, value -> ConfigManager.get().snapping.equalSpacing = value);
     }
 
     private static void section(List<SettingsComponent> items, String title) {

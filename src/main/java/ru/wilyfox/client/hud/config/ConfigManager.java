@@ -174,9 +174,11 @@ public class ConfigManager {
         }
         layout.scale = widget.getScale();
         layout.anchor = widget.getScreenAnchor();
+        layout.anchorOffsetX = widget.getAnchorOffsetX(); layout.anchorOffsetY = widget.getAnchorOffsetY();
         layout.snapTarget = widget.getSnapTargetKey();
         layout.snapOwnCorner = widget.getSnapOwnCorner();
         layout.snapTargetCorner = widget.getSnapTargetCorner();
+        layout.snapOffsetX = widget.getSnapOffsetX(); layout.snapOffsetY = widget.getSnapOffsetY();
         // Legacy hiding is replaced by membership of mainLayout.
         layout.hiddenInGameplay = null;
     }

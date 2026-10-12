@@ -31,7 +31,6 @@ public class VisualsConfig {
     public int time = 6000, shadowStrength = 100, shadowRadius = 100;
     public FogMode fogMode = FogMode.DEFAULT;
     public double fogDistance = 2;
-    public boolean fluidFog = true;
     public Weather weather = Weather.SERVER;
 
     public enum LineStyle { NORMAL, NEON, DASHED, CORNERS }

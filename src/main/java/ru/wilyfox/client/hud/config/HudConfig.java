@@ -15,6 +15,7 @@ public class HudConfig {
     public ClickerConfig clicker = new ClickerConfig();
     public BlocksPerSecondWidgetConfig blocksPerSecondWidget = new BlocksPerSecondWidgetConfig();
     public DailyBlocksConfig dailyBlocks = new DailyBlocksConfig();
+    public MiningStatisticsConfig miningStatistics = new MiningStatisticsConfig();
     public EstimatedTpsConfig estimatedTps = new EstimatedTpsConfig();
     public FpsWidgetConfig fpsWidget = new FpsWidgetConfig();
     public ResourceTimersConfig resourceTimers = new ResourceTimersConfig();
@@ -49,6 +50,7 @@ public class HudConfig {
     public QuickAccessConfig quickAccess = new QuickAccessConfig();
     public ThemeConfig theme = new ThemeConfig();
     public MainWidgetLayoutConfig mainLayout = new MainWidgetLayoutConfig();
+    public HudSnapConfig snapping = new HudSnapConfig();
     public WidgetListSort widgetListSort = WidgetListSort.ALPHABETICAL;
     public Map<String, WidgetLayoutConfig> widgetLayouts = new LinkedHashMap<>();
     public Map<String, LocationWidgetLayoutConfig> locationLayouts = new LinkedHashMap<>();

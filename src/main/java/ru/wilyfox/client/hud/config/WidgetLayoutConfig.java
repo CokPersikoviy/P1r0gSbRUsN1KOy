@@ -13,8 +13,17 @@ public class WidgetLayoutConfig {
     public Double yFraction;
     public Float scale;
     public ScreenAnchor anchor;
+    public int anchorOffsetX, anchorOffsetY;
     public String snapTarget;
     public WidgetCorner snapOwnCorner;
     public WidgetCorner snapTargetCorner;
+    public int snapOffsetX, snapOffsetY;
     public Boolean hiddenInGameplay;
+
+    public void sanitizeOffsets() {
+        anchorOffsetX = Math.clamp(anchorOffsetX, -10000, 10000);
+        anchorOffsetY = Math.clamp(anchorOffsetY, -10000, 10000);
+        snapOffsetX = Math.clamp(snapOffsetX, -10000, 10000);
+        snapOffsetY = Math.clamp(snapOffsetY, -10000, 10000);
+    }
 }

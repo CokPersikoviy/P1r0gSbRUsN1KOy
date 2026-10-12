@@ -10,6 +10,7 @@ public interface HudSnapLayoutHost {
     default WidgetLayoutConfig getStoredPlacement(AbstractWidget widget) { return null; }
     default boolean isSnapTargetVisible(Widget widget) { return widget.isVisible(); }
     default boolean isPlacementReadOnly(Widget widget) { return false; }
+    default boolean isMoving(Widget widget) { return widget == getDraggedWidget(); }
 
     Widget getDraggedWidget();
 

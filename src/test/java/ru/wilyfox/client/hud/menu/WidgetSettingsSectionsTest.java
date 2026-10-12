@@ -10,6 +10,7 @@ class WidgetSettingsSectionsTest {
         var expected = Map.ofEntries(
                 Map.entry(WidgetCatalog.LEVEL_PROGRESS, 1), Map.entry(WidgetCatalog.ESTIMATED_TPS, 1),
                 Map.entry(WidgetCatalog.FPS, 1),
+                Map.entry(WidgetCatalog.MINING_STATISTICS, 41),
                 Map.entry(WidgetCatalog.ROULETTE, 2),
                 Map.entry(WidgetCatalog.DAILY_CREDITS, 2),
                 Map.entry(WidgetCatalog.CRAFT_RECIPE, 1), Map.entry(WidgetCatalog.BOOSTERS, 1),
@@ -29,7 +30,7 @@ class WidgetSettingsSectionsTest {
             assertEquals(expected.getOrDefault(widget, 0), controls.size(), widget.title());
             for (var control : controls) assertTrue(labels.add(control.label), "Duplicated control: " + control.label);
         }
-        assertEquals(46, labels.size());
+        assertEquals(87, labels.size());
     }
 
     @Test void globalMenuKeepsAppearanceAndGameplayFeaturesWithoutWidgetContentDuplicates() {
@@ -38,7 +39,9 @@ class WidgetSettingsSectionsTest {
         HudSettingsFeatureSections.populate(sections, () -> {});
         HudSettingsCoreSections.populate(sections);
         assertEquals(Set.of("Edit Main Layout", "UnClutter (hide widget titles)", "Background",
-                        "Native Renderer (no blur, if glass lags)", "Lightweight HUD (no blur / item icons)", "BG Opacity"),
+                        "Native Renderer (no blur, if glass lags)", "Lightweight HUD (no blur / item icons)", "BG Opacity",
+                        "Widget snapping", "Snap behavior", "Capture distance (screen px)", "Release distance (screen px)",
+                        "New connection gap", "Snap guides", "Screen / hotbar targets", "Align widget edges", "Align centers", "Equal spacing"),
                 new HashSet<>(sections.get(SettingsCategory.WIDGET).stream()
                         .filter(control -> !(control instanceof BreakLineSettingsComponent)).map(control -> control.label).toList()));
         var allLabels = sections.values().stream().flatMap(List::stream).map(control -> control.label).toList();

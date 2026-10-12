@@ -77,5 +77,18 @@
   "social.froghelper.config.busy": "Wait for the current request to finish",
   "social.froghelper.config.cancelled": "Download cancelled: session changed",
   "social.froghelper.config.failed": "Could not download config. Check connection and the 32-download limit.",
-  "social.froghelper.config.downloaded": "Config by %s saved. Select it in Settings → Configs."
+  "social.froghelper.config.downloaded": "Config by %s saved. Select it in Settings → Configs.",
+  "froghelper.mining.time": "Time",
+  "froghelper.mining.total": "Total",
+  "froghelper.mining.per_hour": "Per hour",
+  "froghelper.mining.blocks": "Blocks",
+  "froghelper.mining.money": "Money",
+  "froghelper.mining.shards": "Shards",
+  "froghelper.mining.waiting": "Waiting",
+  "froghelper.mining.running": "Mining",
+  "froghelper.mining.auto_paused": "Auto-paused",
+  "froghelper.mining.paused": "Paused",
+  "froghelper.mining.empty": "No statistics selected",
+  "froghelper.mining.blocks_unit": "b",
+  "froghelper.mining.shards_unit": "s"
 }

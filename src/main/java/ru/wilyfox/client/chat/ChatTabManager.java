@@ -453,8 +453,9 @@ public final class ChatTabManager {
         int scroll = accessor.froghelper$getScroll();
         int previousDisplayLines = accessor.froghelper$getTrimmedMessages().size();
         boolean changed = false;
+        boolean newIncoming = false;
         for (var message : messages) {
-            if (backendMessages.containsKey(message.id())) continue;
+            var previous = backendMessages.get(message.id());
             var content = Component.empty();
             if (ConfigManager.get().render.chatTimestamps)
                 content.append(ChatTimestampFormatter.createTimestampPrefix(Instant.ofEpochMilli(message.sentAt())));
@@ -466,12 +467,20 @@ public final class ChatTabManager {
                     .withStyle(style -> style.withColor(net.minecraft.ChatFormatting.AQUA).withUnderlined(true)
                             .withClickEvent(new net.minecraft.network.chat.ClickEvent.RunCommand("froghelper:image:" + message.id() + ":" + image.id()))
                             .withHoverEvent(new net.minecraft.network.chat.HoverEvent.ShowText(Component.translatable("froghelper.chat.image_open")))));
-            var gui = new GuiMessage(client.gui.hud.getGuiTicks(), content, null, GuiMessageSource.SYSTEM_CLIENT, null);
+            if (previous != null && previous.component().equals(content)
+                    && previous.timestamp().equals(Instant.ofEpochMilli(message.sentAt()))) continue;
+            var gui = new GuiMessage(previous != null ? previous.message().addedTime() : client.gui.hud.getGuiTicks(), content, null, GuiMessageSource.SYSTEM_CLIENT, null);
             var entry = new ChatMessageEntry(gui, Instant.ofEpochMilli(message.sentAt()), ChatTab.FH,
                     ((message.fromDiscord() ? "Discord " : "") + message.name() + ": " + message.text() + message.images().stream()
-                            .map(image -> " " + image.name()).collect(java.util.stream.Collectors.joining())).toLowerCase(Locale.ROOT), live ? System.nanoTime() : 0);
+                            .map(image -> " " + image.name()).collect(java.util.stream.Collectors.joining())).toLowerCase(Locale.ROOT),
+                    previous != null ? previous.receivedNanos() : live ? System.nanoTime() : 0);
+            if (previous != null) {
+                entries.remove(previous.message()); forgetWrapped(previous.message());
+                readReceipts.replace(previous.message(), gui);
+            }
             backendMessages.put(message.id(), entry); entries.put(gui, entry); changed = true;
-            if (live) {
+            if (live && previous == null) {
+                newIncoming = true;
                 notifyWidgetMessage(entry);
                 if (message.fromDiscord() || client.player == null || !message.name().equalsIgnoreCase(client.player.getGameProfile().name())) {
                     ru.wilyfox.client.popup.PopUpManager.getInstance().publish(ru.wilyfox.client.popup.PopUpRequest.of(
@@ -496,7 +505,7 @@ public final class ChatTabManager {
             int addedLines = live ? accessor.froghelper$getTrimmedMessages().size() - previousDisplayLines : 0;
             chat.scrollChat(Math.max(0, scroll + addedLines) - accessor.froghelper$getScroll());
             viewState().scroll = accessor.froghelper$getScroll();
-            viewState().newMessages = scroll > 0 && (newMessages || live);
+            viewState().newMessages = scroll > 0 && (newMessages || newIncoming);
             accessor.froghelper$setNewMessageSinceScroll(viewState().newMessages);
         }
     }

@@ -145,6 +145,7 @@ public class Client {
         ru.wilyfox.client.visuals.VisualsCamera.register();
         RuneSetSwitcher.register();
         Clicker.register();
+        ru.wilyfox.client.statistic.MiningStatisticsTracker.register();
         AutoFish.register();
         AlchemyBrewingTracker.register();
         ru.wilyfox.client.alchemy.AlchemyIngredientTracker.getInstance().register();
@@ -214,6 +215,7 @@ public class Client {
                 ScreenAnchor.HOTBAR_LEFT
         );
         hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.FpsWidget(20, 20, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
+        hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.MiningStatisticsWidget(20, 95, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
         hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.RouletteTimerWidget(20, 45, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
         hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.DailyCreditsTimerWidget(20, 70, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
         hudRenderer.registerWidget(

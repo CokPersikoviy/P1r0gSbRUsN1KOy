@@ -5,6 +5,15 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ChatReadReceiptsTest {
+    @Test void lateAttachmentReplacementPreservesReadStateOfEveryWindow() {
+        var receipts = new ChatReadReceipts<Object>(); var previous = new Object(); var updated = new Object();
+        receipts.read("FH", previous, false);
+        receipts.read("Custom", previous, false);
+        receipts.replace(previous, updated);
+        assertFalse(receipts.unread("FH", updated));
+        assertFalse(receipts.unread("Custom", updated));
+        assertTrue(receipts.unread("Other", updated));
+    }
     @Test void windowsSharingAChannelHaveIndependentReceipts() {
         var receipts = new ChatReadReceipts<Object>(); var message = new Object();
         receipts.read("fox", message, false);

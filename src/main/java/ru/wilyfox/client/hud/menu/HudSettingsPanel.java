@@ -94,6 +94,22 @@ public class HudSettingsPanel {
                 () -> ConfigManager.getWidgetLocations(placed.getConfigKey()).locationHidden,
                 value -> ConfigManager.getWidgetLocations(placed.getConfigKey()).selectHidden(value), "Nowhere"));
         widgetComponents.addAll(WidgetSettingsSections.create(catalog, placed.getConfigKey()));
+        widgetComponents.add(new BreakLineSettingsComponent("Placement"));
+        var anchors = new ru.wilyfox.client.hud.indicators.ScreenAnchor[ru.wilyfox.client.hud.indicators.ScreenAnchor.values().length + 1];
+        System.arraycopy(ru.wilyfox.client.hud.indicators.ScreenAnchor.values(), 0, anchors, 1, anchors.length - 1);
+        widgetComponents.add(new CycleSettingsComponent<>(0, 0, 0, 0, "Screen anchor", placed::getScreenAnchor, anchor -> {
+            placed.clearWidgetSnap(); placed.setScreenAnchor(anchor); placed.setAnchorOffsets(0, 0);
+            ConfigManager.captureWidgetLayout(placed);
+        }, anchors, anchor -> anchor == null ? "None" : anchor.name().toLowerCase(Locale.ROOT).replace('_', ' ')));
+        widgetComponents.add(new DragNumberSettingsComponent(0, 0, 0, 0, "Anchor offset X", placed::getAnchorOffsetX,
+                value -> { placed.setAnchorOffsets(value, placed.getAnchorOffsetY()); ConfigManager.captureWidgetLayout(placed); }, -2000, 2000)
+                .withVisibility(() -> placed.getScreenAnchor() != null));
+        widgetComponents.add(new DragNumberSettingsComponent(0, 0, 0, 0, "Anchor offset Y", placed::getAnchorOffsetY,
+                value -> { placed.setAnchorOffsets(placed.getAnchorOffsetX(), value); ConfigManager.captureWidgetLayout(placed); }, -2000, 2000)
+                .withVisibility(() -> placed.getScreenAnchor() != null));
+        widgetComponents.add(new ActionSettingsComponent("Release connection / anchor", () -> {
+            placed.clearWidgetSnap(); placed.setScreenAnchor(null); ConfigManager.captureWidgetLayout(placed);
+        }).withVisibility(() -> placed.hasWidgetSnap() || placed.getScreenAnchor() != null));
         if (catalog.chatChannel() != null) widgetComponents.add(new ActionSettingsComponent("Delete tab", () -> {
             ru.wilyfox.client.chat.ChatDock.delete(placed.getConfigKey()); closeWidget();
         }));

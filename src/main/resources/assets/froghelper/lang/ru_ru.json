@@ -77,5 +77,18 @@
   "social.froghelper.config.busy": "Дождитесь завершения запроса",
   "social.froghelper.config.cancelled": "Скачивание отменено: сессия изменилась",
   "social.froghelper.config.failed": "Не удалось скачать конфиг. Проверьте связь и лимит 32 скачанных конфигов.",
-  "social.froghelper.config.downloaded": "Конфиг %s сохранён. Выбор: настройки → Configs."
+  "social.froghelper.config.downloaded": "Конфиг %s сохранён. Выбор: настройки → Configs.",
+  "froghelper.mining.time": "Время",
+  "froghelper.mining.total": "Всего",
+  "froghelper.mining.per_hour": "В час",
+  "froghelper.mining.blocks": "Блоки",
+  "froghelper.mining.money": "Деньги",
+  "froghelper.mining.shards": "Шарды",
+  "froghelper.mining.waiting": "Ожидание",
+  "froghelper.mining.running": "Добыча",
+  "froghelper.mining.auto_paused": "Автопауза",
+  "froghelper.mining.paused": "Пауза",
+  "froghelper.mining.empty": "Показатели скрыты",
+  "froghelper.mining.blocks_unit": "бл.",
+  "froghelper.mining.shards_unit": "ш."
 }

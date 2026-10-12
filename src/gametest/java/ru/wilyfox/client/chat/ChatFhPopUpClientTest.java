@@ -32,6 +32,9 @@ public final class ChatFhPopUpClientTest implements FabricClientGameTest {
                 check(notification.title().equals("FH: OtherPlayer") && notification.message().equals("Привет из FH!"), "Sender or message preview missing");
                 chat.acceptBackendMessages(List.of(incoming), true); chat.rebuildVanillaChat();
                 check(count() == 1, "Duplicate delivery or chat rebuild repeated a pop-up");
+                chat.acceptBackendMessages(List.of(new BackendChatMessage(incoming.id(), incoming.name(), incoming.text(), incoming.sentAt(), null,
+                        List.of(new BackendChatMessage.Attachment("1559187699896950924", "image.png", 367, 197)))), true);
+                check(count() == 1, "Late attachment repair repeated a pop-up");
                 chat.acceptBackendMessages(List.of(new BackendChatMessage(now + 2, client.player.getGameProfile().name(), "own message", now)), true);
                 check(count() == 1, "Own FH message created an incoming pop-up");
                 ConfigManager.get().popUps.fhMessageEvent = false;

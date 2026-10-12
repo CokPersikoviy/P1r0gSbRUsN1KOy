@@ -95,6 +95,7 @@ public class HudRenderer {
     private static final long PASSIVE_LAYOUT_INTERVAL_NANOS = 100_000_000L;
 
     private Widget draggedWidget = null;
+    private final ru.wilyfox.client.hud.internal.HudDragSnapController dragSnap = new ru.wilyfox.client.hud.internal.HudDragSnapController();
     private Widget pendingLibraryDrag;
     private double libraryPressX, libraryPressY;
     private int dragOffsetX = 0;
@@ -198,6 +199,7 @@ public class HudRenderer {
     private final HudSnapLayoutHost snapLayoutHost = new HudSnapLayoutHost() {
         @Override public boolean isSnapTargetVisible(Widget widget) { return editing || widget.isVisible(); }
         @Override public boolean isPlacementReadOnly(Widget widget) { return usesInheritedMainPlacement(widget); }
+        @Override public boolean isMoving(Widget widget) { return widget == draggedWidget || draggingWidgetGroup && draggedGroupWidgets.contains(widget); }
         @Override
         public WidgetLayoutConfig getStoredPlacement(AbstractWidget widget) {
             return ConfigManager.getWidgetLayout(widget.getConfigKey());
@@ -264,6 +266,7 @@ public class HudRenderer {
 
     public void setEditing(boolean editing) {
         if (this.editing == editing) return;
+        if (!editing) finishInterruptedDrag();
         layoutAnimation.clear();
         appliedConfig = null; // Editor transitions use exact destination positions, without animation.
         if (settingsPanel != null) settingsPanel.finishInteraction();
@@ -280,6 +283,7 @@ public class HudRenderer {
             selectedWidget = null;
             pendingLibraryDrag = null;
             draggedWidget = null;
+            dragSnap.cancel();
             draggingWidgetGroup = false;
             draggedGroupWidgets.clear();
             draggedGroupStates.clear();
@@ -304,8 +308,10 @@ public class HudRenderer {
     public boolean openWidgetSettings(Widget widget) {
         if (!editing || !widgets.contains(widget) || isInheritedWidget(widget)
                 || !settingsPanel.openWidget(widget, () -> setSettings(false))) return false;
+        finishInterruptedDrag();
         pendingLibraryDrag = null;
         draggedWidget = null;
+        dragSnap.cancel();
         draggingWidgetGroup = false;
         draggedGroupWidgets.clear();
         draggedGroupStates.clear();
@@ -323,10 +329,12 @@ public class HudRenderer {
     public void selectLayout(String id) {
         if (!editing) return;
         if (settingsOpen) setSettings(false);
+        finishInterruptedDrag();
         saveAllWidgetLayouts();
         selectedLayout = ConfigManager.get().locationLayouts.containsKey(id) ? id : HudLayoutResolver.MAIN;
         ConfigManager.setEditorLayout(selectedLayout);
         selectedWidget = pendingLibraryDrag = draggedWidget = null;
+        dragSnap.cancel();
         draggingWidgetGroup = false;
         draggedGroupWidgets.clear(); draggedGroupStates.clear();
         refreshLayout();
@@ -414,6 +422,7 @@ public class HudRenderer {
         if (defaults == null) return;
         widget.setScale(stored != null && stored.scale != null ? stored.scale : defaults.scale);
         widget.setScreenAnchor(stored != null ? stored.anchor : defaults.anchor);
+        widget.setAnchorOffsets(stored != null ? stored.anchorOffsetX : defaults.anchorOffsetX, stored != null ? stored.anchorOffsetY : defaults.anchorOffsetY);
         widget.clearWidgetSnap();
         var window = Minecraft.getInstance().getWindow();
         int w = window.getGuiScaledWidth(), h = window.getGuiScaledHeight();
@@ -424,7 +433,7 @@ public class HudRenderer {
         widget.setStartX(clamp(x, 0, Math.max(0, w - widget.getWidth())));
         widget.setStartY(clamp(y, 0, Math.max(0, h - widget.getHeight())));
         if (stored != null && stored.snapTarget != null && stored.snapOwnCorner != null && stored.snapTargetCorner != null)
-            widget.setWidgetSnap(stored.snapTarget, stored.snapOwnCorner, stored.snapTargetCorner);
+            widget.setWidgetSnap(stored.snapTarget, stored.snapOwnCorner, stored.snapTargetCorner, stored.snapOffsetX, stored.snapOffsetY);
     }
 
     public boolean isSettingsOpen() {
@@ -458,6 +467,7 @@ public class HudRenderer {
                 }
                 if (storedLayout.anchor != null) {
                     abstractWidget.setScreenAnchor(storedLayout.anchor);
+                    abstractWidget.setAnchorOffsets(storedLayout.anchorOffsetX, storedLayout.anchorOffsetY);
                 }
                 if (storedLayout.x != null) {
                     abstractWidget.setStartX(storedLayout.x);
@@ -466,7 +476,7 @@ public class HudRenderer {
                     abstractWidget.setStartY(storedLayout.y);
                 }
                 if (storedLayout.snapTarget != null && storedLayout.snapOwnCorner != null && storedLayout.snapTargetCorner != null) {
-                    abstractWidget.setWidgetSnap(storedLayout.snapTarget, storedLayout.snapOwnCorner, storedLayout.snapTargetCorner);
+                    abstractWidget.setWidgetSnap(storedLayout.snapTarget, storedLayout.snapOwnCorner, storedLayout.snapTargetCorner, storedLayout.snapOffsetX, storedLayout.snapOffsetY);
                 } else {
                     abstractWidget.clearWidgetSnap();
                 }
@@ -607,6 +617,7 @@ public class HudRenderer {
 
     public boolean removeWidget(Widget widget) {
         if (!(widget instanceof AbstractWidget placed) || !isWidgetAdded(widget)) return false;
+        finishInterruptedDrag();
         var selected = ConfigManager.get().locationLayouts.get(selectedLayout);
         if (editing && selected != null && selected.inheritMainLayout
                 && ConfigManager.get().mainLayout.widgets.contains(placed.getConfigKey())) {
@@ -614,6 +625,7 @@ public class HudRenderer {
             selected.widgets.remove(placed.getConfigKey());
             ConfigManager.layoutChanged();
             selectedWidget = pendingLibraryDrag = draggedWidget = null;
+            dragSnap.cancel();
             draggingWidgetGroup = false;
             draggedGroupWidgets.clear(); draggedGroupStates.clear();
             saveAllWidgetLayouts();
@@ -638,6 +650,7 @@ public class HudRenderer {
         if (selectedWidget == widget) selectedWidget = null;
         pendingLibraryDrag = null;
         draggedWidget = null;
+        dragSnap.cancel();
         draggingWidgetGroup = false;
         draggedGroupWidgets.clear();
         draggedGroupStates.clear();
@@ -682,6 +695,9 @@ public class HudRenderer {
                 } else {
                     ModProfiler.getInstance().incrementCounter("hud/layout/skippedPassiveRefresh");
                 }
+                dragSnap.refresh(widgets, screenWidth, screenHeight, Minecraft.getInstance().getWindow().getGuiScale(),
+                        ConfigManager.get().snapping, ru.wilyfox.utils.InputModifiers.hasControlDown());
+                if (draggingWidgetGroup && draggedWidget instanceof AbstractWidget root) updateDraggedGroupPositions(root);
             }
 
             // While the mod's settings menu is open, hide all widgets — only the panel shows.
@@ -867,6 +883,9 @@ public class HudRenderer {
                 draggedGroupStates.clear();
                 detachSnappedDescendants(abstractWidget);
             }
+            var window = Minecraft.getInstance().getWindow();
+            dragSnap.begin(abstractWidget, draggingWidgetGroup ? draggedGroupWidgets : List.of(abstractWidget),
+                    widgets, window.getGuiScaledWidth(), window.getGuiScaledHeight());
         }
     }
 
@@ -889,10 +908,12 @@ public class HudRenderer {
             onMouseDragged(mouseX, mouseY, screenWidth, screenHeight, button);
         }
         Widget releasedWidget = draggedWidget;
+        dragSnap.commit(ConfigManager.get().snapping);
         if (draggingWidgetGroup) {
             finishGroupDrag();
         }
         draggedWidget = null;
+        dragSnap.cancel();
         activeScreenAnchor = null;
         activeDraggedCornerIndicator = null;
         activeTargetCornerIndicator = null;
@@ -940,14 +961,8 @@ public class HudRenderer {
             updateDraggedGroupPositions(abstractWidget);
         }
 
-        boolean snappedToAnchor = applyScreenAnchorSnapping(draggedWidget, screenWidth, screenHeight, ru.wilyfox.utils.InputModifiers.hasShiftDown());
-        if (!snappedToAnchor) {
-            applyWidgetSnapping(screenWidth, screenHeight);
-        } else if (draggedWidget instanceof AbstractWidget abstractWidget) {
-            abstractWidget.clearWidgetSnap();
-        }
-
-        resolveWidgetOverlap(screenWidth, screenHeight);
+        dragSnap.move(newX, newY, Minecraft.getInstance().getWindow().getGuiScale(), ConfigManager.get().snapping,
+                ru.wilyfox.utils.InputModifiers.hasControlDown());
 
         if (draggingWidgetGroup && draggedWidget instanceof AbstractWidget abstractWidget) {
             updateDraggedGroupPositions(abstractWidget);
@@ -1070,6 +1085,7 @@ public class HudRenderer {
         if (snapshot == null) return;
         ConfigManager.restoreSnapshot(snapshot.config);
         pendingLibraryDrag = draggedWidget = null;
+        dragSnap.cancel();
         draggingWidgetGroup = false;
         draggedGroupWidgets.clear(); draggedGroupStates.clear();
         activeScreenAnchor = null;
@@ -1187,16 +1203,8 @@ public class HudRenderer {
         }
     }
 
-    private boolean applyScreenAnchorSnapping(Widget widget, int screenWidth, int screenHeight, boolean shiftHeld) {
-        return snapLayoutEngine.applyScreenAnchorSnapping(snapLayoutHost, widget, screenWidth, screenHeight, shiftHeld);
-    }
-
     private void applyStoredScreenAnchor(Widget widget, ScreenAnchor anchor, int screenWidth, int screenHeight) {
         snapLayoutEngine.applyStoredScreenAnchor(widget, anchor, screenWidth, screenHeight);
-    }
-
-    private void applyWidgetSnapping(int screenWidth, int screenHeight) {
-        snapLayoutEngine.applyWidgetSnapping(snapLayoutHost, screenWidth, screenHeight);
     }
 
     private Map<String, AbstractWidget> getAbstractWidgetMap() {
@@ -1257,10 +1265,6 @@ public class HudRenderer {
         });
     }
 
-    private void resolveWidgetOverlap(int screenWidth, int screenHeight) {
-        snapLayoutEngine.resolveWidgetOverlap(snapLayoutHost, draggingWidgetGroup, screenWidth, screenHeight);
-    }
-
     private void saveAllWidgetLayouts() {
         ConfigManager.saveWidgetLayouts(widgets);
     }
@@ -1301,6 +1305,16 @@ public class HudRenderer {
         );
     }
 
+    /** Restore the temporary group edges before a menu/layout change can save cleared relations. */
+    private void finishInterruptedDrag() {
+        if (draggedWidget == null) { dragSnap.cancel(); return; }
+        if (draggingWidgetGroup) finishGroupDrag();
+        draggedWidget = null;
+        dragSnap.cancel();
+        normalizeWidgetSnapParents();
+        saveAllWidgetLayouts();
+    }
+
     private void updateDraggedGroupPositions(AbstractWidget rootWidget) {
         HudGroupDragController.updateDraggedGroupPositions(rootWidget, draggedGroupWidgets, draggedGroupStates);
     }
@@ -1321,6 +1335,8 @@ public class HudRenderer {
     }
 
     private void renderScreenAnchors(GuiGraphicsExtractor context, int screenWidth, int screenHeight) {
+        if (!ConfigManager.get().snapping.enabled || !ConfigManager.get().snapping.showGuides
+                || !ConfigManager.get().snapping.screenTargets || ru.wilyfox.utils.InputModifiers.hasControlDown()) return;
         HudEditorOverlayRenderer.renderScreenAnchors(
                 overlayHost,
                 context,
@@ -1380,7 +1396,7 @@ public class HudRenderer {
     }
 
     private void renderWidgetSnapIndicators(GuiGraphicsExtractor context) {
-        HudEditorOverlayRenderer.renderWidgetSnapIndicators(overlayHost, context);
+        dragSnap.drawGuides(context, ConfigManager.get().snapping);
     }
 
     private boolean hasPassiveLayoutChanges() {

@@ -36,7 +36,7 @@ public final class HudEditorOverlayRenderer {
     }
 
     public static void renderScreenAnchors(HudEditorOverlayHost host, GuiGraphicsExtractor context, int screenWidth, int screenHeight, int screenSnapMargin) {
-        boolean showCenterAnchors = ru.wilyfox.utils.InputModifiers.hasShiftDown();
+        boolean showCenterAnchors = ru.wilyfox.client.hud.config.ConfigManager.get().snapping.centerAlignment;
 
         renderSingleScreenAnchor(host, context, ScreenAnchor.TOP_LEFT, screenSnapMargin, screenSnapMargin);
         renderSingleScreenAnchor(host, context, ScreenAnchor.TOP_RIGHT, screenWidth - screenSnapMargin, screenSnapMargin);
@@ -47,6 +47,8 @@ public final class HudEditorOverlayRenderer {
             renderSingleScreenAnchor(host, context, ScreenAnchor.TOP_CENTER, screenWidth / 2, screenSnapMargin);
             renderSingleScreenAnchor(host, context, ScreenAnchor.LEFT_CENTER, screenSnapMargin, screenHeight / 2);
             renderSingleScreenAnchor(host, context, ScreenAnchor.RIGHT_CENTER, screenWidth - screenSnapMargin, screenHeight / 2);
+            renderSingleScreenAnchor(host, context, ScreenAnchor.BOTTOM_CENTER, screenWidth / 2, screenHeight - screenSnapMargin);
+            renderSingleScreenAnchor(host, context, ScreenAnchor.CENTER, screenWidth / 2, screenHeight / 2);
         }
 
         renderSingleScreenAnchor(host, context, ScreenAnchor.HOTBAR_LEFT, host.getHotbarLeftAnchorX(screenWidth), host.getHotbarAnchorY(screenHeight));

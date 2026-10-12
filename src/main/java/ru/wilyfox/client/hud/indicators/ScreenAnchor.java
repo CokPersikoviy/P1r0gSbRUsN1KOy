@@ -6,6 +6,8 @@ public enum ScreenAnchor {
     BOTTOM_LEFT,
     BOTTOM_RIGHT,
     TOP_CENTER,
+    BOTTOM_CENTER,
+    CENTER,
     LEFT_CENTER,
     RIGHT_CENTER,
     HOTBAR_LEFT,

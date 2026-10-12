@@ -8,6 +8,8 @@ final class HudConfigSanitizer {
 
     static HudConfig sanitize(HudConfig config) {
         HudConfig sanitized = config != null ? config : new HudConfig();
+        if (sanitized.snapping == null) sanitized.snapping = new HudSnapConfig();
+        sanitized.snapping.sanitize();
         if (sanitized.widgetListSort == null) sanitized.widgetListSort = WidgetListSort.ALPHABETICAL;
 
         if (sanitized.visuals == null) sanitized.visuals = new VisualsConfig();
@@ -19,6 +21,9 @@ final class HudConfigSanitizer {
         if (sanitized.autoMessages == null) sanitized.autoMessages = new AutoMessagesConfig();
         if (sanitized.bossWidget == null) sanitized.bossWidget = new BossWidgetConfig();
         if (sanitized.clicker == null) sanitized.clicker = new ClickerConfig();
+        sanitized.clicker.sanitize();
+        if (sanitized.miningStatistics == null) sanitized.miningStatistics = new MiningStatisticsConfig();
+        sanitized.miningStatistics.sanitize();
         if (sanitized.blocksPerSecondWidget == null) sanitized.blocksPerSecondWidget = new BlocksPerSecondWidgetConfig();
         if (sanitized.dailyBlocks == null) sanitized.dailyBlocks = new DailyBlocksConfig();
         if (sanitized.estimatedTps == null) sanitized.estimatedTps = new EstimatedTpsConfig();
@@ -120,6 +125,7 @@ final class HudConfigSanitizer {
         }
         for (WidgetLayoutConfig layout : sanitized.widgetLayouts.values()) {
             if (layout == null) continue;
+            layout.sanitizeOffsets();
             if ("PotionRecipeWidget".equals(layout.snapTarget)) {
                 layout.snapTarget = null;
                 layout.snapOwnCorner = null;

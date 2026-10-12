@@ -32,7 +32,7 @@ public final class HudSnapGraphNormalizer {
                 continue;
             }
 
-            SnapEdge edge = new SnapEdge(widget, target, widget.getSnapOwnCorner(), widget.getSnapTargetCorner());
+            SnapEdge edge = new SnapEdge(widget, target, widget.getSnapOwnCorner(), widget.getSnapTargetCorner(), widget.getSnapOffsetX(), widget.getSnapOffsetY());
             adjacency.computeIfAbsent(widget.getConfigKey(), ignored -> new ArrayList<>()).add(edge);
             adjacency.computeIfAbsent(target.getConfigKey(), ignored -> new ArrayList<>()).add(edge);
         }
@@ -106,7 +106,8 @@ public final class HudSnapGraphNormalizer {
 
                 if (!readOnly.test(neighbor)) {
                     neighbor.setScreenAnchor(null);
-                    neighbor.setWidgetSnap(current.getConfigKey(), childCorner, parentCorner);
+                    neighbor.setWidgetSnap(current.getConfigKey(), childCorner, parentCorner,
+                            neighbor == edge.child ? edge.offsetX : -edge.offsetX, neighbor == edge.child ? edge.offsetY : -edge.offsetY);
                 }
                 queue.add(neighbor);
             }
@@ -147,7 +148,7 @@ public final class HudSnapGraphNormalizer {
             AbstractWidget child,
             AbstractWidget parent,
             WidgetCorner childCorner,
-            WidgetCorner parentCorner
+            WidgetCorner parentCorner, int offsetX, int offsetY
     ) {
         private AbstractWidget other(AbstractWidget widget) {
             if (widget == child) {

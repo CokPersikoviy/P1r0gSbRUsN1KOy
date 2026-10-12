@@ -18,6 +18,7 @@ public abstract class AbstractWidget implements Widget {
     protected String snapTargetKey;
     protected WidgetCorner snapOwnCorner;
     protected WidgetCorner snapTargetCorner;
+    private int anchorOffsetX, anchorOffsetY, snapOffsetX, snapOffsetY;
 
     protected AbstractWidget(int x, int y, HudLayer l) {
         this.startX = x;
@@ -95,8 +96,14 @@ public abstract class AbstractWidget implements Widget {
     }
 
     public void setScreenAnchor(ScreenAnchor screenAnchor) {
+        if (this.screenAnchor != screenAnchor) anchorOffsetX = anchorOffsetY = 0;
         this.screenAnchor = screenAnchor;
     }
+    public int getAnchorOffsetX() { return anchorOffsetX; }
+    public int getAnchorOffsetY() { return anchorOffsetY; }
+    public void setAnchorOffsets(int x, int y) { anchorOffsetX = x; anchorOffsetY = y; }
+    public int getSnapOffsetX() { return snapOffsetX; }
+    public int getSnapOffsetY() { return snapOffsetY; }
 
     public String getConfigKey() {
         return configKey;
@@ -123,12 +130,17 @@ public abstract class AbstractWidget implements Widget {
     }
 
     public void setWidgetSnap(String snapTargetKey, WidgetCorner snapOwnCorner, WidgetCorner snapTargetCorner) {
+        setWidgetSnap(snapTargetKey, snapOwnCorner, snapTargetCorner, 0, 0);
+    }
+    public void setWidgetSnap(String snapTargetKey, WidgetCorner snapOwnCorner, WidgetCorner snapTargetCorner, int offsetX, int offsetY) {
         this.snapTargetKey = snapTargetKey;
         this.snapOwnCorner = snapOwnCorner;
         this.snapTargetCorner = snapTargetCorner;
+        snapOffsetX = offsetX; snapOffsetY = offsetY;
     }
 
     public void clearWidgetSnap() {
+        snapOffsetX = snapOffsetY = 0;
         this.snapTargetKey = null;
         this.snapOwnCorner = null;
         this.snapTargetCorner = null;

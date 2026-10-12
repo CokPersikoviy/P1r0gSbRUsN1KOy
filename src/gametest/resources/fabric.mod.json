@@ -6,10 +6,13 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
+      "ru.wilyfox.client.statistic.MiningStatisticsClientTest",
+      "ru.wilyfox.client.hud.menu.VisualTimeClientTest",
       "ru.wilyfox.client.chat.ChatRepeatsClientTest",
       "ru.wilyfox.client.chat.BossTimerFiltersClientTest",
       "ru.wilyfox.client.moduser.ConfigSharingClientTest",
       "ru.wilyfox.client.chat.ChatDiscordImagesClientTest",
+      "ru.wilyfox.client.moduser.BackendChatRefreshClientTest",
       "ru.wilyfox.MigrationClientTest",
       "ru.wilyfox.client.hud.MainWidgetLayoutClientTest",
       "ru.wilyfox.client.hud.ChatSnapResizeClientTest",
@@ -18,6 +21,7 @@
       "ru.wilyfox.client.hud.WidgetAnimationClientTest",
       "ru.wilyfox.client.hud.WidgetOpacityClientTest",
       "ru.wilyfox.client.hud.InheritedLayoutClientTest",
+      "ru.wilyfox.client.hud.SnapEngineClientTest",
       "ru.wilyfox.client.profiler.DebugBackgroundProfilerClientTest",
       "ru.wilyfox.client.profiler.AutomaticProfilerClientTest",
       "ru.wilyfox.client.protocol.LocationUpdateClientTest",

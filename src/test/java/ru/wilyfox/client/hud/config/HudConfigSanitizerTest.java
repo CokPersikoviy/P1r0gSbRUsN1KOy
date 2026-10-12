@@ -8,6 +8,43 @@ import static org.junit.jupiter.api.Assertions.*;
 class HudConfigSanitizerTest {
     private final Gson gson = new Gson();
 
+    @Test void legacySnapsHaveZeroOffsetsAndNewPreferencesAreSanitized() {
+        var old = HudConfigSanitizer.sanitize(gson.fromJson("""
+            {"widgetLayouts":{"BossHudWidget":{"snapTarget":"BoostersWidget","snapOwnCorner":"TOP_LEFT","snapTargetCorner":"TOP_RIGHT"}}}
+            """, HudConfig.class));
+        assertTrue(old.snapping.enabled); assertEquals(HudSnapConfig.Behavior.CONNECT, old.snapping.behavior);
+        assertEquals(0, old.widgetLayouts.get("BossHudWidget").snapOffsetX);
+        assertEquals(0, old.widgetLayouts.get("BossHudWidget").anchorOffsetY);
+        old.snapping.capturePixels = 24; old.snapping.releasePixels = 1; old.snapping.gap = -3;
+        old.widgetLayouts.get("BossHudWidget").snapOffsetX = Integer.MAX_VALUE;
+        var local = new LocationWidgetLayoutConfig(); local.widgets.add("BossHudWidget");
+        var placement = new WidgetLayoutConfig(); placement.anchorOffsetY = Integer.MIN_VALUE;
+        local.placements.put("BossHudWidget", placement); old.locationLayouts.put("test", local);
+        HudConfigSanitizer.sanitize(old);
+        assertEquals(24, old.snapping.releasePixels); assertEquals(0, old.snapping.gap);
+        assertEquals(10000, old.widgetLayouts.get("BossHudWidget").snapOffsetX);
+        assertEquals(-10000, local.placements.get("BossHudWidget").anchorOffsetY);
+    }
+
+    @Test void oldConfigsKeepToggleClickerAndNewMiningSettingsHaveSafeDefaults() {
+        var old = HudConfigSanitizer.sanitize(gson.fromJson("{\"clicker\":{\"cps\":10}}", HudConfig.class));
+        assertEquals(ClickerConfig.Activation.TOGGLE, old.clicker.activation);
+        assertEquals(MiningStatisticsConfig.Layout.SUMMARY, old.miningStatistics.layout);
+        assertFalse(old.miningStatistics.showTitle);
+        assertFalse(old.miningStatistics.showStatus);
+        assertEquals(10, old.miningStatistics.idleSeconds);
+        var custom = HudConfigSanitizer.sanitize(gson.fromJson("""
+                {"clicker":{"activation":"HOLD","cps":999},
+                 "miningStatistics":{"sources":[],"idleSeconds":0,"decimals":7,"minimumWidth":-5}}
+                """, HudConfig.class));
+        assertEquals(ClickerConfig.Activation.HOLD, custom.clicker.activation);
+        assertEquals(20, custom.clicker.cps);
+        assertTrue(custom.miningStatistics.sources.isEmpty());
+        assertEquals(1, custom.miningStatistics.idleSeconds);
+        assertEquals(2, custom.miningStatistics.decimals);
+        assertEquals(60, custom.miningStatistics.minimumWidth);
+    }
+
     @Test
     void migratesOldLowHpSettingsAndRestoresMissingFormatParts() {
         HudConfig config = gson.fromJson("""

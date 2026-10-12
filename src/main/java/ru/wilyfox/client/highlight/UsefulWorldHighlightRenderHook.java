@@ -14,6 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.Entity;
@@ -434,7 +435,7 @@ public final class UsefulWorldHighlightRenderHook {
 
                             highlightedBlocks++;
                             long blockPos = cursor.asLong();
-                            boxesByBlockPos.put(blockPos, new ColoredBox(blockType.createBox(cursor, blockState), blockType.red, blockType.green, blockType.blue));
+                            boxesByBlockPos.put(blockPos, new ColoredBox(blockType.createBox(mc.level, cursor, blockState), blockType.red, blockType.green, blockType.blue));
                             if (blockType.isBarrel()) {
                                 barrelsByBlockPos.put(blockPos, blockType);
                             }
@@ -945,16 +946,11 @@ public final class UsefulWorldHighlightRenderHook {
             return TEXTURE_TYPES.get(SkinTextureId.fromValue(texture));
         }
 
-        private AABB createBox(BlockPos blockPos, BlockState blockState) {
+        AABB createBox(BlockGetter level, BlockPos blockPos, BlockState blockState) {
             if (blockState.getBlock() instanceof PlayerHeadBlock || blockState.getBlock() instanceof PlayerWallHeadBlock) {
-                return new AABB(
-                        blockPos.getX() + 0.22D,
-                        blockPos.getY() + 0.18D,
-                        blockPos.getZ() + 0.22D,
-                        blockPos.getX() + 0.78D,
-                        blockPos.getY() + 0.82D,
-                        blockPos.getZ() + 0.78D
-                );
+                // Skulls start at the floor; wall skulls also shift with their facing.
+                // A fixed centered box floats above lucky blocks and misses wall variants.
+                return blockState.getShape(level, blockPos).bounds().move(blockPos).inflate(0.02D);
             }
 
             return AABB.unitCubeFromLowerCorner(Vec3.atLowerCornerOf(blockPos)).inflate(0.02D);
@@ -1101,7 +1097,7 @@ public final class UsefulWorldHighlightRenderHook {
                         continue;
                     }
 
-                    boxesByBlockPos.put(blockPosLong, new ColoredBox(blockType.createBox(cursor, blockState), blockType.red, blockType.green, blockType.blue));
+                    boxesByBlockPos.put(blockPosLong, new ColoredBox(blockType.createBox(mc.level, cursor, blockState), blockType.red, blockType.green, blockType.blue));
                     if (blockType.isBarrel()) {
                         barrelsByBlockPos.put(blockPosLong, blockType);
                     } else {

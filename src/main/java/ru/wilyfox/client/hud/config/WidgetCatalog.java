@@ -11,6 +11,7 @@ public enum WidgetCatalog {
     BOSS_TIMERS("BossHudWidget", "Boss Timers", c -> c.bossWidget.active),
     BLOCK_COUNTER("BlocksPerSecondWidget", "Block Counter", c -> c.blocksPerSecondWidget.active),
     DAILY_BLOCKS("DailyBlocksWidget", "Daily Blocks", c -> c.dailyBlocks.active),
+    MINING_STATISTICS("MiningStatisticsWidget", "Mining Statistics", c -> false),
     ESTIMATED_TPS("EstimatedTpsWidget", "Estimated TPS", c -> c.estimatedTps.active),
     FPS("FpsWidget", "FPS", c -> false),
     ROULETTE("RouletteTimerWidget", "Roulette Timer", c -> false),

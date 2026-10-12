@@ -108,9 +108,12 @@ public final class VisualsExtendedClientTest implements FabricClientGameTest {
         var fog = new net.minecraft.client.renderer.fog.FogData(); fog.environmentalStart = 4; fog.environmentalEnd = 20;
         c.fogMode = VisualsConfig.FogMode.CUSTOM; c.fogDistance = 3; Visuals.fog(fog, FogType.NONE);
         expect(fog.environmentalStart == 12 && fog.environmentalEnd == 60, "Fog multiplier did not scale distances");
-        c.fluidFog = false; Visuals.fog(fog, FogType.WATER); expect(fog.environmentalEnd >= 1_000_000, "Fluid fog could not be disabled");
+        boolean oldClearWater = ConfigManager.get().render.clearWater;
+        ConfigManager.get().render.clearWater = true;
+        Visuals.fog(fog, FogType.WATER); expect(fog.environmentalEnd >= 1_000_000, "Water fog could not be disabled");
+        ConfigManager.get().render.clearWater = oldClearWater;
         c.weather = VisualsConfig.Weather.CLEAR; c.fogMode = VisualsConfig.FogMode.DEFAULT;
-        c.brightnessEnabled = c.skyLightEnabled = c.blockLightEnabled = false; c.fluidFog = true;
+        c.brightnessEnabled = c.skyLightEnabled = c.blockLightEnabled = false;
         c.skyColorEnabled = true; c.skyColor = 0xFF789FD1; c.time = 6000;
         final int[] color = {0x23112233};
         var picker = new ColorPickerSettingsComponent("Alpha", () -> color[0], v -> color[0] = v).withAlpha();

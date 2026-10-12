@@ -67,7 +67,7 @@ final class HudSettingsVisualsSection {
                 config.skyColorEnabled = defaults.skyColorEnabled; config.skyColor = defaults.skyColor;
                 config.fogColorEnabled = defaults.fogColorEnabled; config.fogColor = defaults.fogColor;
                 config.cloudColorEnabled = defaults.cloudColorEnabled; config.cloudColor = defaults.cloudColor;
-                config.fogMode = defaults.fogMode; config.fogDistance = defaults.fogDistance; config.fluidFog = defaults.fluidFog;
+                config.fogMode = defaults.fogMode; config.fogDistance = defaults.fogDistance;
                 config.timeEnabled = defaults.timeEnabled; config.time = defaults.time;
                 config.weather = defaults.weather;
                 config.shadowStrength = defaults.shadowStrength; config.shadowRadius = defaults.shadowRadius;
@@ -214,9 +214,9 @@ final class HudSettingsVisualsSection {
         r.add(color("Cloud color / alpha", () -> c().cloudColor, v -> c().cloudColor = v).withVisibility(() -> c().cloudColorEnabled));
         r.add(cycle("Fog", () -> c().fogMode, v -> c().fogMode = v, VisualsConfig.FogMode.values()));
         r.add(decimal("Fog distance multiplier", () -> c().fogDistance, v -> c().fogDistance = v, 0.1, 10).withVisibility(() -> c().fogMode == VisualsConfig.FogMode.CUSTOM));
-        r.add(toggle("Fluid / snow fog", () -> c().fluidFog, v -> c().fluidFog = v));
         r.add(toggle("Custom time", () -> c().timeEnabled, v -> c().timeEnabled = v));
-        r.add(number("Time (ticks)", () -> c().time, v -> c().time = v, 0, 23999).withVisibility(() -> c().timeEnabled));
+        r.add(new DragNumberSettingsComponent(0, 0, 0, 0, "Time (ticks)",
+                () -> c().time, v -> c().time = v, 0, 23999, 100).withVisibility(() -> c().timeEnabled));
         r.add(cycle("Weather", () -> c().weather, v -> c().weather = v, VisualsConfig.Weather.values()));
         r.add(number("Shadow strength (%)", () -> c().shadowStrength, v -> c().shadowStrength = v, 0, 200));
         r.add(number("Shadow radius (%)", () -> c().shadowRadius, v -> c().shadowRadius = v, 0, 200));

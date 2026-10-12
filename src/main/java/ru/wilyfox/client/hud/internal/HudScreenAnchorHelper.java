@@ -15,7 +15,7 @@ public final class HudScreenAnchorHelper {
         }
 
         return switch (placement.anchor()) {
-            case TOP_CENTER -> Math.abs(widget.getCenterX() - (placement.startX() + widget.getWidth() / 2))
+            case TOP_CENTER, BOTTOM_CENTER, CENTER -> Math.abs(widget.getCenterX() - (placement.startX() + widget.getWidth() / 2))
                     + Math.abs(widget.getTop() - placement.startY());
             case LEFT_CENTER -> Math.abs(widget.getLeft() - placement.startX())
                     + Math.abs(widget.getCenterY() - (placement.startY() + widget.getHeight() / 2));
@@ -46,7 +46,7 @@ public final class HudScreenAnchorHelper {
             case LEFT_CENTER -> 0;
             case TOP_RIGHT, BOTTOM_RIGHT -> screenWidth - widget.getWidth() - screenSnapMargin;
             case RIGHT_CENTER -> screenWidth - widget.getWidth();
-            case TOP_CENTER -> screenWidth / 2 - widget.getWidth() / 2;
+            case TOP_CENTER, BOTTOM_CENTER, CENTER -> screenWidth / 2 - widget.getWidth() / 2;
             case HOTBAR_LEFT -> hotbarLeft - widget.getWidth() - hotbarAnchorGap - leftInset;
             case HOTBAR_RIGHT -> hotbarLeft + hotbarWidth + hotbarAnchorGap + rightInset;
         };
@@ -54,8 +54,8 @@ public final class HudScreenAnchorHelper {
         int anchoredY = switch (anchor) {
             case TOP_LEFT, TOP_RIGHT -> screenSnapMargin;
             case TOP_CENTER -> 0;
-            case BOTTOM_LEFT, BOTTOM_RIGHT -> screenHeight - widget.getHeight() - screenSnapMargin;
-            case LEFT_CENTER, RIGHT_CENTER -> screenHeight / 2 - widget.getHeight() / 2;
+            case BOTTOM_LEFT, BOTTOM_RIGHT, BOTTOM_CENTER -> screenHeight - widget.getHeight() - screenSnapMargin;
+            case LEFT_CENTER, RIGHT_CENTER, CENTER -> screenHeight / 2 - widget.getHeight() / 2;
             case HOTBAR_LEFT, HOTBAR_RIGHT -> hotbarTop + (hotbarHeight - widget.getHeight()) / 2;
         };
 
@@ -87,7 +87,7 @@ public final class HudScreenAnchorHelper {
 
     private static int getHotbarSideInset(boolean leftSide, int offhandSlotWidth) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.player.getOffhandItem().isEmpty()) {
+        if (mc == null || mc.player == null || mc.player.getOffhandItem().isEmpty()) {
             return 0;
         }
 

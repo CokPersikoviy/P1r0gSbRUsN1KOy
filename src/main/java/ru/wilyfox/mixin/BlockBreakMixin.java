@@ -14,6 +14,7 @@ public class BlockBreakMixin {
     private void froghelper$recordBlockBreak(BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
         if (cir.getReturnValue()) {
             BlockBreakCounter.recordBreak();
+            ru.wilyfox.client.statistic.MiningStatisticsTracker.recordBreak();
         }
     }
 }
