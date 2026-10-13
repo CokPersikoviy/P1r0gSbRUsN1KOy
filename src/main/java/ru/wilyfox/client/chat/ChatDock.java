@@ -79,7 +79,7 @@ public final class ChatDock {
         select(tabs.get(Math.floorMod(index + (backwards ? -1 : 1), tabs.size())));
     }
     public static String create() {
-        if (ConfigManager.get().chatWidgets.keySet().stream().filter(WidgetCatalog::isCustomChatKey).count() >= 12) return null;
+        if (ConfigManager.get().chatWidgets.keySet().stream().filter(WidgetCatalog::isCustomChatKey).count() >= ChatWidgetConfig.MAX_CUSTOM_TABS) return null;
         String key = "ChatWidgetCustom_" + UUID.randomUUID();
         var config = new ChatWidgetConfig(ChatTab.ALL);
         config.title = "Chat " + (ConfigManager.get().chatWidgets.size() - ChatTab.values().length + 1);

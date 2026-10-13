@@ -24,6 +24,7 @@ public final class ChatTextFilter {
         if (regex && !source.isEmpty()) {
             try { compiled = Pattern.compile(source); }
             catch (PatternSyntaxException invalid) { failure = invalid.getDescription(); }
+            catch (StackOverflowError tooDeep) { failure = "Pattern nesting is too deep"; }
         }
         pattern = compiled; error = failure;
     }

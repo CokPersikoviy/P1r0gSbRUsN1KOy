@@ -73,6 +73,10 @@ final class HudSettingsCoreSections {
                 value -> ConfigManager.get().render.usefulItemsHighlight = value).withWarningTooltip("Performance sensitive"));
 
         section(items, "Utility");
+        items.add(new ActionSettingsComponent("Import ChatPlus tabs", () -> {
+            var client = net.minecraft.client.Minecraft.getInstance();
+            client.gui.setScreen(new ru.wilyfox.client.chat.ChatPlusImportScreen(client.gui.screen()));
+        }));
         toggle(items, "AutoSprint", () -> ConfigManager.get().render.autoSprint,
                 value -> ConfigManager.get().render.autoSprint = value);
         toggle(items, "Tone-down chat", () -> ConfigManager.get().render.toneDownChat,

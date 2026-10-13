@@ -6,6 +6,16 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
+      "ru.wilyfox.client.profiler.DisplayProbeClientTest",
+      "ru.wilyfox.client.highlight.HighlightScanBudgetClientTest",
+      "ru.wilyfox.client.moduser.RenderTextCacheClientTest",
+      "ru.wilyfox.client.hud.internal.SodiumGuiVerticesClientTest",
+      "ru.wilyfox.client.utility.ClickerHoldClientTest",
+      "ru.wilyfox.client.hud.menu.GoalAndNearbyClientTest",
+      "ru.wilyfox.client.hud.menu.ChatPlusImportClientTest",
+      "ru.wilyfox.client.hud.menu.ChatTabLimitsClientTest",
+      "ru.wilyfox.client.utility.ClickerFocusClientTest",
+      "ru.wilyfox.client.hud.menu.BossTimerBuilderClientTest",
       "ru.wilyfox.client.chat.ChatRegexClientTest",
       "ru.wilyfox.client.chat.ClipboardImageClientTest",
       "ru.wilyfox.client.moduser.ChatInputClientTest",
@@ -70,7 +80,10 @@
       "ru.wilyfox.client.profiler.ProfilerCrashSaveClientTest",
       "ru.wilyfox.client.chat.ChatWindowsClientTest",
       "ru.wilyfox.client.chat.ChatSmoothScrollClientTest",
-      "ru.wilyfox.client.chat.ChatUnreadClientTest"
+      "ru.wilyfox.client.chat.ChatUnreadClientTest",
+      "ru.wilyfox.client.profiler.RecentFeaturesProfilerClientTest",
+      "ru.wilyfox.client.hud.widget.HudVisualParityClientTest",
+      "ru.wilyfox.client.protocol.FishingTextCacheClientTest"
     ]
   },
   "depends": {

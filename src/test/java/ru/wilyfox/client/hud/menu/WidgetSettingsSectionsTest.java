@@ -9,6 +9,7 @@ class WidgetSettingsSectionsTest {
     @Test void allExistingSpecificControlsHaveExactlyOneWidgetOwner() {
         var expected = Map.ofEntries(
                 Map.entry(WidgetCatalog.LEVEL_PROGRESS, 1), Map.entry(WidgetCatalog.ESTIMATED_TPS, 1),
+                Map.entry(WidgetCatalog.LEVEL_GOAL, 7), Map.entry(WidgetCatalog.NEARBY_WORMS, 4), Map.entry(WidgetCatalog.NEARBY_BARRELS, 4), Map.entry(WidgetCatalog.NEARBY_CRYSTALS, 4),
                 Map.entry(WidgetCatalog.FPS, 1),
                 Map.entry(WidgetCatalog.IMAGE, 5),
                 Map.entry(WidgetCatalog.MINING_STATISTICS, 41),
@@ -18,7 +19,7 @@ class WidgetSettingsSectionsTest {
                 Map.entry(WidgetCatalog.POTION_TIMERS, 3), Map.entry(WidgetCatalog.SELLERS, 1),
                 Map.entry(WidgetCatalog.COMBO, 1), Map.entry(WidgetCatalog.WAND, 1),
                 Map.entry(WidgetCatalog.VISIBILITY, 1), Map.entry(WidgetCatalog.MAP, 6),
-                Map.entry(WidgetCatalog.BOSS_TIMERS, 15), Map.entry(WidgetCatalog.POP_UPS, 4),
+                Map.entry(WidgetCatalog.BOSS_TIMERS, 27), Map.entry(WidgetCatalog.POP_UPS, 4),
                 Map.entry(WidgetCatalog.FISHING_NIBBLES, 2), Map.entry(WidgetCatalog.FISHING_QUESTS, 3));
         var labels = new HashSet<String>();
         for (var widget : WidgetCatalog.values()) {
@@ -30,9 +31,10 @@ class WidgetSettingsSectionsTest {
                 continue;
             }
             assertEquals(expected.getOrDefault(widget, 0), controls.size(), widget.title());
-            for (var control : controls) assertTrue(labels.add(control.label), "Duplicated control: " + control.label);
+            for (var control : controls) assertTrue(labels.add(control.label) || widget == WidgetCatalog.BOSS_TIMERS && control.label.equals("Color code")
+                    || widget == WidgetCatalog.NEARBY_BARRELS || widget == WidgetCatalog.NEARBY_CRYSTALS, "Duplicated control: " + control.label);
         }
-        assertEquals(92, labels.size());
+        assertEquals(109, labels.size());
     }
 
     @Test void globalMenuKeepsAppearanceAndGameplayFeaturesWithoutWidgetContentDuplicates() {

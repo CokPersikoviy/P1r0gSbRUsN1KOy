@@ -112,7 +112,7 @@ final class ProfilerDiagnostics {
 
         ThreadMXBean threads = ManagementFactory.getThreadMXBean();
         ClassLoadingMXBean classes = ManagementFactory.getClassLoadingMXBean();
-        CpuSnapshot cpu = captureCpu();
+        CpuSnapshot cpu = captureCpu(scanWorld);
         WorldSnapshot world = captureWorld(minecraft, scanWorld);
         FrogHelperSnapshot frogHelper = captureFrogHelper();
 
@@ -371,12 +371,14 @@ final class ProfilerDiagnostics {
         return total;
     }
 
-    private static CpuSnapshot captureCpu() {
+    private static CpuSnapshot captureCpu(boolean includeLoad) {
         java.lang.management.OperatingSystemMXBean bean = ManagementFactory.getOperatingSystemMXBean();
         if (bean instanceof com.sun.management.OperatingSystemMXBean extended) {
             return new CpuSnapshot(
-                    extended.getProcessCpuLoad(),
-                    extended.getCpuLoad(),
+                    // Windows load queries can block for tens of milliseconds. Periodic memory
+                    // sampling keeps cheap process CPU time; full dumps still include load.
+                    includeLoad ? extended.getProcessCpuLoad() : -1.0,
+                    includeLoad ? extended.getCpuLoad() : -1.0,
                     extended.getProcessCpuTime()
             );
         }

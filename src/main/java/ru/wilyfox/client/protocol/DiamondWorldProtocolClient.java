@@ -285,6 +285,8 @@ public final class DiamondWorldProtocolClient {
         STATE.diagnostics.reset();
     }
 
+    public static long getFishingRevision() { return STATE.fishingRevision; }
+
     public static Map<String, Double> getFishingNibbles() {
         return Map.copyOf(STATE.fishingNibbles);
     }

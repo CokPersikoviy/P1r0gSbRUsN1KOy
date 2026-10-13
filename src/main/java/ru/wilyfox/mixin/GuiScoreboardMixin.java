@@ -12,6 +12,7 @@ import net.minecraft.world.scores.PlayerScoreEntry;
 import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.scores.Scoreboard;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.injection.At;
@@ -139,7 +140,19 @@ public abstract class GuiScoreboardMixin implements ScoreboardSidebarAccessor {
         return scoreboard.getDisplayObjective(DisplaySlot.SIDEBAR);
     }
 
+    @Unique private long froghelper$layoutFrame = Long.MIN_VALUE;
+    @Unique private Objective froghelper$layoutObjective;
+    @Unique private Font froghelper$layoutFont;
+    @Unique private ScoreboardLayout froghelper$cachedLayout;
     private ScoreboardLayout froghelper$getLayout(Objective objective) {
+        long frame = ru.wilyfox.client.hud.internal.HudFrameClock.current();
+        if (froghelper$layoutFrame != frame || froghelper$layoutObjective != objective || froghelper$layoutFont != getFont()) {
+            froghelper$cachedLayout = froghelper$calculateLayout(objective);
+            froghelper$layoutFrame = frame; froghelper$layoutObjective = objective; froghelper$layoutFont = getFont();
+        }
+        return froghelper$cachedLayout;
+    }
+    private ScoreboardLayout froghelper$calculateLayout(Objective objective) {
         Font font = getFont();
         List<PlayerScoreEntry> entries = froghelper$getEntries(objective);
 
@@ -172,6 +185,7 @@ public abstract class GuiScoreboardMixin implements ScoreboardSidebarAccessor {
     }
 
     private void froghelper$logBoosterLines() {
+        if (!ru.wilyfox.client.debug.DebugLogger.isEnabled()) return;
         Objective objective = froghelper$getSidebarObjective();
         if (objective == null) {
             return;

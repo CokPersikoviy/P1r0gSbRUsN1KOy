@@ -24,6 +24,17 @@ public final class FishingNibblesWidget extends AbstractWidget {
     private static final int EMPTY_WIDTH = 166;
     private static final int EMPTY_HEIGHT = 28;
 
+    private long dataRevision = Long.MIN_VALUE;
+    private FishingNibblesSort cachedSort;
+    private List<String> cachedLines = List.of();
+    private List<net.minecraft.util.FormattedCharSequence> visualLines = List.of();
+    private List<String> measuredLines;
+    private net.minecraft.client.gui.Font measuredFont;
+    private net.minecraft.locale.Language measuredLanguage;
+    private boolean measuredTitles;
+    private int measuredWidth, measuredHeight;
+    private int[] lineWidths = new int[0];
+
     public FishingNibblesWidget(int x, int y, HudLayer layer) {
         super(x, y, layer);
     }
@@ -60,12 +71,13 @@ public final class FishingNibblesWidget extends AbstractWidget {
         }
 
         int panelWidth = getUnscaledWidth(lines, mc);
-        for (String line : lines) {
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
             if (isDimensionHeader(line)) {
-                int centeredX = Math.max(PADDING_X, (panelWidth - mc.font.width(line)) / 2);
-                context.text(mc.font, line, centeredX, y, WidgetTheme.TEXT_MUTED);
+                int centeredX = Math.max(PADDING_X, (panelWidth - lineWidths[i]) / 2);
+                context.text(mc.font, visualLines.get(i), centeredX, y, WidgetTheme.TEXT_MUTED);
             } else {
-                context.text(mc.font, line, PADDING_X, y, WidgetTheme.TEXT_SOFT);
+                context.text(mc.font, visualLines.get(i), PADDING_X, y, WidgetTheme.TEXT_SOFT);
             }
             y += mc.font.lineHeight + LINE_GAP;
         }
@@ -100,6 +112,18 @@ public final class FishingNibblesWidget extends AbstractWidget {
     }
 
     private List<String> buildLines() {
+        long revision = DiamondWorldProtocolClient.getFishingRevision();
+        var sort = ConfigManager.get().fishing.nibblesSort;
+        if (dataRevision != revision || cachedSort != sort) {
+            try (var ignored = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("hud/FishingNibbles/lines")) {
+                cachedLines = List.copyOf(rebuildLines()); dataRevision = revision; cachedSort = sort;
+                measuredLines = null;
+            }
+        }
+        return cachedLines;
+    }
+
+    private List<String> rebuildLines() {
         if (!DiamondWorldProtocolClient.hasFishingNibbles()) {
             return List.of();
         }
@@ -165,27 +189,25 @@ public final class FishingNibblesWidget extends AbstractWidget {
         return line.startsWith("- ") && line.endsWith(" -");
     }
 
-    private int getUnscaledWidth(List<String> lines, Minecraft mc) {
-        if (lines.isEmpty()) {
-            return EMPTY_WIDTH;
+    private void measure(List<String> lines, Minecraft mc) {
+        boolean titles = WidgetUtils.showWidgetTitles();
+        var language = net.minecraft.locale.Language.getInstance();
+        if (measuredLines == lines && measuredFont == mc.font && measuredLanguage == language && measuredTitles == titles) return;
+        try (var ignored = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("hud/FishingNibbles/layout")) {
+            visualLines = lines.stream().map(line -> language.getVisualOrder(net.minecraft.network.chat.Component.literal(line))).toList();
+            measuredWidth = titles ? mc.font.width("Fishing Nibbles") : 0;
+            lineWidths = new int[lines.size()];
+            for (int i = 0; i < lines.size(); i++) {
+                lineWidths[i] = mc.font.width(lines.get(i)); measuredWidth = Math.max(measuredWidth, lineWidths[i]);
+            }
+            measuredWidth = lines.isEmpty() ? EMPTY_WIDTH : measuredWidth + PADDING_X * 2;
+            int lineHeight = mc.font.lineHeight + LINE_GAP;
+            measuredHeight = lines.isEmpty() ? EMPTY_HEIGHT : lines.size() * lineHeight + PADDING_Y * 2 + (titles ? lineHeight + 1 : 0);
+            measuredLines = lines; measuredFont = mc.font; measuredLanguage = language; measuredTitles = titles;
         }
-
-        int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Fishing Nibbles") : 0;
-        for (String line : lines) {
-            maxWidth = Math.max(maxWidth, mc.font.width(line));
-        }
-        return maxWidth + PADDING_X * 2;
     }
-
-    private int getUnscaledHeight(List<String> lines, Minecraft mc) {
-        if (lines.isEmpty()) {
-            return EMPTY_HEIGHT;
-        }
-
-        int lineHeight = mc.font.lineHeight + LINE_GAP;
-        int titleBlock = WidgetUtils.showWidgetTitles() ? lineHeight + 1 : 0;
-        return lines.size() * lineHeight + PADDING_Y * 2 + titleBlock;
-    }
+    private int getUnscaledWidth(List<String> lines, Minecraft mc) { measure(lines, mc); return measuredWidth; }
+    private int getUnscaledHeight(List<String> lines, Minecraft mc) { measure(lines, mc); return measuredHeight; }
 
     private boolean isEditorPreview() {
         return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;

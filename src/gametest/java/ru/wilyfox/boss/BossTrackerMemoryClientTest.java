@@ -83,6 +83,24 @@ public final class BossTrackerMemoryClientTest implements FabricClientGameTest {
                     client.level.removeEntity(entities.get(4).getId(), Entity.RemovalReason.DISCARDED);
                     tracker.onWorldTick(client.level);
                     expect(!checkedNames(tracker).containsKey(entities.get(4).getId()), "Unloaded entity retained text");
+                    tracker.onEntityUnload(entities.get(5));
+                    expect(!checkedNames(tracker).containsKey(entities.get(5).getId()), "Unload event retained a candidate");
+                    var replacement = new ArmorStand(client.level, 0, 100, 0);
+                    replacement.setId(entities.get(5).getId());
+                    tracker.onEntityLoad(replacement);
+                    tracker.onEntityUnload(entities.get(5));
+                    expect(checkedNames(tracker).containsKey(replacement.getId()), "An old unload removed a reused entity ID");
+                    tracker.onEntityUnload(replacement);
+                    long oldRespawn = repository.getAll().stream().filter(boss -> boss.getName().equals("Кригер"))
+                            .findFirst().orElseThrow().getRespawnAt();
+                    var mutable = Component.empty().append(Component.literal("Кри"));
+                    entities.get(6).setCustomName(mutable);
+                    tracker.onWorldTick(client.level);
+                    ((net.minecraft.network.chat.MutableComponent) mutable.getSiblings().getFirst()).append("гер");
+                    entities.get(7).setCustomName(Component.literal("00:20"));
+                    tracker.onWorldTick(client.level);
+                    expect(repository.getAll().stream().anyMatch(boss -> boss.getName().equals("Кригер") && boss.getRespawnAt() != oldRespawn),
+                            "An in-place sibling change was ignored");
                     tracker.reset();
                     expect(checkedNames(tracker).isEmpty(), "Reset retained old-world names");
                 } finally {

@@ -76,7 +76,7 @@ public final class UsefulHighlightClientTest implements FabricClientGameTest {
                             .setValue(NoteBlock.NOTE, 19);
                     client.getConnection().handleBlockUpdate(new ClientboundBlockUpdatePacket(barrel, barrelState));
                     refresh(client);
-                    if (UsefulWorldHighlightRenderHook.diagnosticSnapshot().blockBoxes() != 1) fail("Nearest chunk barrel was not detected on first scan");
+                    if (UsefulWorldHighlightRenderHook.diagnosticSnapshot().blockBoxes() != 1) fail("Nearest chunk barrel was not detected after bounded scanning");
                     if (findNotifications(PopUpSource.BARREL_FOUND) != 1) fail("Barrel discovery notification missing");
                     client.getConnection().handleBlockUpdate(new ClientboundBlockUpdatePacket(barrel, barrelState.setValue(NoteBlock.POWERED, true)));
                     refresh(client);
@@ -204,6 +204,10 @@ public final class UsefulHighlightClientTest implements FabricClientGameTest {
 
     private static void refresh(Minecraft client) {
         invoke("refreshCacheIfNeeded", new Class<?>[]{Minecraft.class}, client);
+        for (int frame = 0; frame < 256 && UsefulWorldHighlightRenderHook.diagnosticSnapshot().pendingChunkScans() > 0; frame++) {
+            invoke("refreshCacheIfNeeded", new Class<?>[]{Minecraft.class}, client);
+        }
+        if (UsefulWorldHighlightRenderHook.diagnosticSnapshot().pendingChunkScans() > 0) fail("Incremental scans did not finish");
     }
 
     private static void allowDiscoverySound() {

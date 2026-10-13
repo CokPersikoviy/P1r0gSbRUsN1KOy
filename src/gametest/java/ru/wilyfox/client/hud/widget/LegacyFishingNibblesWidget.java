@@ -1,0 +1,199 @@
+package ru.wilyfox.client.hud.widget;
+
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.world.item.Items;
+import ru.wilyfox.client.hud.HudEditingScreen;
+import ru.wilyfox.client.hud.config.ConfigManager;
+import ru.wilyfox.client.hud.config.FishingNibblesSort;
+import ru.wilyfox.client.hud.config.FishingWidgetVisibility;
+import ru.wilyfox.client.hud.layer.HudLayer;
+import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+public final class LegacyFishingNibblesWidget extends AbstractWidget {
+    private static final int PADDING_X = 6;
+    private static final int PADDING_Y = 5;
+    private static final int LINE_GAP = 1;
+    private static final int EMPTY_WIDTH = 166;
+    private static final int EMPTY_HEIGHT = 28;
+
+    public LegacyFishingNibblesWidget(int x, int y, HudLayer layer) {
+        super(x, y, layer);
+    }
+
+    @Override
+    public void render(GuiGraphicsExtractor context, DeltaTracker tickCounter) {
+        if (!isInLayout()) {
+            return;
+        }
+
+        if (!isVisible()) {
+            return;
+        }
+
+        Minecraft mc = Minecraft.getInstance();
+        List<String> lines = buildLines();
+
+        context.pose().pushMatrix();
+        context.pose().translate(startX, startY);
+        context.pose().scale(scale, scale);
+
+        if (lines.isEmpty()) {
+            renderPlaceholder(context, mc);
+            context.pose().popMatrix();
+            return;
+        }
+
+        HudSurface.drawPanel(context, getUnscaledWidth(lines, mc), getUnscaledHeight(lines, mc));
+
+        int y = PADDING_Y;
+        if (WidgetUtils.showWidgetTitles()) {
+            context.text(mc.font, "Fishing Nibbles", PADDING_X, y, WidgetTheme.TITLE);
+            y += mc.font.lineHeight + LINE_GAP + 1;
+        }
+
+        int panelWidth = getUnscaledWidth(lines, mc);
+        for (String line : lines) {
+            if (isDimensionHeader(line)) {
+                int centeredX = Math.max(PADDING_X, (panelWidth - mc.font.width(line)) / 2);
+                context.text(mc.font, line, centeredX, y, WidgetTheme.TEXT_MUTED);
+            } else {
+                context.text(mc.font, line, PADDING_X, y, WidgetTheme.TEXT_SOFT);
+            }
+            y += mc.font.lineHeight + LINE_GAP;
+        }
+
+        context.pose().popMatrix();
+    }
+
+    @Override
+    public boolean isVisible() {
+        return isInLayout()
+                && (isEditorPreview() || (matchesVisibility(ConfigManager.get().fishing.nibblesVisibility)
+                && DiamondWorldProtocolClient.hasFishingNibbles()));
+    }
+
+    @Override
+    public int getWidth() {
+        Minecraft mc = Minecraft.getInstance();
+        List<String> lines = buildLines();
+        return Math.round(getUnscaledWidth(lines, mc) * getScale());
+    }
+
+    @Override
+    public int getHeight() {
+        Minecraft mc = Minecraft.getInstance();
+        List<String> lines = buildLines();
+        return Math.round(getUnscaledHeight(lines, mc) * getScale());
+    }
+
+    @Override
+    public String getDisplayName() {
+        return "Fishing Nibbles";
+    }
+
+    private List<String> buildLines() {
+        if (!DiamondWorldProtocolClient.hasFishingNibbles()) {
+            return List.of();
+        }
+
+        List<String> lines = new ArrayList<>();
+        Map<String, Double> nibbles = DiamondWorldProtocolClient.getFishingNibbles();
+        Map<String, String> locationNames = DiamondWorldProtocolClient.getFishingLocationNames();
+        Comparator<Map.Entry<String, Double>> comparator = ConfigManager.get().fishing.nibblesSort == FishingNibblesSort.NIBBLE
+                ? Comparator.<Map.Entry<String, Double>>comparingDouble(Map.Entry::getValue).reversed()
+                : dimensionComparator();
+
+        int previousDimension = Integer.MIN_VALUE;
+        for (Map.Entry<String, Double> entry : nibbles.entrySet().stream()
+                .filter(entry -> locationNames.containsKey(entry.getKey()))
+                .sorted(comparator.thenComparing(entry -> locationNames.get(entry.getKey()), String.CASE_INSENSITIVE_ORDER))
+                .toList()) {
+            if (ConfigManager.get().fishing.nibblesSort == FishingNibblesSort.DIMENSION) {
+                int dimension = dimensionOrder(entry.getKey());
+                if (dimension != previousDimension) {
+                    lines.add("- " + dimensionName(dimension) + " -");
+                    previousDimension = dimension;
+                }
+            }
+            String name = locationNames.get(entry.getKey());
+            lines.add(name + " - " + String.format(Locale.ROOT, "%.1f%%", entry.getValue()));
+        }
+        return lines;
+    }
+
+    private static boolean matchesVisibility(FishingWidgetVisibility visibility) {
+        Minecraft mc = Minecraft.getInstance();
+        return switch (visibility) {
+            case ALWAYS -> true;
+            case FISHING_WARP -> DiamondWorldProtocolClient.isCurrentFishingLocation();
+            case FISHING_ROD -> mc.player != null && mc.player.getMainHandItem().is(Items.FISHING_ROD);
+        };
+    }
+
+    static Comparator<Map.Entry<String, Double>> dimensionComparator() {
+        return Comparator.<Map.Entry<String, Double>>comparingInt(entry -> dimensionOrder(entry.getKey()))
+                .thenComparing(Map.Entry.<String, Double>comparingByValue().reversed());
+    }
+
+    private static int dimensionOrder(String id) {
+        return switch (id) {
+            case "bay", "azurepond", "citycanal", "swamp", "ambergrot" -> 0;
+            case "basalt", "netherval", "magma" -> 1;
+            case "endwharf", "silence", "crystal" -> 2;
+            default -> Integer.MAX_VALUE;
+        };
+    }
+
+    private static String dimensionName(int dimension) {
+        return switch (dimension) {
+            case 0 -> "Overworld";
+            case 1 -> "Nether";
+            case 2 -> "End";
+            default -> "Other";
+        };
+    }
+
+    private static boolean isDimensionHeader(String line) {
+        return line.startsWith("- ") && line.endsWith(" -");
+    }
+
+    private int getUnscaledWidth(List<String> lines, Minecraft mc) {
+        if (lines.isEmpty()) {
+            return EMPTY_WIDTH;
+        }
+
+        int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Fishing Nibbles") : 0;
+        for (String line : lines) {
+            maxWidth = Math.max(maxWidth, mc.font.width(line));
+        }
+        return maxWidth + PADDING_X * 2;
+    }
+
+    private int getUnscaledHeight(List<String> lines, Minecraft mc) {
+        if (lines.isEmpty()) {
+            return EMPTY_HEIGHT;
+        }
+
+        int lineHeight = mc.font.lineHeight + LINE_GAP;
+        int titleBlock = WidgetUtils.showWidgetTitles() ? lineHeight + 1 : 0;
+        return lines.size() * lineHeight + PADDING_Y * 2 + titleBlock;
+    }
+
+    private boolean isEditorPreview() {
+        return Minecraft.getInstance().gui.screen() instanceof HudEditingScreen;
+    }
+
+    private void renderPlaceholder(GuiGraphicsExtractor context, Minecraft mc) {
+        HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
+        context.text(mc.font, "Fishing Nibbles", PADDING_X, 6, WidgetTheme.TITLE);
+        context.text(mc.font, "No fishing data", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
+    }
+}

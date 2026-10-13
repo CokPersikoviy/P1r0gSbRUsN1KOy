@@ -4,6 +4,8 @@ import ru.wilyfox.client.chat.ChatTab;
 
 /** Content settings belong to a window; layouts only override its placement. */
 public final class ChatWidgetConfig {
+    public static final int MAX_CUSTOM_TABS = 20;
+    public static final int MAX_FILTER_LENGTH = 512;
     public ChatTab channel;
     public int width = 280;
     public int rows = 10;
@@ -31,6 +33,6 @@ public final class ChatWidgetConfig {
         if (title == null || title.isBlank()) title = channel.getTitle();
         title = title.strip().substring(0, Math.min(20, title.strip().length()));
         if (textFilter == null) textFilter = "";
-        textFilter = textFilter.substring(0, Math.min(128, textFilter.length()));
+        textFilter = textFilter.substring(0, Math.min(MAX_FILTER_LENGTH, textFilter.length()));
     }
 }

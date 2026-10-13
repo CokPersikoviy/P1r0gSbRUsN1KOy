@@ -25,6 +25,16 @@ public final class DebugBackgroundProfilerClientTest implements FabricClientGame
         try {
             context.runOnClient(client -> ConfigManager.get().render.debug = false);
             context.waitTicks(2);
+            context.runOnClient(client -> {
+                long total = 0;
+                for (int i = 0; i < 8; i++) {
+                    var sample = ProfilerDiagnostics.captureSample(client, false);
+                    expect(sample.processCpuLoad() == -1 && sample.systemCpuLoad() == -1,
+                            "Minimal snapshot queried the blocking operating system load counters");
+                    if (i >= 3) total += sample.captureNanos();
+                }
+                System.out.println("Minimal profiler snapshot warm mean: " + total / 5e6 + " ms");
+            });
             context.runOnClient(client -> profiler.stop());
             var previousRecorder = context.computeOnClient(client -> recorder(profiler));
             if (previousRecorder != null) previousRecorder.finish().get(15, TimeUnit.SECONDS);

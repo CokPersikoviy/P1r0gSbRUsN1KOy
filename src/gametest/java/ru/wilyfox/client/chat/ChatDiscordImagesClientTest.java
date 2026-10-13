@@ -16,6 +16,9 @@ import javax.imageio.ImageIO;
 public final class ChatDiscordImagesClientTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
         var original = context.computeOnClient(client -> ConfigManager.snapshot());
+        int guiScale = context.computeOnClient(client -> client.options.guiScale().get());
+        int windowWidth = context.computeOnClient(client -> client.getWindow().getScreenWidth());
+        int windowHeight = context.computeOnClient(client -> client.getWindow().getScreenHeight());
         var chat = ChatTabManager.getInstance();
         try (var world = context.worldBuilder().create()) {
             context.runOnClient(client -> {
@@ -73,6 +76,23 @@ public final class ChatDiscordImagesClientTest implements FabricClientGameTest {
                 context.waitTicks(15);
                 check(decoded.get(), "Image was not decoded on the worker");
                 context.takeScreenshot("fh-image-" + format);
+                if (format.equals("png")) {
+                    context.runOnClient(client -> {
+                        client.getWindow().setWindowed(1000, 760);
+                    });
+                    context.waitTicks(2);
+                    context.runOnClient(client -> {
+                        client.options.guiScale().set(3); client.resizeGui();
+                        var viewer = client.gui.screen();
+                        check(viewer.width <= 360, "Compact viewer fixture did not reach the intended GUI scale");
+                        check(viewer.children().stream().filter(child -> child instanceof net.minecraft.client.gui.components.Button)
+                                .allMatch(child -> { var button = (net.minecraft.client.gui.components.Button) child;
+                                    return button.getX() >= 0 && button.getRight() <= viewer.width && button.getBottom() <= viewer.height;
+                                }), "Image viewer actions leave a compact GUI");
+                    });
+                    context.waitTicks(2); context.takeScreenshot("fh-image-small");
+                    context.runOnClient(client -> { client.options.guiScale().set(guiScale); client.getWindow().setWindowed(windowWidth, windowHeight); client.resizeGui(); });
+                }
                 context.runOnClient(client -> client.gui.screen().onClose());
             }
             context.runOnClient(client -> {
@@ -81,7 +101,8 @@ public final class ChatDiscordImagesClientTest implements FabricClientGameTest {
                 check(client.gui.screen() instanceof ChatScreen, "Malformed local link opened viewer");
                 System.out.println("Discord FH: unicode names, local attachment links, file drop, PNG/JPEG worker decoding and viewer lifecycle passed");
             });
-        } finally { context.runOnClient(client -> { client.gui.setScreen(null); chat.clearBackendMessages(); ConfigManager.restoreSnapshot(original); }); }
+        } finally { context.runOnClient(client -> { client.gui.setScreen(null); chat.clearBackendMessages(); ConfigManager.restoreSnapshot(original);
+            client.options.guiScale().set(guiScale); client.getWindow().setWindowed(windowWidth, windowHeight); client.resizeGui(); }); }
     }
     private static void check(boolean value, String message) { if (!value) throw new AssertionError(message); }
 }

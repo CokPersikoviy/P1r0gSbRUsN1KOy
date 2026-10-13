@@ -42,7 +42,12 @@ public final class PresenceStore {
     }
 
     public static boolean isKnown(String name) {
-        return name != null && online.containsKey(name.toLowerCase(Locale.ROOT));
+        return isKnownNormalized(name == null ? null : name.toLowerCase(Locale.ROOT));
+    }
+
+    /** Lookup without allocating another lowercase string on each nametag frame. */
+    public static boolean isKnownNormalized(String playerNameKey) {
+        return playerNameKey != null && online.containsKey(playerNameKey);
     }
 
     public static int knownCount() { return names.size(); }

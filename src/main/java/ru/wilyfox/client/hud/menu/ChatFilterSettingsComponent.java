@@ -14,7 +14,7 @@ final class ChatFilterSettingsComponent extends TextInputSettingsComponent {
     private ChatTextFilter compiled = ChatTextFilter.EMPTY;
     ChatFilterSettingsComponent(Supplier<ChatWidgetConfig> config) {
         super(0, 0, 0, 0, "Text filter", () -> config.get().textFilter,
-                value -> { config.get().textFilter = value; ConfigManager.layoutChanged(); }, 128);
+                value -> { config.get().textFilter = value; ConfigManager.layoutChanged(); }, ChatWidgetConfig.MAX_FILTER_LENGTH);
         this.config = config;
     }
     private ChatTextFilter filter() {

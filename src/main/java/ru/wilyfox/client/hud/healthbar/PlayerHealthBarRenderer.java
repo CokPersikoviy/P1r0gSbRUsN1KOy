@@ -67,6 +67,9 @@ public final class PlayerHealthBarRenderer {
     private static final java.util.Map<Player, long[]> VISIBILITY_CACHE = new java.util.IdentityHashMap<>();
     private static ClientLevel visibilityLevel;
     private static long lastVisibilityPruneMs;
+    private static final it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<net.minecraft.util.FormattedCharSequence> HEALTH_TEXT =
+            new it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap<>();
+    private static net.minecraft.locale.Language textLanguage;
 
     private PlayerHealthBarRenderer() {
     }
@@ -75,6 +78,8 @@ public final class PlayerHealthBarRenderer {
         VISIBILITY_CACHE.clear();
         lastVisibilityPruneMs = 0L;
         visibilityLevel = null;
+        HEALTH_TEXT.clear();
+        textLanguage = null;
     }
 
     public static void render(PoseStack poseStack, SubmitNodeCollector collector, float partialTick) {
@@ -276,8 +281,9 @@ public final class PlayerHealthBarRenderer {
     ) {
         Minecraft minecraft = Minecraft.getInstance();
         Font font = minecraft.font;
-        String text = formatHealth(health, maxHealth);
-        int textWidth = font.width(text);
+        var sequence = healthText(health, maxHealth);
+        // Measure with the current font so a resource-pack reload cannot retain old glyph widths.
+        int textWidth = font.width(sequence);
         if (textWidth <= 0) {
             return;
         }
@@ -304,7 +310,6 @@ public final class PlayerHealthBarRenderer {
         poseStack.pushPose();
         poseStack.translate(textX, textY, TEXT_Z);
         poseStack.scale(textScale, textScale, 1.0F);
-        var sequence = net.minecraft.network.chat.Component.literal(text).getVisualOrderText();
         collector.submitText(poseStack, 0, 0, sequence, false, Font.DisplayMode.SEE_THROUGH,
                 0xF000F0, textColor, 0, 0);
         collector.submitText(poseStack, 0, 0, sequence, true, Font.DisplayMode.NORMAL,
@@ -317,6 +322,26 @@ public final class PlayerHealthBarRenderer {
         int current = Math.max(0, Mth.ceil(health));
         int maximum = Math.max(1, Mth.ceil(maxHealth));
         return current + "/" + maximum;
+    }
+
+    static net.minecraft.util.FormattedCharSequence healthText(float health, float maxHealth) {
+        var language = net.minecraft.locale.Language.getInstance();
+        if (textLanguage != language) {
+            HEALTH_TEXT.clear();
+            textLanguage = language;
+        }
+        int current = Math.max(0, Mth.ceil(health));
+        int maximum = Math.max(1, Mth.ceil(maxHealth));
+        long key = ((long) current << 32) | Integer.toUnsignedLong(maximum);
+        var sequence = HEALTH_TEXT.getAndMoveToLast(key);
+        if (sequence == null) {
+            try (var ignored = ModProfiler.getInstance().scope("render/PlayerHealthBarRenderer/numeric/prepare")) {
+                sequence = net.minecraft.network.chat.Component.literal(current + "/" + maximum).getVisualOrderText();
+            }
+            if (HEALTH_TEXT.size() >= 256) HEALTH_TEXT.removeFirst();
+            HEALTH_TEXT.put(key, sequence);
+        }
+        return sequence;
     }
 
     private static void fillQuad(VertexConsumer vertexConsumer, Matrix4f matrix, int x1, int y1, int x2, int y2, float z, int argb) {

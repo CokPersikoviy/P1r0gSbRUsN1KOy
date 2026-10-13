@@ -19,6 +19,9 @@ import ru.wilyfox.client.hud.internal.HudFrameClock;
 import ru.wilyfox.utils.MouseUtils;
 import ru.wilyfox.client.hud.config.BossTimerSourceMode;
 import ru.wilyfox.client.boss.BossTimerFilter;
+import ru.wilyfox.client.boss.BossTimerRowFormatter;
+import ru.wilyfox.client.hud.config.BossTimerElement;
+import net.minecraft.network.chat.Component;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
@@ -64,6 +67,8 @@ public class BossHudWidget extends AbstractWidget {
         String name;
         String compact;
         String timer;
+        Component nameComponent, compactComponent;
+        BossTimerRowFormatter.Appearance appearance;
         long seconds = Long.MIN_VALUE;
         boolean spawned;
         int nameWidth;
@@ -126,8 +131,8 @@ public class BossHudWidget extends AbstractWidget {
         HudSurface.drawPanel(context, getUnscaledWidth(), getUnscaledHeight());
 
         int contentY = PADDING_Y;
-        if (WidgetUtils.showWidgetTitles()) {
-            context.text(mc.font, "Boss Timers", PADDING_X, contentY, WidgetTheme.TITLE);
+        if (showTitle()) {
+            context.text(mc.font, "Boss Timers", PADDING_X, contentY, BossTimerRowFormatter.color(ConfigManager.get().bossWidget, BossTimerElement.TITLE, WidgetTheme.TITLE));
             contentY += mc.font.lineHeight + LINE_GAP + 2;
         }
 
@@ -135,66 +140,8 @@ public class BossHudWidget extends AbstractWidget {
             BossInfo boss = visibleBosses.get(line);
             int y = contentY + line * lineStep;
             RowText row = rowCache.get(boss);
-            boolean spawned = row.spawned;
-            String nameText = row.name;
-            String compactMarkerText = showName ? "" : row.compact;
-            String levelText = row.level;
-            String timerText = row.timer;
-
-            int currentX = PADDING_X;
-            int nameColor = spawned ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_PRIMARY;
-            int levelColor = spawned ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_SECONDARY;
-            int timerColor = spawned ? WidgetTheme.HARD_ACCENT : WidgetTheme.TEXT_SOFT;
-            int iconY = y + Math.max(0, (mc.font.lineHeight - ICON_SIZE) / 2) + ICON_Y_OFFSET;
-
-            if (showIcons) {
-                if (!ConfigManager.get().render.lightweightHud) {
-                    renderBossIcon(context, getBossIcon(boss), currentX, iconY);
-                }
-                currentX += ICON_SIZE;
-
-                if (showName || showLevel || showTimer) {
-                    currentX += ICON_TEXT_GAP;
-                }
-            }
-
-            if (!showName && compactMarkerWidth > 0) {
-                if (!compactMarkerText.isEmpty()) {
-                    context.text(mc.font, compactMarkerText, currentX, y, nameColor);
-                }
-                currentX += compactMarkerWidth;
-
-                if (showLevel || showTimer) {
-                    currentX += COLUMN_GAP;
-                }
-            }
-
-            if (showName) {
-                context.text(mc.font, nameText, currentX, y, nameColor);
-
-                if (fullAlignment) {
-                    currentX += maxNameWidth;
-                } else {
-                    currentX += row.nameWidth;
-                }
-
-                if (showLevel || showTimer) {
-                    currentX += COLUMN_GAP;
-                }
-            }
-
-            if (showLevel) {
-                context.text(mc.font, levelText, currentX, y, levelColor);
-                currentX += fullAlignment ? maxLevelWidth : row.levelWidth;
-
-                if (showTimer) {
-                    currentX += COLUMN_GAP;
-                }
-            }
-
-            if (showTimer) {
-                context.text(mc.font, timerText, currentX, y, timerColor);
-            }
+            ItemStack icon = showIcons && !ConfigManager.get().render.lightweightHud ? getBossIcon(boss) : ItemStack.EMPTY;
+            renderRow(context, mc, row, icon, y, maxNameWidth, maxLevelWidth, compactMarkerWidth);
         }
 
         // Hover feedback for the chat-click teleport: a 1px accent underline under the row the mouse is
@@ -211,6 +158,68 @@ public class BossHudWidget extends AbstractWidget {
         }
 
         context.pose().popMatrix();
+    }
+
+    private static void renderRow(GuiGraphicsExtractor context, Minecraft mc, RowText row, ItemStack icon,
+                                  int y, int maxNameWidth, int maxLevelWidth, int compactMarkerWidth) {
+        var config = ConfigManager.get().bossWidget;
+        boolean showName = config.showName, showIcons = config.showIcons, showLevel = config.showLevel, showTimer = config.showTimer;
+        boolean fullAlignment = config.fullAligment, spawned = row.spawned;
+        String compactMarkerText = showName ? "" : row.compact, levelText = row.level, timerText = row.timer;
+        int currentX = PADDING_X;
+        int nameColor = spawned ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_PRIMARY;
+        int levelColor = BossTimerRowFormatter.color(ConfigManager.get().bossWidget, BossTimerElement.LEVEL, spawned ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_SECONDARY);
+        int timerColor = BossTimerRowFormatter.color(ConfigManager.get().bossWidget, BossTimerElement.TIMER, spawned ? WidgetTheme.HARD_ACCENT : WidgetTheme.TEXT_SOFT);
+        int iconY = y + Math.max(0, (mc.font.lineHeight - ICON_SIZE) / 2) + ICON_Y_OFFSET;
+
+        if (showIcons) {
+            if (!ConfigManager.get().render.lightweightHud) {
+                renderBossIcon(context, icon, currentX, iconY);
+            }
+            currentX += ICON_SIZE;
+
+            if (showName || compactMarkerWidth > 0 || showLevel || showTimer) {
+                currentX += ICON_TEXT_GAP;
+            }
+        }
+
+        if (!showName && compactMarkerWidth > 0) {
+            if (!compactMarkerText.isEmpty()) {
+                context.text(mc.font, row.compactComponent, currentX, y, nameColor);
+            }
+            currentX += compactMarkerWidth;
+
+            if (showLevel || showTimer) {
+                currentX += COLUMN_GAP;
+            }
+        }
+
+        if (showName) {
+            context.text(mc.font, row.nameComponent, currentX, y, nameColor);
+
+            if (fullAlignment) {
+                currentX += maxNameWidth;
+            } else {
+                currentX += row.nameWidth;
+            }
+
+            if (showLevel || showTimer) {
+                currentX += COLUMN_GAP;
+            }
+        }
+
+        if (showLevel) {
+            context.text(mc.font, levelText, currentX, y, levelColor);
+            currentX += fullAlignment ? maxLevelWidth : row.levelWidth;
+
+            if (showTimer) {
+                currentX += COLUMN_GAP;
+            }
+        }
+
+        if (showTimer) {
+            context.text(mc.font, timerText, currentX, y, timerColor);
+        }
     }
 
     @Override
@@ -245,12 +254,8 @@ public class BossHudWidget extends AbstractWidget {
         RowText row = rowCache.computeIfAbsent(boss, RowText::new);
         String prefix = bossStatusPrefix(boss);
         String suffix = bossCollectibleSuffix(boss);
-        if (!Objects.equals(row.prefix, prefix) || !Objects.equals(row.suffix, suffix)) {
-            row.prefix = prefix;
-            row.suffix = suffix;
-            row.name = prefix + boss.getName() + suffix;
-            row.compact = (prefix + suffix).trim().replace("  ", " ");
-        }
+        boolean changed = !Objects.equals(row.prefix, prefix) || !Objects.equals(row.suffix, suffix);
+        row.prefix = prefix; row.suffix = suffix;
         long remaining = getDisplayRespawnAt(boss) - cachedFrameTime;
         boolean spawned = remaining < 0L;
         long seconds = Math.abs(remaining) / 1000L;
@@ -260,6 +265,9 @@ public class BossHudWidget extends AbstractWidget {
             row.timer = spawned ? formatMillisSigned(getDisplayRespawnAt(boss), cachedFrameTime)
                     : formatMillis(getDisplayRespawnAt(boss), cachedFrameTime);
         }
+        var appearance = BossTimerRowFormatter.appearance(ConfigManager.get().bossWidget,
+                row.spawned ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_PRIMARY);
+        if (changed || !appearance.equals(row.appearance)) updateLabel(row, boss.getName(), appearance);
         // Measure against the current font each frame so resource-pack reloads remain correct.
         var font = Minecraft.getInstance().font;
         row.nameWidth = font.width(row.name);
@@ -325,7 +333,7 @@ public class BossHudWidget extends AbstractWidget {
 
         int lineStep = getLineStep(Minecraft.getInstance());
         int contentY = PADDING_Y;
-        if (WidgetUtils.showWidgetTitles()) {
+        if (showTitle()) {
             contentY += Minecraft.getInstance().font.lineHeight + LINE_GAP + 2;
         }
 
@@ -359,7 +367,7 @@ public class BossHudWidget extends AbstractWidget {
         int maxNameWidth = fullAlignment && showName ? getMaxNameWidth(visibleBosses, mc) : 0;
         int maxLevelWidth = fullAlignment && showLevel ? getMaxLevelWidth(visibleBosses, mc) : 0;
         int compactMarkerWidth = !showName ? getMaxCompactMarkerWidth(visibleBosses, mc) : 0;
-        int maxWidth = WidgetUtils.showWidgetTitles() ? mc.font.width("Boss Timers") : 0;
+        int maxWidth = showTitle() ? mc.font.width("Boss Timers") : 0;
 
         for (BossInfo boss : visibleBosses) {
             RowText row = rowCache.get(boss);
@@ -369,7 +377,7 @@ public class BossHudWidget extends AbstractWidget {
             if (showIcons) {
                 rowWidth += ICON_SIZE;
 
-                if (showName || showLevel || showTimer) {
+                if (showName || compactMarkerWidth > 0 || showLevel || showTimer) {
                     rowWidth += ICON_TEXT_GAP;
                 }
             }
@@ -420,7 +428,7 @@ public class BossHudWidget extends AbstractWidget {
         }
 
         int lineStep = getLineStep(Minecraft.getInstance());
-        int titleBlock = WidgetUtils.showWidgetTitles()
+        int titleBlock = showTitle()
                 ? Minecraft.getInstance().font.lineHeight + LINE_GAP + 2
                 : 0;
         return PADDING_Y * 2 + 2 + titleBlock + rendered * lineStep;
@@ -511,7 +519,7 @@ public class BossHudWidget extends AbstractWidget {
         return minecraft.font.lineHeight + LINE_GAP;
     }
 
-    private void renderBossIcon(GuiGraphicsExtractor context, ItemStack stack, int x, int y) {
+    private static void renderBossIcon(GuiGraphicsExtractor context, ItemStack stack, int x, int y) {
         float iconScale = ICON_SIZE / (float) NATIVE_ICON_SIZE;
         context.pose().pushMatrix();
         context.pose().translate(x, y);
@@ -521,8 +529,8 @@ public class BossHudWidget extends AbstractWidget {
     }
 
     private String bossStatusPrefix(BossInfo boss) {
-        boolean captured = DiamondWorldProtocolClient.getCapturedBossLevels().contains(boss.getLevel());
-        boolean mythicalRaid = DiamondWorldProtocolClient.isMythicalEventActive()
+        boolean captured = ConfigManager.get().bossWidget.showCapture && DiamondWorldProtocolClient.getCapturedBossLevels().contains(boss.getLevel());
+        boolean mythicalRaid = ConfigManager.get().bossWidget.showMythical && DiamondWorldProtocolClient.isMythicalEventActive()
                 && DiamondWorldProtocolClient.isRaidBossLevel(boss.getLevel());
         // Capture and the mythical event are independent statuses; show both when applicable.
         if (captured) return mythicalRaid ? CAPTURE_MARKER + RAID_MARKER : CAPTURE_MARKER;
@@ -561,10 +569,74 @@ public class BossHudWidget extends AbstractWidget {
         context.pose().scale(scale, scale);
 
         HudSurface.drawPlaceholderPanel(context, EMPTY_WIDTH, EMPTY_HEIGHT);
-        context.text(mc.font, "Boss Timers", PADDING_X, 6, WidgetTheme.TITLE);
+        if (showTitle()) context.text(mc.font, "Boss Timers", PADDING_X, 6, BossTimerRowFormatter.color(ConfigManager.get().bossWidget, BossTimerElement.TITLE, WidgetTheme.TITLE));
         context.text(mc.font, "No active timers", PADDING_X, 15, WidgetTheme.TEXT_MUTED);
 
         context.pose().popMatrix();
+    }
+
+    private static boolean showTitle() { return ConfigManager.get().bossWidget.showTitle && WidgetUtils.showWidgetTitles(); }
+
+    private static void updateLabel(RowText row, String name, BossTimerRowFormatter.Appearance appearance) {
+        var config = ConfigManager.get().bossWidget;
+        boolean capture = row.prefix.contains("✗"), mythical = row.prefix.contains("✦");
+        Boolean collected = row.suffix.isEmpty() ? null : row.suffix.contains("✔");
+        row.nameComponent = BossTimerRowFormatter.label(config, name, capture, mythical, collected, true, appearance);
+        row.compactComponent = BossTimerRowFormatter.label(config, name, capture, mythical, collected, false, appearance);
+        row.name = row.nameComponent.getString(); row.compact = row.compactComponent.getString(); row.appearance = appearance;
+    }
+
+    /** Fixed examples rendered by the same row renderer, independent of packets/world state. */
+    public static final class Preview {
+        private final List<BossInfo> bosses = List.of(new BossInfo("Бессмертный Легион", 0, 130),
+                new BossInfo("Цербер", 0, 365), new BossInfo("Демонический рыцарь", 0, 480));
+        private final List<RowText> rows = bosses.stream().map(RowText::new).toList();
+        private final List<ItemStack> icons = List.of(new ItemStack(Items.ZOMBIE_HEAD), new ItemStack(Items.SKELETON_SKULL), new ItemStack(Items.CLOCK));
+        public void render(GuiGraphicsExtractor graphics, int x, int y, int width, int height) {
+            var mc = Minecraft.getInstance(); var config = ConfigManager.get().bossWidget;
+            int nameWidth = 0, levelWidth = 0, compactWidth = 0;
+            for (int i = 0; i < rows.size(); i++) {
+                var row = rows.get(i); row.spawned = i == 1; row.timer = i == 0 ? "12:34" : i == 1 ? "-00:15" : "24:08";
+                String prefix = i == 0 ? (config.showCapture ? "✗ " : "") + (config.showMythical ? "✦ " : "")
+                        : i == 1 && config.showCapture ? "✗ " : "";
+                String suffix = config.showCollectibles && i < 2 ? i == 0 ? " ◇" : " ✔" : "";
+                var appearance = BossTimerRowFormatter.appearance(config, row.spawned ? WidgetTheme.TEXT_ACCENT : WidgetTheme.TEXT_PRIMARY);
+                boolean changed = !prefix.equals(row.prefix) || !suffix.equals(row.suffix) || !appearance.equals(row.appearance);
+                row.prefix = prefix; row.suffix = suffix;
+                if (changed) updateLabel(row, bosses.get(i).getName(), appearance);
+                row.nameWidth = mc.font.width(row.name); row.levelWidth = mc.font.width(row.level);
+                row.compactWidth = mc.font.width(row.compact); row.timerWidth = mc.font.width(row.timer);
+                nameWidth = Math.max(nameWidth, row.nameWidth); levelWidth = Math.max(levelWidth, row.levelWidth);
+                compactWidth = Math.max(compactWidth, row.compactWidth);
+            }
+            graphics.enableScissor(x, y, x + width, y + height);
+            graphics.pose().pushMatrix(); graphics.pose().translate(x - PADDING_X, y);
+            try {
+                int top = 3;
+                if (showTitle()) { graphics.text(mc.font, "Boss Timers", PADDING_X, top, BossTimerRowFormatter.color(config, BossTimerElement.TITLE, WidgetTheme.TITLE)); top += mc.font.lineHeight + 3; }
+                if (!config.showName && !config.showIcons && !config.showLevel && !config.showTimer && !config.showCapture && !config.showMythical && !config.showCollectibles) {
+                    graphics.text(mc.font, "Enable at least one row element", PADDING_X, top, WidgetTheme.STATUS_WARNING); return;
+                }
+                int step = config.showIcons ? Math.max(mc.font.lineHeight, ICON_SIZE) : mc.font.lineHeight + LINE_GAP;
+                for (int i = 0; i < rows.size(); i++) renderRow(graphics, mc, rows.get(i), icons.get(i), top + i * step,
+                        config.fullAligment && config.showName ? nameWidth : 0, config.fullAligment && config.showLevel ? levelWidth : 0,
+                        config.showName ? 0 : compactWidth);
+            } finally { graphics.pose().popMatrix(); graphics.disableScissor(); }
+        }
+        public String text() {
+            var config = ConfigManager.get().bossWidget;
+            var lines = new ArrayList<String>();
+            if (showTitle()) lines.add("Boss Timers");
+            for (int i = 0; i < bosses.size(); i++) {
+                var appearance = BossTimerRowFormatter.appearance(config, WidgetTheme.TEXT_PRIMARY);
+                String text = BossTimerRowFormatter.label(config, bosses.get(i).getName(), i < 2, i == 0,
+                        i == 0 ? Boolean.FALSE : i == 1 ? Boolean.TRUE : null, config.showName, appearance).getString();
+                if (config.showLevel) text += (text.isEmpty() ? "" : " ") + "[" + bosses.get(i).getLevel() + "]";
+                if (config.showTimer) text += (text.isEmpty() ? "" : " ") + (i == 0 ? "12:34" : i == 1 ? "-00:15" : "24:08");
+                lines.add(text);
+            }
+            return String.join("\n", lines);
+        }
     }
 
     private ItemStack getBossIcon(BossInfo boss) {

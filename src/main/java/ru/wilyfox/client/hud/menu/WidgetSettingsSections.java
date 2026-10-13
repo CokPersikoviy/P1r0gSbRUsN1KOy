@@ -56,6 +56,30 @@ final class WidgetSettingsSections {
             return items;
         }
         switch (widget) {
+            case LEVEL_GOAL -> {
+                items.add(slider("Target level (0 = not set)", () -> ConfigManager.get().levelGoal.targetLevel,
+                        value -> { ConfigManager.get().levelGoal.targetLevel = value; ConfigManager.get().levelGoal.sanitize(); }, 0, ru.wilyfox.client.calculator.LevelCalculator.MAX_LEVEL));
+                items.add(cycle("Goal server", () -> ConfigManager.get().levelGoal.server, value -> ConfigManager.get().levelGoal.server = value,
+                        ru.wilyfox.client.hud.config.LevelGoalConfig.ServerMode.values(), Enum::name));
+                items.add(new CycleSettingsComponent<>(0,0,0,0,"Goal discount", () -> ConfigManager.get().levelGoal.discount, value -> ConfigManager.get().levelGoal.discount = value,
+                        () -> ru.wilyfox.client.calculator.LevelCalculator.discounts(ConfigManager.get().levelGoal.targetLevel).toArray(ru.wilyfox.client.calculator.LevelCalculator.Discount[]::new),
+                        value -> value == ru.wilyfox.client.calculator.LevelCalculator.Discount.MAX ? "Maximum" : value.percent() + "%"));
+                items.add(toggle("Goal money remaining", () -> ConfigManager.get().levelGoal.showMoney, value -> ConfigManager.get().levelGoal.showMoney = value));
+                items.add(toggle("Goal blocks remaining", () -> ConfigManager.get().levelGoal.showBlocks, value -> ConfigManager.get().levelGoal.showBlocks = value));
+                items.add(toggle("Goal progress bar", () -> ConfigManager.get().levelGoal.showBar, value -> ConfigManager.get().levelGoal.showBar = value));
+                items.add(toggle("Goal ready notification", () -> ConfigManager.get().levelGoal.notifications, value -> ConfigManager.get().levelGoal.notifications = value));
+            }
+            case NEARBY_WORMS, NEARBY_BARRELS, NEARBY_CRYSTALS -> {
+                java.util.function.Supplier<ru.wilyfox.client.hud.config.NearbyMineWidgetConfig> config = () -> switch (widget) {
+                    case NEARBY_WORMS -> ConfigManager.get().nearbyWorms;
+                    case NEARBY_BARRELS -> ConfigManager.get().nearbyBarrels;
+                    default -> ConfigManager.get().nearbyCrystals;
+                };
+                items.add(slider("Nearby radius (blocks)", () -> config.get().range, value -> config.get().range = value, 1, 32));
+                items.add(toggle("Nearest object distance", () -> config.get().showDistance, value -> config.get().showDistance = value));
+                items.add(toggle("Nearest object coordinates", () -> config.get().showCoordinates, value -> config.get().showCoordinates = value));
+                items.add(toggle("Show empty nearby counter", () -> config.get().showZero, value -> config.get().showZero = value));
+            }
             case IMAGE -> {
                 items.add(slider("Image width", () -> ConfigManager.get().imageWidget.width, value -> ConfigManager.get().imageWidget.width = value, 40, 600));
                 items.add(slider("Image height", () -> ConfigManager.get().imageWidget.height, value -> ConfigManager.get().imageWidget.height = value, 40, 600));
@@ -203,63 +227,23 @@ final class WidgetSettingsSections {
                     return level > 0 ? Integer.toString(level) : "Waiting for player level";
                 }).withVisibility(() -> ConfigManager.get().bossWidget.matchPlayerLevel));
 
-                items.add(
-                        new ToggleSettingsComponent(
-                                0, 0, 0, 0,
-                                "Show name",
-                                () -> ConfigManager.get().bossWidget.showName,
-                                value -> ConfigManager.get().bossWidget.showName = value
-                        )
-                );
-
-                items.add(
-                        new ToggleSettingsComponent(
-                                0, 0, 0, 0,
-                                "Show icons",
-                                () -> ConfigManager.get().bossWidget.showIcons,
-                                value -> ConfigManager.get().bossWidget.showIcons = value
-                        )
-                );
-
-                items.add(
-                        new ToggleSettingsComponent(
-                                0, 0, 0, 0,
-                                "Show level",
-                                () -> ConfigManager.get().bossWidget.showLevel,
-                                value -> ConfigManager.get().bossWidget.showLevel = value
-                        )
-                );
-
-                items.add(
-                        new ToggleSettingsComponent(
-                                0, 0, 0, 0,
-                                "Show timer",
-                                () -> ConfigManager.get().bossWidget.showTimer,
-                                value -> ConfigManager.get().bossWidget.showTimer = value
-                        )
-                );
-
-                items.add(
-                        new BossBlacklistSettingsComponent()
-                );
-
-                items.add(
-                        new ToggleSettingsComponent(
-                                0, 0, 0, 0,
-                                "Show collectibles",
-                                () -> ConfigManager.get().bossWidget.showCollectibles,
-                                value -> ConfigManager.get().bossWidget.showCollectibles = value
-                        )
-                );
-
-                items.add(
-                        new ToggleSettingsComponent(
-                                0, 0, 0, 0,
-                                "Full alignment",
-                                () -> ConfigManager.get().bossWidget.fullAligment,
-                                value -> ConfigManager.get().bossWidget.fullAligment = value
-                        )
-                );
+                items.add(new BossBlacklistSettingsComponent());
+                items.add(toggle("Full alignment", () -> ConfigManager.get().bossWidget.fullAligment,
+                        value -> ConfigManager.get().bossWidget.fullAligment = value));
+                items.add(new BreakLineSettingsComponent("Row builder"));
+                items.add(new BossTimerPreviewComponent());
+                for (var part : ru.wilyfox.client.hud.config.BossTimerElement.values()) {
+                    items.add(toggle(part.title(), () -> part.visible(ConfigManager.get().bossWidget),
+                            value -> part.visible(ConfigManager.get().bossWidget, value)));
+                    if (part == ru.wilyfox.client.hud.config.BossTimerElement.ICON) continue;
+                    items.add(new TextInputSettingsComponent(0, 0, 0, 0, "Color code",
+                            () -> ConfigManager.get().bossWidget.colorCode(part),
+                            value -> ConfigManager.get().bossWidget.colorCode(part, value), 2) {
+                        @Override public String getTooltip(int mouseX, int mouseY) {
+                            return isHovered(mouseX, mouseY) ? "&0–&f; empty = theme color" : null;
+                        }
+                    }.withIndent(12).withVisibility(() -> part.visible(ConfigManager.get().bossWidget)));
+                }
             }
             case POP_UPS -> {
                 items.add(

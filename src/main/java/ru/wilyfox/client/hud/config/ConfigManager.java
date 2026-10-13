@@ -52,6 +52,33 @@ public class ConfigManager {
         save();
     }
 
+    /** Import only tabs, with a recoverable backup and no partial runtime update on a write failure. */
+    public static synchronized ru.wilyfox.client.chat.ChatPlusTabImport.Result importChatPlusTabs(
+            List<ru.wilyfox.client.chat.ChatPlusTabImport.Selection> tabs) throws IOException {
+        try (var profile = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("chat/import/persist")) {
+            var candidate = HudConfigCodec.decode(GSON, snapshot());
+            var result = ru.wilyfox.client.chat.ChatPlusTabImport.append(candidate, tabs);
+            if (result.keys().isEmpty()) return result;
+            var previous = CONFIG;
+            AtomicFileWriter.write(CONFIG_PATH.resolveSibling("froghelper-before-chatplus-import.json"), writer -> GSON.toJson(CONFIG, writer));
+            AtomicFileWriter.write(CONFIG_PATH, writer -> GSON.toJson(candidate, writer));
+            CONFIG = candidate;
+            try {
+                ConfigProfiles.saveIfReady();
+            } catch (IOException failure) {
+                CONFIG = previous;
+                try {
+                    AtomicFileWriter.write(CONFIG_PATH, writer -> GSON.toJson(previous, writer));
+                    ConfigProfiles.saveIfReady();
+                } catch (IOException rollback) { failure.addSuppressed(rollback); }
+                throw failure;
+            }
+            layoutChanged();
+            WidgetTheme.syncConfiguredTheme();
+            return result;
+        }
+    }
+
     public static synchronized void save() {
         CONFIG = HudConfigSanitizer.sanitize(CONFIG);
         WidgetTheme.syncConfiguredTheme();

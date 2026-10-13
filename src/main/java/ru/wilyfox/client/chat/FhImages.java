@@ -25,8 +25,20 @@ public final class FhImages {
             int sample = Math.max(1, (int) Math.ceil(Math.max(source.getWidth(), source.getHeight()) / 1280d));
             int width = (source.getWidth() + sample - 1) / sample, height = (source.getHeight() + sample - 1) / sample;
             result = new NativeImage(width, height, false);
+            var raster = source.getRaster();
+            int[] pixels;
+            if (source.getType() == java.awt.image.BufferedImage.TYPE_INT_ARGB
+                    && raster.getDataBuffer() instanceof java.awt.image.DataBufferInt data
+                    && raster.getSampleModel() instanceof java.awt.image.SinglePixelPackedSampleModel packed
+                    && packed.getScanlineStride() == source.getWidth() && data.getOffset() == 0 && data.getNumBanks() == 1
+                    && raster.getSampleModelTranslateX() == 0 && raster.getSampleModelTranslateY() == 0) {
+                pixels = data.getData(); // GIF composition already produced non-premultiplied ARGB.
+            } else {
+                // Preserve getRGB's exact colour conversion for other formats and subimages.
+                pixels = source.getRGB(0, 0, source.getWidth(), source.getHeight(), null, 0, source.getWidth());
+            }
             for (int y = 0; y < height; y++) for (int x = 0; x < width; x++)
-                result.setPixel(x, y, source.getRGB(x * sample, y * sample));
+                result.setPixel(x, y, pixels[y * sample * source.getWidth() + x * sample]);
             return result;
         } catch (RuntimeException failure) { if (result != null) result.close(); throw failure; }
         finally { source.flush(); }

@@ -27,7 +27,7 @@ public final class ImageWidgetClientTest implements FabricClientGameTest {
             context.runOnClient(client->client.gui.setScreen(viewer));
             Button pin=null;
             for(int i=0;i<100&&pin==null;i++){
-                pin=context.computeOnClient(client->viewer.children().stream().filter(c->c instanceof Button b&&b.active).map(c->(Button)c).findFirst().orElse(null));
+                pin=context.computeOnClient(client->viewer.children().stream().filter(c->c instanceof Button b&&b.active&&b.getMessage().equals(net.minecraft.network.chat.Component.translatable("froghelper.image_widget.pin"))).map(c->(Button)c).findFirst().orElse(null));
                 context.waitTicks(1);
             }
             check(pin!=null,"Image pin button did not become available");

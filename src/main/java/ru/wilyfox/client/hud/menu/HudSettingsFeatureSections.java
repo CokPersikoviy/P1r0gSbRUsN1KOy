@@ -334,6 +334,11 @@ final class HudSettingsFeatureSections {
                 value -> ConfigManager.get().clicker.activation = value,
                 ru.wilyfox.client.hud.config.ClickerConfig.Activation.values(),
                 value -> value == ru.wilyfox.client.hud.config.ClickerConfig.Activation.HOLD ? "Hold" : "Toggle"));
+        componentsByCategory.get(SettingsCategory.CLICKER).add(new CycleSettingsComponent<>(0, 0, 0, 0,
+                "Clicker action", () -> ConfigManager.get().clicker.actionMode,
+                value -> ConfigManager.get().clicker.actionMode = value,
+                ru.wilyfox.client.hud.config.ClickerConfig.ActionMode.values(),
+                value -> value == ru.wilyfox.client.hud.config.ClickerConfig.ActionMode.HOLD ? "Hold mouse button" : "Repeated clicks"));
         componentsByCategory.get(SettingsCategory.CLICKER).add(
                 new DragNumberSettingsComponent(
                         0, 0, 0, 0,
@@ -341,7 +346,7 @@ final class HudSettingsFeatureSections {
                         () -> ConfigManager.get().clicker.cps,
                         value -> ConfigManager.get().clicker.cps = value,
                         1, 20
-                )
+                ).withVisibility(() -> ConfigManager.get().clicker.actionMode == ru.wilyfox.client.hud.config.ClickerConfig.ActionMode.CLICK)
         );
 
         componentsByCategory.get(SettingsCategory.CLICKER).add(

@@ -64,15 +64,15 @@ public final class UsefulWorldHighlightRenderHook {
     private static final int DIRTY_CHUNK_RESCAN_LIMIT = 2;
     private static final int DIRTY_LOCAL_RESCAN_RADIUS = 1;
     private static final int DIRTY_FULL_RESCAN_THRESHOLD = 6;
-    private static final int MIN_CHUNK_SCAN_BUDGET_PER_FRAME = 1;
-    private static final int MAX_CHUNK_SCAN_BUDGET_PER_FRAME = 3;
-    private static final long TARGET_CHUNK_SCAN_BUDGET_NANOS = 4_000_000L;
+    private static final int MAX_BLOCK_SCAN_STEPS_PER_FRAME = 8192;
+    private static final long TARGET_CHUNK_SCAN_BUDGET_NANOS = 1_500_000L;
     private static final long DIRTY_CHUNK_MARK_COOLDOWN_MS = 500L;
     private static final int HORIZONTAL_SCAN_RADIUS = 32;
     private static final int VERTICAL_SCAN_RADIUS = 20;
     private static final double GOLDEN_CRYSTAL_CLUSTER_RADIUS = 1.6D;
-    private static final String GOLDEN_CRYSTAL_MODEL_PREFIX = "modelengine:fragment_";
-    private static final String GOLDEN_CRYSTAL_FIRE_PREFIX = "modelengine:internal_fire/";
+    private static final net.minecraft.world.entity.EquipmentSlot[] ARMOR_SLOTS = {
+            net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.entity.EquipmentSlot.CHEST,
+            net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.entity.EquipmentSlot.FEET};
     private static final double GOLDEN_CRYSTAL_BOX_WIDTH = 0.58D;
     private static final double GOLDEN_CRYSTAL_BOX_HEIGHT = 0.46D;
     private static final double GOLDEN_CRYSTAL_BOX_Y_OFFSET = 0.28D;
@@ -89,7 +89,7 @@ public final class UsefulWorldHighlightRenderHook {
     private static final LinkedHashSet<Long> PENDING_BLOCK_SCAN_KEYS = new LinkedHashSet<>();
     private static long lastEntityScanTick = Long.MIN_VALUE;
     private static long lastBlockRefreshTick = Long.MIN_VALUE;
-    private static long averageChunkScanNanos = 10_000_000L;
+    private static final Map<Long, ChunkScanCursor> BLOCK_SCAN_CURSORS = new HashMap<>();
     private static int lastMinChunkX = Integer.MIN_VALUE;
     private static int lastMaxChunkX = Integer.MIN_VALUE;
     private static int lastMinChunkZ = Integer.MIN_VALUE;
@@ -113,7 +113,7 @@ public final class UsefulWorldHighlightRenderHook {
         LevelRenderEvents.BEFORE_GIZMOS.register(UsefulWorldHighlightRenderHook::onAfterEntities);
         ClientChunkEvents.CHUNK_LOAD.register((level, chunk) -> {
             Minecraft mc = Minecraft.getInstance();
-            if (level != mc.level || mc.player == null || !ConfigManager.get().render.usefulItemsHighlight) return;
+            if (level != mc.level || mc.player == null || !needsBlockDetection()) return;
             BlockPos center = mc.player.blockPosition();
             ChunkPos pos = chunk.getPos();
             if (pos.x() >= SectionPos.blockToSectionCoord(center.getX() - HORIZONTAL_SCAN_RADIUS)
@@ -128,6 +128,7 @@ public final class UsefulWorldHighlightRenderHook {
             long key = chunk.getPos().pack();
             BLOCK_CHUNK_CACHE.remove(key);
             PENDING_BLOCK_SCAN_KEYS.remove(key);
+            BLOCK_SCAN_CURSORS.remove(key);
             DIRTY_CHUNK_KEYS.remove(key);
             DIRTY_BLOCK_POSITIONS.remove(key);
             DIRTY_CHUNK_MARK_TIMES.remove(key);
@@ -182,13 +183,14 @@ public final class UsefulWorldHighlightRenderHook {
                 return;
             }
 
-            if (!ConfigManager.get().render.usefulItemsHighlight || !isMineHighlightLocation()) {
+            if (!needsBlockDetection() || !isMineHighlightLocation()) {
                 count("dirtyMark/skippedDisabled");
                 return;
             }
 
             long chunkKey = ChunkPos.pack(SectionPos.blockToSectionCoord(blockPos.getX()), SectionPos.blockToSectionCoord(blockPos.getZ()));
             DIRTY_CHUNK_KEYS.add(chunkKey);
+            BLOCK_SCAN_CURSORS.remove(chunkKey);
             Set<Long> dirtyPositions = DIRTY_BLOCK_POSITIONS.computeIfAbsent(chunkKey, unused -> new LinkedHashSet<>());
             boolean added = dirtyPositions.add(blockPos.asLong());
             count(added ? "dirtyMark/accepted" : "dirtyMark/duplicate");
@@ -231,7 +233,7 @@ public final class UsefulWorldHighlightRenderHook {
                 cachedLevel = mc.level;
             }
 
-            if (!ConfigManager.get().render.usefulItemsHighlight) {
+            if (!needsDetection()) {
                 count("frame/skippedDisabled");
                 clearCache();
                 return;
@@ -243,7 +245,7 @@ public final class UsefulWorldHighlightRenderHook {
             }
 
             refreshCacheIfNeeded(mc);
-            if (CACHED_BOXES.isEmpty()) {
+            if (!ConfigManager.get().render.usefulItemsHighlight || CACHED_BOXES.isEmpty()) {
                 count("frame/skippedEmptyBoxes");
                 return;
             }
@@ -262,8 +264,11 @@ public final class UsefulWorldHighlightRenderHook {
 
     private static void refreshCacheIfNeeded(Minecraft mc) {
         try (ModProfiler.Scope ignored = profile("refreshCache")) {
-            refreshBlockCacheIfNeeded(mc);
-            refreshEntityCacheIfNeeded(mc);
+            if (needsBlockDetection()) refreshBlockCacheIfNeeded(mc);
+            else { BLOCK_BOXES.clear(); BLOCK_CHUNK_CACHE.clear(); PENDING_BLOCK_SCAN_KEYS.clear(); BLOCK_SCAN_CURSORS.clear(); DIRTY_CHUNK_KEYS.clear(); DIRTY_BLOCK_POSITIONS.clear(); DIRTY_CHUNK_MARK_TIMES.clear(); NearbyMineState.clearBarrels(); lastBlockRefreshTick=Long.MIN_VALUE; lastScanCenter=null; }
+            if (ConfigManager.get().render.usefulItemsHighlight || counterAdded(ru.wilyfox.client.hud.config.WidgetCatalog.NEARBY_WORMS)
+                    || counterAdded(ru.wilyfox.client.hud.config.WidgetCatalog.NEARBY_CRYSTALS)) refreshEntityCacheIfNeeded(mc);
+            else { ENTITY_BOXES.clear(); NearbyMineState.clearEntities(); lastEntityScanTick=Long.MIN_VALUE; }
 
             try (ModProfiler.Scope mergeScope = profile("refreshCache/merge")) {
                 CACHED_BOXES.clear();
@@ -313,11 +318,12 @@ public final class UsefulWorldHighlightRenderHook {
             if (!isMineHighlightLocation()) {
                 count("refreshBlockCache/skippedNotMine");
                 BLOCK_BOXES.clear();
+                NearbyMineState.clearBarrels();
                 BLOCK_CHUNK_CACHE.clear();
                 DIRTY_CHUNK_MARK_TIMES.clear();
                 DIRTY_CHUNK_KEYS.clear();
                 DIRTY_BLOCK_POSITIONS.clear();
-                PENDING_BLOCK_SCAN_KEYS.clear();
+                PENDING_BLOCK_SCAN_KEYS.clear(); BLOCK_SCAN_CURSORS.clear();
                 lastBlockRefreshTick = mc.level.getGameTime();
                 return;
             }
@@ -348,6 +354,7 @@ public final class UsefulWorldHighlightRenderHook {
             if (!chunkWindowChanged && !refreshExpired && PENDING_BLOCK_SCAN_KEYS.isEmpty()) {
                 count("refreshBlockCache/fastPathHits");
                 processDirtyChunks(mc, minChunkX, maxChunkX, minChunkZ, maxChunkZ);
+                if (processPendingChunkScans(mc)) rebuildBlockBoxes();
                 return;
             }
 
@@ -361,6 +368,7 @@ public final class UsefulWorldHighlightRenderHook {
             lastMaxChunkZ = maxChunkZ;
             if (chunkWindowChanged || refreshExpired) lastScanCenter = playerPos;
 
+            if (chunkWindowChanged) BLOCK_SCAN_CURSORS.clear();
             Set<Long> activeChunkKeys = new HashSet<>();
             int newlyQueuedChunks = 0;
             try (ModProfiler.Scope buildWindowScope = profile("refreshBlockCache/buildWindow")) {
@@ -385,69 +393,68 @@ public final class UsefulWorldHighlightRenderHook {
                 DIRTY_CHUNK_MARK_TIMES.keySet().removeIf(chunkKey -> !activeChunkKeys.contains(chunkKey));
                 DIRTY_BLOCK_POSITIONS.keySet().removeIf(chunkKey -> !activeChunkKeys.contains(chunkKey));
                 PENDING_BLOCK_SCAN_KEYS.removeIf(chunkKey -> !activeChunkKeys.contains(chunkKey));
+                BLOCK_SCAN_CURSORS.keySet().removeIf(chunkKey -> !activeChunkKeys.contains(chunkKey));
             }
 
             count("refreshBlockCache/cacheChunksAfterPrune", BLOCK_CHUNK_CACHE.size());
             count("refreshBlockCache/pendingChunksAfterPrune", PENDING_BLOCK_SCAN_KEYS.size());
-            processPendingChunkScans(mc);
-            rebuildBlockBoxes();
             processDirtyChunks(mc, minChunkX, maxChunkX, minChunkZ, maxChunkZ);
+            boolean published = processPendingChunkScans(mc);
+            if (published || chunkWindowChanged) rebuildBlockBoxes();
         }
     }
 
-    private static ChunkScanResult scanChunk(Minecraft mc, LevelChunk chunk) {
-        try (ModProfiler.Scope ignored = profile("scanChunk")) {
-            long scanStartedAt = System.nanoTime();
-            Map<Long, ColoredBox> boxesByBlockPos = new HashMap<>();
-            Map<Long, HighlightBlockType> barrelsByBlockPos = new HashMap<>();
-            BlockPos playerPos = mc.player.blockPosition();
+    /** A scan retains its old published result until the complete new window is ready. */
+    private static final class ChunkScanCursor {
+        private final LevelChunk chunk;
+        private final int minX, minY, minZ, maxY, xSpan, zSpan, layerSize, total;
+        private final Map<Long, ColoredBox> boxes = new HashMap<>();
+        private final Map<Long, HighlightBlockType> barrels = new HashMap<>();
+        private final BlockPos.MutableBlockPos position = new BlockPos.MutableBlockPos();
+        private int index;
+
+        private ChunkScanCursor(Minecraft mc, LevelChunk chunk) {
+            this.chunk = chunk;
+            BlockPos center = lastScanCenter != null ? lastScanCenter : mc.player.blockPosition();
             int worldMinY = mc.level.dimensionType().minY();
-            int worldMaxY = worldMinY + mc.level.dimensionType().height() - 1;
-            int minY = Math.max(worldMinY, playerPos.getY() - VERTICAL_SCAN_RADIUS);
-            int maxY = Math.min(worldMaxY, playerPos.getY() + VERTICAL_SCAN_RADIUS);
-            ChunkPos chunkPos = chunk.getPos();
-            int minX = Math.max(chunkPos.getMinBlockX(), playerPos.getX() - HORIZONTAL_SCAN_RADIUS);
-            int maxX = Math.min(chunkPos.getMaxBlockX(), playerPos.getX() + HORIZONTAL_SCAN_RADIUS);
-            int minZ = Math.max(chunkPos.getMinBlockZ(), playerPos.getZ() - HORIZONTAL_SCAN_RADIUS);
-            int maxZ = Math.min(chunkPos.getMaxBlockZ(), playerPos.getZ() + HORIZONTAL_SCAN_RADIUS);
-            int visitedBlocks = 0;
-            int highlightedBlocks = 0;
-            count("scanChunk/ySpan", maxY - minY + 1);
-            count("scanChunk/xSpan", maxX - minX + 1);
-            count("scanChunk/zSpan", maxZ - minZ + 1);
+            minY = Math.max(worldMinY, center.getY() - VERTICAL_SCAN_RADIUS);
+            maxY = Math.min(worldMinY + mc.level.dimensionType().height() - 1, center.getY() + VERTICAL_SCAN_RADIUS);
+            minX = Math.max(chunk.getPos().getMinBlockX(), center.getX() - HORIZONTAL_SCAN_RADIUS);
+            minZ = Math.max(chunk.getPos().getMinBlockZ(), center.getZ() - HORIZONTAL_SCAN_RADIUS);
+            xSpan = Math.max(0, Math.min(chunk.getPos().getMaxBlockX(), center.getX() + HORIZONTAL_SCAN_RADIUS) - minX + 1);
+            zSpan = Math.max(0, Math.min(chunk.getPos().getMaxBlockZ(), center.getZ() + HORIZONTAL_SCAN_RADIUS) - minZ + 1);
+            layerSize = xSpan * zSpan;
+            total = Math.max(0, maxY - minY + 1) * layerSize;
+        }
 
-            BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-            try (ModProfiler.Scope iterateScope = profile("scanChunk/iterateBlocks")) {
-                for (int y = minY; y <= maxY; y++) {
-                    for (int x = minX; x <= maxX; x++) {
-                        for (int z = minZ; z <= maxZ; z++) {
-                            visitedBlocks++;
-                            cursor.set(x, y, z);
-                            BlockState blockState = chunk.getBlockState(cursor);
-                            if (!HighlightBlockType.canMatch(blockState)) {
-                                continue;
-                            }
-
-                            HighlightBlockType blockType = HighlightBlockType.from(blockState, chunk.getBlockEntity(cursor));
-                            if (blockType == null) {
-                                continue;
-                            }
-
-                            highlightedBlocks++;
-                            long blockPos = cursor.asLong();
-                            boxesByBlockPos.put(blockPos, new ColoredBox(blockType.createBox(mc.level, cursor, blockState), blockType.red, blockType.green, blockType.blue));
-                            if (blockType.isBarrel()) {
-                                barrelsByBlockPos.put(blockPos, blockType);
-                            }
-                        }
+        private int advance(Minecraft mc, int stepBudget, long deadline) {
+            try (var ignored = profile("scanChunk"); var iterate = profile("scanChunk/iterateBlocks")) {
+                int steps = 0;
+                while (index < total && steps < stepBudget) {
+                    if ((steps & 127) == 0 && System.nanoTime() >= deadline) break;
+                    int y = minY + index / layerSize;
+                    if (chunk.getSection(chunk.getSectionIndex(y)).hasOnlyAir()) {
+                        int nextY = Math.min(maxY + 1, (Math.floorDiv(y, 16) + 1) * 16);
+                        int next = (nextY - minY) * layerSize;
+                        count("scanChunk/skippedAirBlocks", next - index);
+                        index = next;
+                        continue;
                     }
+                    int x = minX + (index / zSpan) % xSpan;
+                    int z = minZ + index % zSpan;
+                    position.set(x, y, z);
+                    index++; steps++;
+                    BlockState state = chunk.getBlockState(position);
+                    if (!HighlightBlockType.canMatch(state)) continue;
+                    HighlightBlockType type = HighlightBlockType.from(state, chunk.getBlockEntity(position));
+                    if (type == null) continue;
+                    long key = position.asLong();
+                    boxes.put(key, new ColoredBox(type.createBox(mc.level, position, state), type.red, type.green, type.blue));
+                    if (type.isBarrel()) barrels.put(key, type);
                 }
+                count("scanChunk/visitedBlocks", steps);
+                return steps;
             }
-            count("scanChunk/visitedBlocks", visitedBlocks);
-            count("scanChunk/highlightedBlocks", highlightedBlocks);
-            count("scanChunk/outputBoxes", boxesByBlockPos.size());
-            recordChunkScanSample(System.nanoTime() - scanStartedAt);
-            return new ChunkScanResult(boxesByBlockPos, barrelsByBlockPos);
         }
     }
 
@@ -484,7 +491,8 @@ public final class UsefulWorldHighlightRenderHook {
 
                     Set<Long> dirtyPositions = DIRTY_BLOCK_POSITIONS.getOrDefault(chunkKey, Set.of());
                     if (shouldDoFullDirtyRescan(dirtyPositions)) {
-                        updateChunkScanResult(chunkKey, scanChunk(mc, chunk));
+                        PENDING_BLOCK_SCAN_KEYS.add(chunkKey);
+                        BLOCK_SCAN_CURSORS.remove(chunkKey);
                         escalatedFullScan++;
                     } else {
                         updateChunkScanResult(chunkKey, rescanDirtyPositions(mc, chunk, dirtyPositions));
@@ -511,65 +519,61 @@ public final class UsefulWorldHighlightRenderHook {
 
             DIRTY_CHUNK_KEYS.removeAll(rescannedChunkKeys);
             DIRTY_BLOCK_POSITIONS.keySet().removeIf(rescannedChunkKeys::contains);
-            rebuildBlockBoxes();
+            if (locallyPatched > 0) rebuildBlockBoxes();
         }
     }
 
-    private static void processPendingChunkScans(Minecraft mc) {
+    private static boolean processPendingChunkScans(Minecraft mc) {
         try (ModProfiler.Scope ignored = profile("processPendingChunkScans")) {
-            if (PENDING_BLOCK_SCAN_KEYS.isEmpty()) {
-                count("processPendingChunkScans/skippedEmpty");
-                return;
-            }
-
-            count("processPendingChunkScans/pendingQueueSize", PENDING_BLOCK_SCAN_KEYS.size());
-            int scanned = 0;
-            int missingChunks = 0;
-            int scanBudget = chunkScanBudgetPerFrame();
-            List<Long> completedChunkKeys = new ArrayList<>();
+            if (PENDING_BLOCK_SCAN_KEYS.isEmpty()) return false;
+            long deadline = System.nanoTime() + TARGET_CHUNK_SCAN_BUDGET_NANOS;
+            int remainingSteps = MAX_BLOCK_SCAN_STEPS_PER_FRAME;
+            int completed = 0;
             List<Long> nearestFirst = new ArrayList<>(PENDING_BLOCK_SCAN_KEYS);
             ChunkPos playerChunk = mc.player.chunkPosition();
             nearestFirst.sort(java.util.Comparator.comparingInt(key ->
                     Math.abs(ChunkPos.getX(key) - playerChunk.x()) + Math.abs(ChunkPos.getZ(key) - playerChunk.z())));
-            try (ModProfiler.Scope iterateScope = profile("processPendingChunkScans/iterate")) {
-                for (long chunkKey : nearestFirst) {
-                    int chunkX = ChunkPos.getX(chunkKey);
-                    int chunkZ = ChunkPos.getZ(chunkKey);
-                    LevelChunk chunk = mc.level.getChunkSource().getChunkNow(chunkX, chunkZ);
-                    if (chunk == null) {
-                        missingChunks++;
-                        BLOCK_CHUNK_CACHE.remove(chunkKey);
-                        completedChunkKeys.add(chunkKey);
-                        continue;
-                    }
-
-                    updateChunkScanResult(chunkKey, scanChunk(mc, chunk));
-                    completedChunkKeys.add(chunkKey);
-                    scanned++;
-                    if (scanned >= scanBudget) {
-                        break;
-                    }
+            for (long key : nearestFirst) {
+                LevelChunk chunk = mc.level.getChunkSource().getChunkNow(ChunkPos.getX(key), ChunkPos.getZ(key));
+                if (chunk == null) {
+                    BLOCK_CHUNK_CACHE.remove(key); BLOCK_SCAN_CURSORS.remove(key); PENDING_BLOCK_SCAN_KEYS.remove(key);
+                    completed++;
+                    continue;
                 }
+                ChunkScanCursor cursor = BLOCK_SCAN_CURSORS.get(key);
+                if (cursor == null || cursor.chunk != chunk) {
+                    cursor = new ChunkScanCursor(mc, chunk);
+                    BLOCK_SCAN_CURSORS.put(key, cursor);
+                }
+                remainingSteps -= cursor.advance(mc, remainingSteps, deadline);
+                if (cursor.index == cursor.total) {
+                    updateChunkScanResult(key, new ChunkScanResult(cursor.boxes, cursor.barrels));
+                    PENDING_BLOCK_SCAN_KEYS.remove(key); BLOCK_SCAN_CURSORS.remove(key);
+                    count("scanChunk/outputBoxes", cursor.boxes.size());
+                    completed++;
+                }
+                if (remainingSteps <= 0 || System.nanoTime() >= deadline) break;
             }
-
-            count("processPendingChunkScans/scanBudget", scanBudget);
-            count("processPendingChunkScans/scanned", scanned);
-            count("processPendingChunkScans/missingChunks", missingChunks);
-            count("processPendingChunkScans/completed", completedChunkKeys.size());
-            if (!completedChunkKeys.isEmpty()) {
-                PENDING_BLOCK_SCAN_KEYS.removeAll(completedChunkKeys);
-            }
+            count("processPendingChunkScans/visitedBlocks", MAX_BLOCK_SCAN_STEPS_PER_FRAME - remainingSteps);
+            count("processPendingChunkScans/completed", completed);
+            count("processPendingChunkScans/pendingQueueSize", PENDING_BLOCK_SCAN_KEYS.size());
+            return completed != 0;
         }
     }
 
     private static void rebuildBlockBoxes() {
         try (ModProfiler.Scope ignored = profile("rebuildBlockBoxes")) {
             BLOCK_BOXES.clear();
+            var barrels = new ArrayList<NearbyMineState.Point>();
             int cacheEntries = 0;
             for (ChunkScanResult result : BLOCK_CHUNK_CACHE.values()) {
                 cacheEntries++;
                 BLOCK_BOXES.addAll(result.boxesByBlockPos.values());
+                for (long key : result.barrelsByBlockPos.keySet()) {
+                    var pos=BlockPos.of(key); barrels.add(new NearbyMineState.Point(pos.getX()+.5,pos.getY()+.5,pos.getZ()+.5));
+                }
             }
+            NearbyMineState.barrels(barrels);
             count("rebuildBlockBoxes/cacheEntries", cacheEntries);
             count("rebuildBlockBoxes/outputBoxes", BLOCK_BOXES.size());
         }
@@ -582,6 +586,7 @@ public final class UsefulWorldHighlightRenderHook {
                 : previous.barrelsByBlockPos;
 
         for (Map.Entry<Long, HighlightBlockType> entry : next.barrelsByBlockPos.entrySet()) {
+            if (!ConfigManager.get().render.usefulItemsHighlight) break;
             if (previousBarrels.get(entry.getKey()) == entry.getValue()) {
                 continue;
             }
@@ -630,28 +635,35 @@ public final class UsefulWorldHighlightRenderHook {
                     searchBox,
                     candidate -> candidate != mc.player
                             && !candidate.isRemoved()
-                            && isUsefulHighlightEntity(candidate)
+                            && (candidate instanceof ArmorStand || candidate instanceof Interaction)
             );
             count("collectNearbyEntities/candidates", candidates.size());
+            CrystalParts parts = new CrystalParts(mc, candidates);
             int highlightedEntities = 0;
             Map<Long, BlockPos> goldenCrystalPositions = new LinkedHashMap<>();
+            var worms = new ArrayList<NearbyMineState.Point>();
             try (ModProfiler.Scope classifyScope = profile("collectNearbyEntities/classify")) {
                 for (Entity entity : candidates) {
-                    HighlightEntityType entityType = HighlightEntityType.from(entity);
+                    if (!entity.getBoundingBox().intersects(searchBox)) continue;
+                    AABB cluster = entity instanceof Interaction interaction ? parts.clusterBox(interaction) : null;
+                    HighlightEntityType entityType = cluster != null ? HighlightEntityType.GOLDEN_CRYSTAL : HighlightEntityType.from(entity);
                     if (entityType == null) {
                         continue;
                     }
 
                     highlightedEntities++;
-                    AABB box = entityType.createBox(entity);
+                    AABB box = cluster != null ? cluster : entityType.createBox(entity);
                     ENTITY_BOXES.add(new ColoredBox(box, entityType.red, entityType.green, entityType.blue));
                     if (entityType == HighlightEntityType.GOLDEN_CRYSTAL) {
                         BlockPos position = BlockPos.containing(box.getCenter());
                         goldenCrystalPositions.putIfAbsent(position.asLong(), position);
                     }
+                    if (entityType == HighlightEntityType.WORM) worms.add(new NearbyMineState.Point(entity.getX(),entity.getY(),entity.getZ()));
                 }
             }
-            publishNewGoldenCrystals(goldenCrystalPositions);
+            NearbyMineState.entities(worms, goldenCrystalPositions.values().stream()
+                    .map(pos->new NearbyMineState.Point(pos.getX()+.5,pos.getY()+.5,pos.getZ()+.5)).toList());
+            if (ConfigManager.get().render.usefulItemsHighlight) publishNewGoldenCrystals(goldenCrystalPositions);
             count("collectNearbyEntities/highlighted", highlightedEntities);
             count("collectNearbyEntities/goldenCrystals", goldenCrystalPositions.size());
         }
@@ -676,6 +688,7 @@ public final class UsefulWorldHighlightRenderHook {
     }
 
     private static void clearCache() {
+        NearbyMineState.clear();
         CACHED_BOXES.clear();
         BLOCK_BOXES.clear();
         ENTITY_BOXES.clear();
@@ -684,10 +697,9 @@ public final class UsefulWorldHighlightRenderHook {
         DIRTY_CHUNK_MARK_TIMES.clear();
         DIRTY_CHUNK_KEYS.clear();
         DIRTY_BLOCK_POSITIONS.clear();
-        PENDING_BLOCK_SCAN_KEYS.clear();
+        PENDING_BLOCK_SCAN_KEYS.clear(); BLOCK_SCAN_CURSORS.clear();
         lastEntityScanTick = Long.MIN_VALUE;
         lastBlockRefreshTick = Long.MIN_VALUE;
-        averageChunkScanNanos = 10_000_000L;
         lastMinChunkX = Integer.MIN_VALUE;
         lastMaxChunkX = Integer.MIN_VALUE;
         lastMinChunkZ = Integer.MIN_VALUE;
@@ -701,6 +713,11 @@ public final class UsefulWorldHighlightRenderHook {
                 || entity instanceof Interaction
                 || entity instanceof Display.ItemDisplay;
     }
+
+    public static boolean isMineLocation() { return isMineHighlightLocation(); }
+    private static boolean counterAdded(ru.wilyfox.client.hud.config.WidgetCatalog catalog) { return ConfigManager.isWidgetInCurrentLayout(catalog.key()) && isMineHighlightLocation(); }
+    private static boolean needsBlockDetection() { return ConfigManager.get().render.usefulItemsHighlight || counterAdded(ru.wilyfox.client.hud.config.WidgetCatalog.NEARBY_BARRELS); }
+    private static boolean needsDetection() { return needsBlockDetection() || counterAdded(ru.wilyfox.client.hud.config.WidgetCatalog.NEARBY_WORMS) || counterAdded(ru.wilyfox.client.hud.config.WidgetCatalog.NEARBY_CRYSTALS); }
 
     private record ColoredBox(AABB box, float red, float green, float blue) {
     }
@@ -744,21 +761,19 @@ public final class UsefulWorldHighlightRenderHook {
                     return GOLDEN_CRYSTAL;
                 }
 
-                String name = entity.getName().getString();
-                if (!name.isBlank() && (name.contains("Червь") || name.contains("Р§РµСЂРІСЊ"))) {
-                    return WORM;
+                var customName = stand.getCustomName();
+                if (customName != null) {
+                    String name = customName.getString();
+                    if (!name.isBlank() && (name.contains("Червь") || name.contains("Р§РµСЂРІСЊ"))) return WORM;
                 }
-            }
-
-            if (entity instanceof Interaction interaction && isClusterGoldenCrystal(interaction)) {
-                return GOLDEN_CRYSTAL;
             }
 
             return null;
         }
 
         private static boolean isLegacyGoldenCrystal(ArmorStand stand) {
-            for (ItemStack stack : java.util.List.of(stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD), stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST), stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS), stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET))) {
+            for (var slot : ARMOR_SLOTS) {
+                ItemStack stack = stand.getItemBySlot(slot);
                 if (matchesCustomModel(stack, GOLDEN_CRYSTAL_MODEL_ID)) {
                     return true;
                 }
@@ -766,43 +781,9 @@ public final class UsefulWorldHighlightRenderHook {
             return false;
         }
 
-        private static boolean isClusterGoldenCrystal(Interaction interaction) {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.level == null) {
-                return false;
-            }
-
-            List<Entity> nearbyEntities = mc.level.getEntities(
-                    interaction,
-                    interaction.getBoundingBox().inflate(GOLDEN_CRYSTAL_CLUSTER_RADIUS),
-                    candidate -> candidate != interaction
-            );
-
-            boolean hasEmptyArmorStand = false;
-            int goldenCrystalPartCount = 0;
-            int firePartCount = 0;
-
-            for (Entity nearbyEntity : nearbyEntities) {
-                if (nearbyEntity instanceof ArmorStand stand && isEmptyArmorStand(stand)) {
-                    hasEmptyArmorStand = true;
-                    continue;
-                }
-
-                if (nearbyEntity instanceof Display.ItemDisplay itemDisplay) {
-                    String itemModel = readItemModel(itemDisplay.getItemStack());
-                    if (itemModel.startsWith(GOLDEN_CRYSTAL_MODEL_PREFIX)) {
-                        goldenCrystalPartCount++;
-                    } else if (itemModel.startsWith(GOLDEN_CRYSTAL_FIRE_PREFIX)) {
-                        firePartCount++;
-                    }
-                }
-            }
-
-            return hasEmptyArmorStand && goldenCrystalPartCount >= 1 && firePartCount >= 1;
-        }
-
         private static boolean isEmptyArmorStand(ArmorStand stand) {
-            for (ItemStack stack : java.util.List.of(stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD), stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST), stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS), stand.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.FEET))) {
+            for (var slot : ARMOR_SLOTS) {
+                ItemStack stack = stand.getItemBySlot(slot);
                 if (!stack.isEmpty()) {
                     return false;
                 }
@@ -812,13 +793,6 @@ public final class UsefulWorldHighlightRenderHook {
 
         private AABB createBox(Entity entity) {
             if (this == GOLDEN_CRYSTAL) {
-                if (entity instanceof Interaction interaction) {
-                    AABB clusterBox = buildGoldenCrystalClusterBox(interaction);
-                    if (clusterBox != null) {
-                        return clusterBox;
-                    }
-                }
-
                 return AABB.ofSize(
                         new Vec3(entity.getX(), entity.getY() + GOLDEN_CRYSTAL_BOX_Y_OFFSET, entity.getZ()),
                         GOLDEN_CRYSTAL_BOX_WIDTH,
@@ -830,36 +804,82 @@ public final class UsefulWorldHighlightRenderHook {
             return entity.getBoundingBox().inflate(inflate);
         }
 
-        private AABB buildGoldenCrystalClusterBox(Interaction interaction) {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.level == null) {
-                return null;
-            }
+    }
 
-            AABB clusterBox = interaction.getBoundingBox();
-            boolean foundPart = false;
-            for (Entity nearbyEntity : mc.level.getEntities(
-                    interaction,
-                    interaction.getBoundingBox().inflate(GOLDEN_CRYSTAL_CLUSTER_RADIUS),
-                    candidate -> candidate != interaction
-            )) {
-                if (nearbyEntity instanceof ArmorStand stand && isEmptyArmorStand(stand)) {
-                    clusterBox = clusterBox.minmax(stand.getBoundingBox());
-                    foundPart = true;
-                    continue;
+    /** One short-lived spatial index per refresh; equipment/models are read once, never cached across packets. */
+    private static final class CrystalParts {
+        private final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<List<CrystalPart>> cells =
+                new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+        private final List<CrystalPart> oversized = new ArrayList<>();
+        private final List<CrystalPart> all = new ArrayList<>();
+        private int query;
+
+        private CrystalParts(Minecraft mc, List<Entity> candidates) {
+            try (var ignored = profile("collectNearbyEntities/indexParts")) {
+                AABB search = null;
+                for (Entity candidate : candidates) {
+                    if (candidate instanceof Interaction) {
+                        AABB area = candidate.getBoundingBox().inflate(GOLDEN_CRYSTAL_CLUSTER_RADIUS);
+                        search = search == null ? area : search.minmax(area);
+                    }
                 }
-
-                if (nearbyEntity instanceof Display.ItemDisplay itemDisplay) {
-                    String itemModel = readItemModel(itemDisplay.getItemStack());
-                    if (itemModel.startsWith(GOLDEN_CRYSTAL_MODEL_PREFIX) || itemModel.startsWith(GOLDEN_CRYSTAL_FIRE_PREFIX)) {
-                        clusterBox = clusterBox.minmax(itemDisplay.getBoundingBox());
-                        foundPart = true;
+                if (search == null) return;
+                List<Entity> entities = mc.level.getEntities(mc.player, search,
+                        entity -> !entity.isRemoved() && (entity instanceof ArmorStand || entity instanceof Display.ItemDisplay));
+                for (Entity entity : entities) {
+                    int kind = entity instanceof ArmorStand stand && HighlightEntityType.isEmptyArmorStand(stand) ? 1
+                            : entity instanceof Display.ItemDisplay display ? crystalPartKind(display.getItemStack()) : 0;
+                    if (kind == 0) continue;
+                    var part = new CrystalPart(entity.getBoundingBox(), kind);
+                    all.add(part);
+                    AABB box = part.box;
+                    int x0 = cell(box.minX), x1 = cell(box.maxX), y0 = cell(box.minY), y1 = cell(box.maxY), z0 = cell(box.minZ), z1 = cell(box.maxZ);
+                    if ((long) (x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1) > 4096) { oversized.add(part); continue; }
+                    for (int x = x0; x <= x1; x++) for (int y = y0; y <= y1; y++) for (int z = z0; z <= z1; z++) {
+                        cells.computeIfAbsent(BlockPos.asLong(x, y, z), key -> new ArrayList<>()).add(part);
                     }
                 }
             }
-
-            return foundPart ? clusterBox.inflate(0.08D, 0.12D, 0.08D) : null;
         }
+
+        private AABB clusterBox(Interaction interaction) {
+            AABB area = interaction.getBoundingBox().inflate(GOLDEN_CRYSTAL_CLUSTER_RADIUS);
+            AABB box = interaction.getBoundingBox();
+            int kinds = 0;
+            int stamp = ++query;
+            // Do not walk a huge grid for an unusually large custom interaction.
+            if ((long) (cell(area.maxX) - cell(area.minX) + 1) * (cell(area.maxY) - cell(area.minY) + 1)
+                    * (cell(area.maxZ) - cell(area.minZ) + 1) > 4096) {
+                for (CrystalPart part : all) {
+                    if (part.box.intersects(area)) { kinds |= part.kind; box = box.minmax(part.box); }
+                }
+                return kinds == 7 ? box.inflate(.08D, .12D, .08D) : null;
+            }
+            for (int x = cell(area.minX); x <= cell(area.maxX); x++)
+                for (int y = cell(area.minY); y <= cell(area.maxY); y++)
+                    for (int z = cell(area.minZ); z <= cell(area.maxZ); z++) {
+                        List<CrystalPart> parts = cells.get(BlockPos.asLong(x, y, z));
+                        if (parts == null) continue;
+                        for (CrystalPart part : parts) {
+                            if (part.visited == stamp) continue;
+                            part.visited = stamp;
+                            if (part.box.intersects(area)) { kinds |= part.kind; box = box.minmax(part.box); }
+                        }
+                    }
+            for (CrystalPart part : oversized) {
+                if (part.box.intersects(area)) { kinds |= part.kind; box = box.minmax(part.box); }
+            }
+            return kinds == 7 ? box.inflate(.08D, .12D, .08D) : null;
+        }
+
+        private static int cell(double coordinate) { return Mth.floor(coordinate / 4D); }
+    }
+
+    private static final class CrystalPart {
+        private final AABB box;
+        private final int kind;
+        private int visited;
+        private CrystalPart(AABB box, int kind) { this.box = box; this.kind = kind; }
     }
 
     enum HighlightBlockType {
@@ -1041,9 +1061,11 @@ public final class UsefulWorldHighlightRenderHook {
         return firstValue != null && Mth.floor(firstValue) == modelId;
     }
 
-    private static String readItemModel(ItemStack stack) {
-        Object itemModel = stack.get(DataComponents.ITEM_MODEL);
-        return itemModel == null ? "" : itemModel.toString();
+    private static int crystalPartKind(ItemStack stack) {
+        var model = stack.get(DataComponents.ITEM_MODEL);
+        if (model == null || !model.getNamespace().equals("modelengine")) return 0;
+        if (model.getPath().startsWith("fragment_")) return 2;
+        return model.getPath().startsWith("internal_fire/") ? 4 : 0;
     }
 
     private static ChunkScanResult rescanDirtyPositions(Minecraft mc, LevelChunk chunk, Set<Long> dirtyPositions) {
@@ -1145,33 +1167,18 @@ public final class UsefulWorldHighlightRenderHook {
         return dirtyPositions.isEmpty() || dirtyPositions.size() >= DIRTY_FULL_RESCAN_THRESHOLD;
     }
 
-    private static int chunkScanBudgetPerFrame() {
-        long safeAverageNanos = Math.max(1_000_000L, averageChunkScanNanos);
-        int dynamicBudget = (int) Math.max(MIN_CHUNK_SCAN_BUDGET_PER_FRAME, TARGET_CHUNK_SCAN_BUDGET_NANOS / safeAverageNanos);
-        return Mth.clamp(dynamicBudget, MIN_CHUNK_SCAN_BUDGET_PER_FRAME, MAX_CHUNK_SCAN_BUDGET_PER_FRAME);
-    }
-
-    private static void recordChunkScanSample(long elapsedNanos) {
-        long sample = Math.max(0L, elapsedNanos);
-        if (sample <= 0L) {
-            return;
-        }
-
-        averageChunkScanNanos = averageChunkScanNanos <= 0L
-                ? sample
-                : ((averageChunkScanNanos * 7L) + sample) / 8L;
-        count("scanChunk/averageNanos", averageChunkScanNanos);
-    }
-
     private static ModProfiler.Scope profile(String section) {
-        return ModProfiler.getInstance().scope(PROFILER_PREFIX + "/" + section);
+        ModProfiler profiler = ModProfiler.getInstance();
+        return profiler.scope(profiler.isEnabled() ? PROFILER_PREFIX + "/" + section : null);
     }
 
     private static void count(String counter) {
-        ModProfiler.getInstance().incrementCounter(PROFILER_PREFIX + "/" + counter);
+        ModProfiler profiler = ModProfiler.getInstance();
+        if (profiler.isEnabled()) profiler.incrementCounter(PROFILER_PREFIX + "/" + counter);
     }
 
     private static void count(String counter, long delta) {
-        ModProfiler.getInstance().incrementCounter(PROFILER_PREFIX + "/" + counter, delta);
+        ModProfiler profiler = ModProfiler.getInstance();
+        if (profiler.isEnabled()) profiler.incrementCounter(PROFILER_PREFIX + "/" + counter, delta);
     }
 }

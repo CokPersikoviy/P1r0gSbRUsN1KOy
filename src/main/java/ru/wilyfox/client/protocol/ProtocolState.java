@@ -67,6 +67,7 @@ final class ProtocolState {
     DwGameLocation currentGameLocation;
     Set<String> fishingLocationIds = new LinkedHashSet<>();
     Map<String, String> fishingLocationNames = new LinkedHashMap<>();
+    long fishingRevision;
     Map<String, Double> fishingNibbles = new LinkedHashMap<>();
     Map<Integer, DwHourlyQuestType> hourlyQuestTypes = new LinkedHashMap<>();
     Map<Integer, DwHourlyQuestProgress> hourlyQuestProgress = new LinkedHashMap<>();
@@ -104,6 +105,7 @@ final class ProtocolState {
         fishingLocationIds = new LinkedHashSet<>();
         fishingLocationNames = new LinkedHashMap<>();
         fishingNibbles = new LinkedHashMap<>();
+        fishingRevision++;
         hourlyQuestTypes = new LinkedHashMap<>();
         hourlyQuestProgress = new LinkedHashMap<>();
         quests = new LinkedHashMap<>();

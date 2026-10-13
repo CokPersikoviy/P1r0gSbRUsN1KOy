@@ -167,8 +167,10 @@ final class BackendChatClient {
         nextSend = System.currentTimeMillis() + 3100;
         String nonce = UUID.randomUUID().toString();
         sending = ru.wilyfox.client.chat.FhImages.supply(() -> {
-            try { return source.call(); }
-            catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
+            try (var profile = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("chat/imageAttach/prepareUpload")) {
+                try { return source.call(); }
+                catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
+            }
         }).thenCompose(bytes -> {
             if (attempt != generation) return CompletableFuture.<HttpResponse<byte[]>>failedFuture(new IllegalStateException("Session changed"));
             var request = HttpRequest.newBuilder(backend.resolve("/v1/chat/image?nonce=" + nonce + "&text="

@@ -43,8 +43,13 @@ public final class PlayerClanStorage {
         update(parsed.playerName(), parsed.clanName());
     }
 
-    public static synchronized String getClan(String playerName) {
-        String normalized = normalize(playerName);
+    public static String getClan(String playerName) {
+        return getClanNormalized(normalize(playerName));
+    }
+
+    /** Lookup for renderers which already keep a Locale.ROOT lowercase player-name key. */
+    public static synchronized String getClanNormalized(String playerNameKey) {
+        String normalized = cleanPlayerName(playerNameKey);
         if (normalized == null) {
             return null;
         }

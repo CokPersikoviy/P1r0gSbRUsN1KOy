@@ -10,7 +10,7 @@ import net.minecraft.resources.Identifier;
 import ru.wilyfox.client.moduser.BackendSocialClient;
 import java.util.concurrent.CompletableFuture;
 
-public final class FhImageScreen extends Screen {
+public final class FhImageScreen extends ru.wilyfox.client.hud.menu.FhDialogScreen {
     private static final Identifier TEXTURE = Identifier.fromNamespaceAndPath("froghelper", "fh_chat_image");
     private final Screen parent;
     private final java.util.function.Supplier<CompletableFuture<byte[]>> download;
@@ -25,6 +25,7 @@ public final class FhImageScreen extends Screen {
     private Frame pending;
     private boolean decoding;
     private long frameDue;
+    private int panelX, panelY, panelWidth, panelHeight;
     private record Frame(com.mojang.blaze3d.platform.NativeImage image, GifAnimation animation, int delayMillis) {}
     public FhImageScreen(Screen parent, long message, String attachment) {
         this(parent, () -> BackendSocialClient.downloadChatImage(message, attachment));
@@ -44,9 +45,14 @@ public final class FhImageScreen extends Screen {
         return true;
     }
     @Override protected void init() {
-        pinButton = addRenderableWidget(net.minecraft.client.gui.components.Button.builder(
-                Component.translatable("froghelper.image_widget.pin"), button -> pinImage())
-                .bounds(Math.max(12, width / 2 - 100), height - 44, Math.min(200, width - 24), 20).build());
+        super.init();
+        panelWidth = Math.min(860, width - 16); panelHeight = height - 16;
+        panelX = (width - panelWidth) / 2; panelY = 8;
+        int inner = panelWidth - 24, half = (inner - 8) / 2;
+        pinButton = button(panelX + 12, panelY + panelHeight - 46, half,
+                Component.translatable("froghelper.image_widget.pin"), true, this::pinImage);
+        button(panelX + 20 + half, panelY + panelHeight - 46, inner - half - 8,
+                Component.translatable("gui.back"), false, this::onClose);
         pinButton.active = loaded && !pinning;
         if (started) return; started = true;
         download.get().thenApplyAsync(bytes -> {
@@ -61,16 +67,18 @@ public final class FhImageScreen extends Screen {
                 if (gif != null) gif.close(); throw new java.util.concurrent.CompletionException(failure);
             }
         }, FhImages.IO).whenComplete((frame, error) -> minecraft.execute(() -> {
-            if (closed || minecraft.gui.screen() != this) { discard(frame); return; }
-            if (error != null) { failed = true; return; }
-            imageWidth = frame.image.getWidth(); imageHeight = frame.image.getHeight();
-            animation = frame.animation;
-            try {
-                texture = new DynamicTexture(() -> "FH chat image", frame.image);
-                minecraft.getTextureManager().register(TEXTURE, texture); loaded = true;
-                frameDue = System.nanoTime() + frame.delayMillis * 1_000_000L;
-                preloadFrame();
-            } catch (RuntimeException failure) { discard(frame); failed = true; }
+            try (var profile = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("chat/imageUpload")) {
+                if (closed || minecraft.gui.screen() != this) { discard(frame); return; }
+                if (error != null) { failed = true; return; }
+                imageWidth = frame.image.getWidth(); imageHeight = frame.image.getHeight();
+                animation = frame.animation;
+                try {
+                    texture = new DynamicTexture(() -> "FH chat image", frame.image);
+                    minecraft.getTextureManager().register(TEXTURE, texture); loaded = true;
+                    frameDue = System.nanoTime() + frame.delayMillis * 1_000_000L;
+                    preloadFrame();
+                } catch (RuntimeException failure) { discard(frame); failed = true; }
+            }
         }));
     }
     private void pinImage() {
@@ -115,23 +123,34 @@ public final class FhImageScreen extends Screen {
         if (!loaded || animation == null || !minecraft.isWindowActive()) return;
         if (pending != null && System.nanoTime() >= frameDue) {
             var frame = pending; pending = null;
-            texture.setPixels(frame.image); texture.upload();
+            try (var profile = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("chat/gifUpload")) {
+                texture.setPixels(frame.image); texture.upload();
+            }
             frameDue = System.nanoTime() + frame.delayMillis * 1_000_000L;
         }
         preloadFrame();
     }
-    @Override public void extractRenderState(GuiGraphicsExtractor graphics, int x, int y, float delta) {
+    @Override protected void extractDialogContents(GuiGraphicsExtractor graphics, int x, int y, float delta) {
         advanceAnimation();
         pinButton.active = loaded && sourceBytes != null && !pinning;
-        graphics.fill(0, 0, width, height, 0xE8101010);
+        dialog(graphics, panelX, panelY, panelWidth, panelHeight);
+        int viewX = panelX + 12, viewY = panelY + 32, viewWidth = panelWidth - 24, viewHeight = panelHeight - 86;
+        ru.wilyfox.client.hud.widget.HudSurface.fillRounded(graphics, viewX, viewY, viewWidth, viewHeight, 4,
+                ru.wilyfox.client.hud.widget.WidgetTheme.PANEL_BG_SOFT);
         if (loaded) {
-            double scale = Math.min((width - 24d) / imageWidth, (height - 80d) / imageHeight);
+            double scale = Math.min((viewWidth - 8d) / imageWidth, (viewHeight - 8d) / imageHeight);
             int w = Math.max(1, (int) (imageWidth * scale)), h = Math.max(1, (int) (imageHeight * scale));
-            graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, (width - w) / 2, (height - h) / 2, 0, 0, w, h,
+            graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, viewX + (viewWidth - w) / 2, viewY + (viewHeight - h) / 2, 0, 0, w, h,
                     imageWidth, imageHeight, imageWidth, imageHeight);
-        } else graphics.centeredText(font, Component.translatable(failed ? "froghelper.chat.image_failed" : "froghelper.chat.image_loading"), width / 2, height / 2, 0xFFFFFFFF);
-        graphics.centeredText(font, Component.translatable("froghelper.chat.image_close"), width / 2, height - 18, 0xFFAAAAAA);
-        super.extractRenderState(graphics, x, y, delta);
+        } else {
+            var lines = font.split(Component.translatable(failed ? "froghelper.chat.image_failed" : "froghelper.chat.image_loading"), viewWidth - 16);
+            int start = viewY + (viewHeight - lines.size() * font.lineHeight) / 2;
+            for (int i = 0; i < lines.size(); i++) graphics.text(font, lines.get(i),
+                    viewX + (viewWidth - font.width(lines.get(i))) / 2, start + i * font.lineHeight,
+                    ru.wilyfox.client.hud.widget.WidgetTheme.TEXT_SECONDARY);
+        }
+        graphics.centeredText(font, font.plainSubstrByWidth(Component.translatable("froghelper.chat.image_close").getString(), panelWidth - 24),
+                width / 2, panelY + panelHeight - 16, ru.wilyfox.client.hud.widget.WidgetTheme.TEXT_SECONDARY);
     }
     @Override public boolean isPauseScreen() { return false; }
     @Override public void onClose() { minecraft.gui.setScreen(parent); }
@@ -141,5 +160,6 @@ public final class FhImageScreen extends Screen {
         if (animation != null) animation.close();
         discard(pending); pending = null;
         if (loaded) minecraft.getTextureManager().release(TEXTURE);
+        super.removed();
     }
 }

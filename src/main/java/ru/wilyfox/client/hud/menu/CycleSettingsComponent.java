@@ -13,13 +13,19 @@ import java.util.function.Supplier;
 public class CycleSettingsComponent<T> extends SettingsComponent {
     private final Supplier<T> getter;
     private final Consumer<T> setter;
-    private final T[] values;
+    private final Supplier<T[]> values;
     private final Function<T, String> labelMapper;
 
     public CycleSettingsComponent(int x, int y, int width, int height, String label,
                                   Supplier<T> getter,
                                   Consumer<T> setter,
                                   T[] values,
+                                  Function<T, String> labelMapper) {
+        this(x,y,width,height,label,getter,setter,() -> values,labelMapper);
+    }
+
+    public CycleSettingsComponent(int x, int y, int width, int height, String label,
+                                  Supplier<T> getter, Consumer<T> setter, Supplier<T[]> values,
                                   Function<T, String> labelMapper) {
         super(x, y, width, height, label);
         this.getter = getter;
@@ -52,22 +58,23 @@ public class CycleSettingsComponent<T> extends SettingsComponent {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if ((button != 0 && button != 1) || values.length == 0 || !isHovered(mouseX, mouseY)) {
+        T[] options = values.get();
+        if ((button != 0 && button != 1) || options.length == 0 || !isHovered(mouseX, mouseY)) {
             return false;
         }
 
         T current = getter.get();
         int index = 0;
 
-        for (int i = 0; i < values.length; i++) {
-            if (values[i] == current) {
+        for (int i = 0; i < options.length; i++) {
+            if (options[i] == current) {
                 index = i;
                 break;
             }
         }
 
         int direction = button == 1 ? -1 : 1;
-        setter.accept(values[Math.floorMod(index + direction, values.length)]);
+        setter.accept(options[Math.floorMod(index + direction, options.length)]);
         ConfigManager.save();
         return true;
     }

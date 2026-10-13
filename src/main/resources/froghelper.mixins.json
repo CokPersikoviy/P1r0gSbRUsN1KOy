@@ -9,6 +9,7 @@
     "LevelRendererProfilerMixin",
     "BlockEntityRenderDispatcherProfilerMixin",
     "EntityRenderDispatcherProfilerMixin",
+    "DisplayProbeMixin",
     "ChatComponentAccessorMixin",
     "ChatHudMixin",
     "ChatScreenMixin",

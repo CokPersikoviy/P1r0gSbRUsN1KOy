@@ -16,7 +16,11 @@ public class ClientEntityEventHandler {
     }
 
     public void register() {
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> bossTracker.reset());
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            bossTracker.reset();
+            ru.wilyfox.client.utility.PlayerNameFormatter.clearCache();
+        });
+        ClientEntityEvents.ENTITY_UNLOAD.register((entity, world) -> bossTracker.onEntityUnload(entity));
         ClientEntityEvents.ENTITY_LOAD.register((Entity entity, ClientLevel world) -> {
             try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("world/ClientEntityEventHandler/entityLoad")) {
                 this.bossTracker.onEntityLoad(entity);

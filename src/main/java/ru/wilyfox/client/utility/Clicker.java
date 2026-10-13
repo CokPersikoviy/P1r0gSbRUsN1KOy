@@ -14,11 +14,16 @@ public final class Clicker {
     private static final ClickerActivation activation = new ClickerActivation();
     private static boolean autoAttackEnabled;
     private static long lastAttackTime = 0L;
+    private static KeyMapping heldKey;
 
     private Clicker() {}
 
     public static void register() {
         ClientTickEvents.END_CLIENT_TICK.register(Clicker::tick);
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            releaseHeldKey(client); activation.reset(); autoAttackEnabled = false; lastAttackTime = 0;
+        });
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(Clicker::releaseHeldKey);
     }
 
     public static void tick(Minecraft client) {
@@ -27,7 +32,8 @@ public final class Clicker {
             while (KeyBinds.AUTO_ATTACK.consumeClick()) presses++;
             var mode = ConfigManager.get().clicker.activation;
             boolean allowed = client.player != null && client.level != null && client.player.isAlive()
-                    && client.gui.screen() == null && client.isWindowActive();
+                    && client.gui.screen() == null && !client.isPaused()
+                    && (client.isWindowActive() || !client.options.pauseOnLostFocus);
             if (client.player == null || client.level == null) activation.reset();
             boolean active = activation.update(mode, presses, KeyBinds.AUTO_ATTACK.isDown(), allowed);
             if (active != autoAttackEnabled && mode == ru.wilyfox.client.hud.config.ClickerConfig.Activation.TOGGLE && allowed) {
@@ -36,9 +42,26 @@ public final class Clicker {
             }
             autoAttackEnabled = active;
             if (!active) {
+                releaseHeldKey(client);
                 lastAttackTime = 0L;
                 return;
             }
+
+            if (ConfigManager.get().clicker.actionMode == ru.wilyfox.client.hud.config.ClickerConfig.ActionMode.HOLD) {
+                try (var profile = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("tick/Clicker/hold")) {
+                    KeyMapping action = getActionKey(client);
+                    if (heldKey != action) {
+                        releaseHeldKey(client);
+                        heldKey = action;
+                        // A real button press starts the action once; subsequent ticks only keep it down.
+                        KeyMapping.click(com.mojang.blaze3d.platform.InputConstants.getKey(action.saveString()));
+                    }
+                    heldKey.setDown(true);
+                    lastAttackTime = 0;
+                    return;
+                }
+            }
+            releaseHeldKey(client);
 
             long now = System.currentTimeMillis();
 
@@ -49,6 +72,21 @@ public final class Clicker {
                 lastAttackTime = now;
                 click();
             }
+        }
+    }
+    private static void releaseHeldKey(Minecraft client) {
+        try (var profile = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("tick/Clicker/release")) {
+            if (heldKey == null) return;
+            var key = heldKey; heldKey = null;
+            var input = com.mojang.blaze3d.platform.InputConstants.getKey(key.saveString());
+            boolean physical = false;
+            if (client.getWindow() != null && client.isWindowActive()) {
+                if (input.getType() == com.mojang.blaze3d.platform.InputConstants.Type.MOUSE)
+                    physical = org.lwjgl.glfw.GLFW.glfwGetMouseButton(client.getWindow().handle(), input.getValue()) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
+                else if (input.getType() == com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM && input.getValue() >= 0)
+                    physical = com.mojang.blaze3d.platform.InputConstants.isKeyDown(client.getWindow(), input.getValue());
+            }
+            key.setDown(physical);
         }
     }
     public static void click() {

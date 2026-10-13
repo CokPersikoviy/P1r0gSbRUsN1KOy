@@ -27,7 +27,7 @@ public final class LevelCalculatorScreen extends UiSoundScreen {
     private LevelCalculator.Server server;
     private LevelCalculator.Discount discount = LevelCalculator.Discount.NONE;
     private EditBox currentInput, targetInput;
-    private Button evo, fast, discountButton;
+    private Button evo, fast, discountButton, pinGoal;
     private int left, top, panelWidth, panelHeight;
 
     public LevelCalculatorScreen(Screen parent) {
@@ -62,11 +62,23 @@ public final class LevelCalculatorScreen extends UiSoundScreen {
             refresh();
         });
         discountButton = button(x + w / 2, top + 94, w / 2, 20, Component.empty(), () -> cycleDiscount(1));
-        button(x, top + 177, half, 18, text("my_level"), () -> {
+        int third = (w - 8) / 3;
+        button(x, top + 177, third, 18, text("my_level"), () -> {
             int level = DiamondWorldProtocolClient.getCurrentLevel();
             if (level > 0) currentInput.setValue(Integer.toString(Math.min(level, LevelCalculator.MAX_LEVEL)));
         }).active = DiamondWorldProtocolClient.getCurrentLevel() > 0;
-        button(x + half + 10, top + 177, half, 18, Component.translatable("gui.done"), this::onClose);
+        pinGoal = button(x + third + 4, top + 177, third, 18, Component.translatable("froghelper.goal.pin"), () -> {
+            var config = ru.wilyfox.client.hud.config.ConfigManager.get();
+            config.levelGoal.targetLevel = level(target);
+            config.levelGoal.server = server == LevelCalculator.Server.EVO_FAST
+                    ? ru.wilyfox.client.hud.config.LevelGoalConfig.ServerMode.EVO_FAST : ru.wilyfox.client.hud.config.LevelGoalConfig.ServerMode.EVO;
+            config.levelGoal.discount = discount; config.levelGoal.sanitize();
+            config.mainLayout.widgets.add(ru.wilyfox.client.hud.config.WidgetCatalog.LEVEL_GOAL.key());
+            ru.wilyfox.client.hud.config.ConfigManager.layoutChanged(); ru.wilyfox.client.hud.config.ConfigManager.save();
+            ru.wilyfox.client.Client.getInstance().getHudRenderer().refreshLayout();
+            pinGoal.setMessage(Component.translatable("froghelper.goal.pinned")); pinGoal.active = false;
+        });
+        button(x + 2 * (third + 4), top + 177, w - 2 * (third + 4), 18, Component.translatable("gui.done"), this::onClose);
         refresh();
         setInitialFocus(targetInput);
     }
@@ -107,6 +119,7 @@ public final class LevelCalculatorScreen extends UiSoundScreen {
         discountButton.active = LevelCalculator.discounts(level(target)).size() > 1;
         discountButton.setMessage(discount == LevelCalculator.Discount.NONE ? text("no_discount")
                 : discount == LevelCalculator.Discount.MAX ? text("maximum") : Component.literal(discount.percent() + "%"));
+        if (pinGoal != null) { pinGoal.active = LevelCalculator.calculate(level(current), level(target), server, discount) != null; pinGoal.setMessage(Component.translatable("froghelper.goal.pin")); }
     }
 
     static int level(String value) {
@@ -129,24 +142,26 @@ public final class LevelCalculatorScreen extends UiSoundScreen {
     }
 
     @Override public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
-        graphics.fill(0, 0, width, height, WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0x66));
-        HudBlur.beginFrame(graphics);
-        HudSurface.drawPanel(graphics, left, top, panelWidth, panelHeight, WidgetChrome.FROST, HudSurface.nativeRenderer());
-        graphics.text(font, title, left + 14, top + 12, WidgetTheme.TITLE);
-        graphics.text(font, text("current"), left + 14, top + 54, WidgetTheme.TEXT_SECONDARY);
-        graphics.text(font, text("target"), targetInput.getX(), top + 54, WidgetTheme.TEXT_SECONDARY);
-        graphics.text(font, text("discount"), left + 14, top + 100, WidgetTheme.TEXT_SECONDARY);
-        var result = LevelCalculator.calculate(level(current), level(target), server, discount);
-        row(graphics, 123, "levels", result == null ? "—" : number(result.levels()));
-        row(graphics, 140, "money", result == null ? "—" : amount(result.money()));
-        row(graphics, 157, "blocks", result == null ? "—" : amount(result.blocks()));
-        if (result != null && mouseX >= left + 14 && mouseX < left + panelWidth - 14) {
-            if (mouseY >= top + 138 && mouseY < top + 151)
-                graphics.setTooltipForNextFrame(font, Component.literal(number(result.money())), mouseX, mouseY);
-            else if (mouseY >= top + 155 && mouseY < top + 168)
-                graphics.setTooltipForNextFrame(font, Component.literal(number(result.blocks())), mouseX, mouseY);
+        try (var profile = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("ui/LevelCalculatorScreen/render")) {
+            graphics.fill(0, 0, width, height, WidgetTheme.withAlpha(WidgetTheme.PANEL_BG, 0x66));
+            HudBlur.beginFrame(graphics);
+            HudSurface.drawPanel(graphics, left, top, panelWidth, panelHeight, WidgetChrome.FROST, HudSurface.nativeRenderer());
+            graphics.text(font, title, left + 14, top + 12, WidgetTheme.TITLE);
+            graphics.text(font, text("current"), left + 14, top + 54, WidgetTheme.TEXT_SECONDARY);
+            graphics.text(font, text("target"), targetInput.getX(), top + 54, WidgetTheme.TEXT_SECONDARY);
+            graphics.text(font, text("discount"), left + 14, top + 100, WidgetTheme.TEXT_SECONDARY);
+            var result = LevelCalculator.calculate(level(current), level(target), server, discount);
+            row(graphics, 123, "levels", result == null ? "—" : number(result.levels()));
+            row(graphics, 140, "money", result == null ? "—" : amount(result.money()));
+            row(graphics, 157, "blocks", result == null ? "—" : amount(result.blocks()));
+            if (result != null && mouseX >= left + 14 && mouseX < left + panelWidth - 14) {
+                if (mouseY >= top + 138 && mouseY < top + 151)
+                    graphics.setTooltipForNextFrame(font, Component.literal(number(result.money())), mouseX, mouseY);
+                else if (mouseY >= top + 155 && mouseY < top + 168)
+                    graphics.setTooltipForNextFrame(font, Component.literal(number(result.blocks())), mouseX, mouseY);
+            }
+            super.extractRenderState(graphics, mouseX, mouseY, delta);
         }
-        super.extractRenderState(graphics, mouseX, mouseY, delta);
     }
 
     private void row(GuiGraphicsExtractor graphics, int y, String label, String value) {

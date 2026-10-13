@@ -9,12 +9,14 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 import ru.wilyfox.client.moduser.BackendSocialClient;
+import ru.wilyfox.client.hud.menu.FhDialogScreen;
+import ru.wilyfox.client.hud.widget.*;
 import java.nio.file.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /** Explicit image submission: clipboard paste, file drops and F2 selection never send immediately. */
-public final class FhImageAttachScreen extends Screen {
+public final class FhImageAttachScreen extends FhDialogScreen {
     private final Screen parent;
     private final String parentInputKey;
     private String path = "", caption;
@@ -35,30 +37,28 @@ public final class FhImageAttachScreen extends Screen {
         }
     }
     @Override protected void init() {
-        closed = false;
-        panelWidth = Math.min(360, width - 24); left = (width - panelWidth) / 2; top = Math.max(4, (height - 216) / 2);
+        super.init(); closed = false;
+        panelWidth = Math.min(384, width - 16); left = (width - panelWidth) / 2; top = Math.max(4, (height - 224) / 2);
+        int x = left + 12, w = panelWidth - 24, half = (w - 8) / 2;
         if (clipboardImage == null) {
-            fileInput = addRenderableWidget(new EditBox(font, left, top + 54, panelWidth, 20, Component.translatable("froghelper.chat.image_path")));
+            fileInput = input(x, top + 64, w, Component.translatable("froghelper.chat.image_path"));
             fileInput.setMaxLength(2048); fileInput.setValue(path); fileInput.setResponder(value -> path = value);
         } else {
             fileInput = null;
-            if (preview == null) preview = new FhImageTexture(() -> CompletableFuture.completedFuture(clipboardImage), false);
+            if (preview == null) preview = new FhImageTexture(() -> CompletableFuture.completedFuture(clipboardImage), false, "chat/imageAttach/preview");
         }
-        captionInput = addRenderableWidget(new EditBox(font, left, top + 132, panelWidth, 20, Component.translatable("froghelper.chat.image_caption")));
+        captionInput = input(x, top + 140, w, Component.translatable("froghelper.chat.image_caption"));
         captionInput.setMaxLength(256); captionInput.setValue(caption); captionInput.setResponder(value -> caption = value);
-        addRenderableWidget(Button.builder(Component.translatable("froghelper.chat.image_screenshot"), button -> latestScreenshot())
-                .bounds(left, top + 160, panelWidth / 2 - 3, 20).build());
-        addRenderableWidget(Button.builder(Component.translatable("froghelper.chat.image_clipboard"), button -> paste())
-                .bounds(left + panelWidth / 2 + 3, top + 160, panelWidth / 2 - 3, 20).build());
-        send = addRenderableWidget(Button.builder(Component.translatable("froghelper.chat.image_send"), button -> {
+        button(x, top + 168, half, Component.translatable("froghelper.chat.image_screenshot"), false, this::latestScreenshot);
+        button(x + half + 8, top + 168, w - half - 8, Component.translatable("froghelper.chat.image_clipboard"), false, this::paste);
+        send = button(x, top + 194, half, Component.translatable("froghelper.chat.image_send"), true, () -> {
             try {
                 if (clipboardImage != null) BackendSocialClient.sendChatImage(clipboardImage, caption);
                 else BackendSocialClient.sendChatImage(Path.of(path.strip().replaceAll("^\"|\"$", "")), caption);
                 onClose();
             } catch (InvalidPathException invalid) { minecraft.gui.hud.setOverlayMessage(Component.translatable("froghelper.chat.image_send_failed"), false); }
-        }).bounds(left, top + 186, panelWidth / 2 - 3, 20).build());
-        addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), button -> onClose())
-                .bounds(left + panelWidth / 2 + 3, top + 186, panelWidth / 2 - 3, 20).build());
+        });
+        button(x + half + 8, top + 194, w - half - 8, Component.translatable("gui.cancel"), false, this::onClose);
         send.active = clipboardImage == null;
         setInitialFocus(fileInput == null ? captionInput : fileInput);
     }
@@ -67,25 +67,31 @@ public final class FhImageAttachScreen extends Screen {
             minecraft.gui.hud.setOverlayMessage(Component.translatable("froghelper.chat.clipboard_empty"), false);
     }
     private void acceptClipboard(byte[] bytes) {
-        if (closed) return;
-        if (preview != null) { preview.close(); preview = null; }
-        clipboardImage = bytes; clearWidgets(); init();
+        try (var profile = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("chat/imageAttach/acceptClipboard")) {
+            if (closed) return;
+            if (preview != null) { preview.close(); preview = null; }
+            clipboardImage = bytes; clearWidgets(); init();
+        }
     }
     private void selectFile(Path file) {
-        if (closed) return;
-        if (preview != null) { preview.close(); preview = null; }
-        clipboardImage = null; path = file.toAbsolutePath().toString(); clearWidgets(); init();
+        try (var profile = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("chat/imageAttach/selectFile")) {
+            if (closed) return;
+            if (preview != null) { preview.close(); preview = null; }
+            clipboardImage = null; path = file.toAbsolutePath().toString(); clearWidgets(); init();
+        }
     }
     private void latestScreenshot() {
         Path directory = minecraft.gameDirectory.toPath().resolve("screenshots");
         var client = minecraft;
         FhImages.supply(() -> {
-            Path newest = null; long time = Long.MIN_VALUE;
-            try (var files = Files.newDirectoryStream(directory, "*.png")) {
-                for (var file : files) { long stamp = Files.getLastModifiedTime(file).toMillis();
-                    if (stamp > time) { time = stamp; newest = file; } }
-            } catch (java.io.IOException ignored) { }
-            return newest;
+            try (var profile = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("chat/imageAttach/findScreenshot")) {
+                Path newest = null; long time = Long.MIN_VALUE;
+                try (var files = Files.newDirectoryStream(directory, "*.png")) {
+                    for (var file : files) { long stamp = Files.getLastModifiedTime(file).toMillis();
+                        if (stamp > time) { time = stamp; newest = file; } }
+                } catch (java.io.IOException ignored) { }
+                return newest;
+            }
         }).thenAccept(file -> client.execute(() -> {
             if (closed || client.gui.screen() != this) return;
             if (file != null) selectFile(file);
@@ -98,30 +104,35 @@ public final class FhImageAttachScreen extends Screen {
         return super.keyPressed(event);
     }
     @Override public void onFilesDrop(List<Path> files) { if (!files.isEmpty()) selectFile(files.getFirst()); }
-    @Override public void extractRenderState(GuiGraphicsExtractor graphics, int x, int y, float delta) {
-        graphics.fill(0, 0, width, height, 0xE8101010);
-        graphics.centeredText(font, title, width / 2, top + 10, 0xFFFFFFFF);
-        String limits = font.plainSubstrByWidth(Component.translatable("froghelper.chat.image_limits").getString(), panelWidth);
-        graphics.centeredText(font, limits, width / 2, top + 26, 0xFFAAAAAA);
-        if (clipboardImage == null) graphics.text(font, Component.translatable("froghelper.chat.image_path"), left, top + 40, 0xFFAAAAAA);
-        else {
-            graphics.fill(left, top + 40, left + panelWidth, top + 114, 0xFF181818);
+    @Override protected void extractDialogContents(GuiGraphicsExtractor graphics, int x, int y, float delta) {
+        dialog(graphics, left, top, panelWidth, 224);
+        int contentX = left + 12, contentWidth = panelWidth - 24;
+        String limits = font.plainSubstrByWidth(Component.translatable("froghelper.chat.image_limits").getString(), contentWidth);
+        graphics.text(font, limits, contentX, top + 28, WidgetTheme.TEXT_SECONDARY);
+        if (clipboardImage == null) {
+            graphics.text(font, font.plainSubstrByWidth(Component.translatable("froghelper.chat.image_path").getString(), contentWidth),
+                    contentX, top + 48, WidgetTheme.TEXT_SECONDARY);
+        } else {
+            HudSurface.fillRounded(graphics, contentX, top + 46, contentWidth, 74, 4, WidgetTheme.PANEL_BG_SOFT);
             if (preview != null && preview.loaded()) {
-                float scale = Math.min(panelWidth / (float) preview.width(), 70f / preview.height());
+                float scale = Math.min((contentWidth - 8) / (float) preview.width(), 66f / preview.height());
                 int w = Math.max(1, Math.round(preview.width() * scale)), h = Math.max(1, Math.round(preview.height() * scale));
-                graphics.blit(RenderPipelines.GUI_TEXTURED, preview.id(), left + (panelWidth - w) / 2, top + 42 + (70 - h) / 2,
+                graphics.blit(RenderPipelines.GUI_TEXTURED, preview.id(), contentX + (contentWidth - w) / 2, top + 50 + (66 - h) / 2,
                         0, 0, w, h, preview.width(), preview.height(), preview.width(), preview.height());
-            } else graphics.centeredText(font, Component.translatable(preview != null && preview.failed()
-                    ? "froghelper.chat.image_send_failed" : "froghelper.chat.image_loading"), width / 2, top + 72, 0xFFAAAAAA);
+            } else {
+                var lines = font.split(Component.translatable(preview != null && preview.failed()
+                        ? "froghelper.chat.image_send_failed" : "froghelper.chat.image_loading"), contentWidth - 16);
+                for (int i = 0; i < lines.size(); i++) graphics.text(font, lines.get(i), contentX + 8,
+                        top + 83 - lines.size() * font.lineHeight / 2 + i * font.lineHeight, WidgetTheme.TEXT_SECONDARY);
+            }
             send.active = preview != null && preview.loaded();
         }
-        graphics.text(font, Component.translatable("froghelper.chat.image_caption"), left, top + 120, 0xFFAAAAAA);
-        super.extractRenderState(graphics, x, y, delta);
+        graphics.text(font, Component.translatable("froghelper.chat.image_caption"), contentX, top + 128, WidgetTheme.TEXT_SECONDARY);
     }
     @Override public boolean isPauseScreen() { return false; }
     @Override public void onClose() {
         minecraft.gui.setScreen(parent);
         if (parentInputKey != null && parent instanceof ru.wilyfox.bridge.ChatInputHost host) host.froghelper$focusInput(parentInputKey);
     }
-    @Override public void removed() { closed = true; if (preview != null) { preview.close(); preview = null; } }
+    @Override public void removed() { closed = true; if (preview != null) { preview.close(); preview = null; } super.removed(); }
 }

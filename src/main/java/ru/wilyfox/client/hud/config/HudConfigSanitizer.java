@@ -22,6 +22,12 @@ final class HudConfigSanitizer {
         if (sanitized.bossWidget == null) sanitized.bossWidget = new BossWidgetConfig();
         if (sanitized.clicker == null) sanitized.clicker = new ClickerConfig();
         sanitized.clicker.sanitize();
+        if (sanitized.levelGoal == null) sanitized.levelGoal = new LevelGoalConfig();
+        sanitized.levelGoal.sanitize();
+        if (sanitized.nearbyWorms == null) sanitized.nearbyWorms = new NearbyMineWidgetConfig();
+        if (sanitized.nearbyBarrels == null) sanitized.nearbyBarrels = new NearbyMineWidgetConfig();
+        if (sanitized.nearbyCrystals == null) sanitized.nearbyCrystals = new NearbyMineWidgetConfig();
+        sanitized.nearbyWorms.sanitize(); sanitized.nearbyBarrels.sanitize(); sanitized.nearbyCrystals.sanitize();
         if (sanitized.miningStatistics == null) sanitized.miningStatistics = new MiningStatisticsConfig();
         sanitized.miningStatistics.sanitize();
         if (sanitized.blocksPerSecondWidget == null) sanitized.blocksPerSecondWidget = new BlocksPerSecondWidgetConfig();
@@ -183,7 +189,7 @@ final class HudConfigSanitizer {
         while (tabIterator.hasNext()) {
             var entry = tabIterator.next();
             if (!WidgetCatalog.isCustomChatKey(entry.getKey())) continue;
-            if (++customTabs > 12) { tabIterator.remove(); continue; }
+            if (++customTabs > ChatWidgetConfig.MAX_CUSTOM_TABS) { tabIterator.remove(); continue; }
             if (entry.getValue() == null) entry.setValue(new ChatWidgetConfig(ru.wilyfox.client.chat.ChatTab.ALL));
             entry.getValue().sanitize(ru.wilyfox.client.chat.ChatTab.ALL);
         }

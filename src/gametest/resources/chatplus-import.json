@@ -1,0 +1,17 @@
+{
+  "chatWindows": [
+    {
+      "tabSettings": {
+        "tabs": [
+          {"settings": [
+            {"name": "Joined", "pattern": "(?iu)^(?!.*:).*(заш[её]л|выш[её]л).*", "skipOthers": true, "priority": 10},
+            {"name": "Joined DW", "pattern": ".*DW.*", "serverPattern": {"pattern": ".*diamondworld.*"}, "priority": 10}
+          ]},
+          {"settings": [{"name": "Rewards", "pattern": "(?iu).*Награда.*", "priority": 2}]},
+          {"settings": [{"name": "Colored", "pattern": "§a.*", "formatted": true}]},
+          {"settings": [{"name": "Invalid", "pattern": "["}]}
+        ]
+      }
+    }
+  ]
+}

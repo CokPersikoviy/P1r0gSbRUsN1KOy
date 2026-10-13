@@ -32,6 +32,19 @@ public class BossWidgetConfig {
     public boolean showLevel = true;
     public boolean showTimer = true;
     public boolean showCollectibles = true;
+    public boolean showCapture = true;
+    public boolean showMythical = true;
+    public boolean showTitle = true;
+    /** Empty/invalid codes use the current theme, including the spawned-boss accent. */
+    public java.util.Map<BossTimerElement, String> colors = new java.util.EnumMap<>(BossTimerElement.class);
+
+    public String colorCode(BossTimerElement part) {
+        return colors == null ? "" : java.util.Objects.requireNonNullElse(colors.get(part), "");
+    }
+    public void colorCode(BossTimerElement part, String value) {
+        if (colors == null) colors = new java.util.EnumMap<>(BossTimerElement.class);
+        colors.put(part, value == null ? "" : value.replace('§', '&'));
+    }
 
     /** How long (seconds) a spawned boss keeps counting into the negative before it drops from the timer. */
     public int postSpawnShowSeconds = 30;

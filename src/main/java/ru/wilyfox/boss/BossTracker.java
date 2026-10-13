@@ -11,20 +11,17 @@ import ru.wilyfox.utils.BossName;
 import ru.wilyfox.utils.Formatting;
 
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
-import java.util.Iterator;
-import java.util.Set;
 
 import static ru.wilyfox.FrogHelper.LOGGER;
 import static ru.wilyfox.client.debug.DebugLogger.info;
 
 public class BossTracker {
-    private final Set<Integer> pendingEntityIds = new HashSet<>();
-    // Keep only name/registry snapshots, never entities or old worlds. Decorations often keep
-    // an unrelated custom name for their entire lifetime; do not parse it on every tick.
+    // Live candidates are removed on unload/reset. Avoid looking up every decorative entity
+    // in the world's entity index each tick, and keep the last rejected name alongside it.
+    // HashMap keeps the ID-set's traversal order used to pair adjacent name/time holograms.
     private final Map<Integer, CheckedName> checkedNames = new HashMap<>();
     private final BossRepository repository;
     private ClientLevel trackedWorld;
@@ -38,12 +35,15 @@ public class BossTracker {
 
     public void onEntityLoad(Entity entity) {
         if (entity.level() instanceof ClientLevel world) observeWorld(world);
-        checkedNames.remove(entity.getId());
-        pendingEntityIds.add(entity.getId());
+        checkedNames.put(entity.getId(), new CheckedName(entity));
+    }
+
+    public void onEntityUnload(Entity entity) {
+        CheckedName candidate = checkedNames.get(entity.getId());
+        if (candidate != null && candidate.entity == entity) checkedNames.remove(entity.getId());
     }
 
     public void reset() {
-        pendingEntityIds.clear();
         checkedNames.clear();
         pendingBossName = null;
         pendingBossTimeMillis = null;
@@ -59,28 +59,26 @@ public class BossTracker {
 
     public void onWorldTick(ClientLevel world) {
         observeWorld(world);
-        Iterator<Integer> it = pendingEntityIds.iterator();
+        var it = checkedNames.values().iterator();
         long catalogRevision = BossTypeCatalog.revision();
         List<DwBossType> catalog = null;
 
         while (it.hasNext()) {
-            Integer id = it.next();
-            Entity entity = world.getEntity(id);
+            CheckedName previous = it.next();
+            Entity entity = previous.entity;
 
-            if (entity == null) {
+            if (entity.isRemoved() || entity.level() != world) {
                 it.remove();
-                checkedNames.remove(id);
                 continue;
             }
 
             Component customName = entity.getCustomName();
             if (customName == null) {
-                checkedNames.remove(id);
+                previous.name = null;
                 continue;
             }
 
-            CheckedName previous = checkedNames.get(id);
-            if (previous != null && previous.catalogRevision() == catalogRevision && previous.name().equals(customName)) {
+            if (previous.name != null && previous.catalogRevision == catalogRevision && previous.name.equals(customName)) {
                 continue;
             }
             String raw = customName.getString();
@@ -92,7 +90,6 @@ public class BossTracker {
             if (bossName != null) {
                 pendingBossName = bossName;
                 it.remove();
-                checkedNames.remove(id);
                 tryCommit();
                 continue;
             }
@@ -102,15 +99,20 @@ public class BossTracker {
             if (millis != -1) {
                 pendingBossTimeMillis = millis;
                 it.remove();
-                checkedNames.remove(id);
                 tryCommit();
             } else {
-                checkedNames.put(id, new CheckedName(snapshotName(customName), catalogRevision));
+                previous.name = snapshotName(customName);
+                previous.catalogRevision = catalogRevision;
             }
         }
     }
 
-    private record CheckedName(Component name, long catalogRevision) {}
+    private static final class CheckedName {
+        private final Entity entity;
+        private Component name;
+        private long catalogRevision;
+        private CheckedName(Entity entity) { this.entity = entity; }
+    }
 
     private static Component snapshotName(Component name) {
         var copy = name.copy();

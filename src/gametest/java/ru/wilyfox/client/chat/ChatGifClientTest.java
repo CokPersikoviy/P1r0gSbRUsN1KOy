@@ -18,6 +18,7 @@ import net.minecraft.resources.Identifier;
 public final class ChatGifClientTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
         try (var world = context.worldBuilder().create()) {
+            context.runOnClient(client -> { verifyPixelConversion(); benchmarkConversion(); });
             byte[] bytes = gif();
             var parent = context.computeOnClient(client -> new ChatScreen("caption", false));
             var viewer = context.computeOnClient(client -> new FhImageScreen(parent, () -> CompletableFuture.completedFuture(bytes)));
@@ -48,6 +49,42 @@ public final class ChatGifClientTest implements FabricClientGameTest {
             check(context.computeOnClient(client -> client.gui.screen() == parent), "Late GIF download reopened viewer");
             System.out.println("FH GIF: actual animated texture, close cleanup and late completion passed");
         } finally { context.runOnClient(client -> client.gui.setScreen(null)); }
+    }
+    private static void verifyPixelConversion() {
+        int tested = 0;
+        for (int type : new int[]{BufferedImage.TYPE_INT_ARGB, BufferedImage.TYPE_INT_ARGB_PRE,
+                BufferedImage.TYPE_INT_RGB, BufferedImage.TYPE_4BYTE_ABGR, BufferedImage.TYPE_BYTE_INDEXED}) {
+            var source = new BufferedImage(17, 11, type);
+            for (int y = 0; y < 11; y++) for (int x = 0; x < 17; x++) source.setRGB(x, y, (x * 15) << 24 | (y * 20) << 16 | x * 10 << 8 | y * 12);
+            for (var image : new BufferedImage[]{source, source.getSubimage(3, 2, 9, 6)}) {
+                try (var converted = FhImages.gifPixels(new GifAnimation.Frame(image, 100))) {
+                    for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++)
+                        check(converted.getPixel(x, y) == image.getRGB(x, y), "Optimized GIF conversion changed a pixel/alpha");
+                }
+                tested++;
+            }
+        }
+        System.out.println("GIF conversion: " + tested + " image/subimage cases preserve every original ARGB pixel");
+    }
+    private static void benchmarkConversion() {
+        var image = new BufferedImage(512, 256, BufferedImage.TYPE_INT_ARGB);
+        var bean = (com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
+        if (!bean.isThreadAllocatedMemorySupported()) return;
+        if (!bean.isThreadAllocatedMemoryEnabled()) bean.setThreadAllocatedMemoryEnabled(true);
+        for (int i = 0; i < 4; i++) { try (var old = legacyPixels(image); var fresh = FhImages.gifPixels(new GifAnimation.Frame(image, 100))) { } }
+        long thread = Thread.currentThread().threadId(), before = bean.getThreadAllocatedBytes(thread), started = System.nanoTime();
+        for (int i = 0; i < 20; i++) try (var converted = legacyPixels(image)) { converted.getPixel(0, 0); }
+        long oldTime = System.nanoTime() - started, oldBytes = bean.getThreadAllocatedBytes(thread) - before;
+        before = bean.getThreadAllocatedBytes(thread); started = System.nanoTime();
+        for (int i = 0; i < 20; i++) try (var converted = FhImages.gifPixels(new GifAnimation.Frame(image, 100))) { converted.getPixel(0, 0); }
+        long newTime = System.nanoTime() - started, newBytes = bean.getThreadAllocatedBytes(thread) - before;
+        System.out.println("GIF benchmark 20 x 512x256: previous=" + oldTime / 1e6 + "ms, " + oldBytes
+                + " allocated bytes; optimized=" + newTime / 1e6 + "ms, " + newBytes + " allocated bytes");
+    }
+    private static com.mojang.blaze3d.platform.NativeImage legacyPixels(BufferedImage image) {
+        var result = new com.mojang.blaze3d.platform.NativeImage(image.getWidth(), image.getHeight(), false);
+        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) result.setPixel(x, y, image.getRGB(x, y));
+        image.flush(); return result;
     }
     static byte[] gif() {
         var bytes = new ByteArrayOutputStream();

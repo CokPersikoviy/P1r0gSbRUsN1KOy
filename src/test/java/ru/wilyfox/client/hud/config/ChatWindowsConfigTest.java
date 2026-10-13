@@ -56,12 +56,32 @@ class ChatWindowsConfigTest {
             config.chatWidgets.put("ChatWidgetCustom_" + String.format("%08x", i) + "-bbbb-cccc-dddd-eeeeeeeeeeee", tab);
         }
         var repaired = HudConfigSanitizer.sanitize(config);
-        assertEquals(19, repaired.chatWidgets.size());
+        assertEquals(27, repaired.chatWidgets.size());
         assertEquals(ChatTab.CLAN, repaired.chatWidgets.get("ChatWidgetClan").channel);
         var custom = repaired.chatWidgets.values().stream().filter(tab -> tab.width == 100).findFirst().orElseThrow();
         assertEquals(30, custom.rows); assertEquals(ChatTab.ALL, custom.channel); assertEquals("", custom.textFilter);
         assertEquals(ChatWidgetVisibility.ALWAYS, custom.visibility);
         assertNull(WidgetCatalog.find("ChatWidgetCustom_bad"));
+    }
+    @Test void twentyCustomTabsAnd512CharacterRegexSurviveReloadTogether() {
+        var config = new HudConfig();
+        String regex = "^" + "a".repeat(500) + "(?:b|c){1}$";
+        assertEquals(512, regex.length());
+        for (int i = 0; i < 20; i++) {
+            String key = "ChatWidgetCustom_" + String.format("%08x", i) + "-bbbb-cccc-dddd-eeeeeeeeeeee";
+            var tab = new ChatWidgetConfig(ChatTab.ALL); tab.textFilter = regex;
+            config.chatWidgets.put(key, tab); config.chatTabOrder.add(key);
+        }
+        var gson = HudConfigCodec.createGson();
+        var restored = HudConfigCodec.decode(gson, gson.toJsonTree(config));
+        assertEquals(20, restored.chatWidgets.keySet().stream().filter(WidgetCatalog::isCustomChatKey).count());
+        for (var entry : restored.chatWidgets.entrySet()) if (WidgetCatalog.isCustomChatKey(entry.getKey())) {
+            assertEquals(regex, entry.getValue().textFilter);
+            assertTrue(entry.getValue().regexFilter);
+            var filter = ru.wilyfox.client.chat.ChatTextFilter.compile(entry.getValue().textFilter, true);
+            assertTrue(filter.matches("a".repeat(500) + "b"));
+            assertFalse(filter.matches("a".repeat(500) + "d"));
+        }
     }
     @Test void transientChatVisibilityHasAnIdleHoldAndFadeAndOpeningAlwaysRevealsHistory() {
         var mode = ChatWidgetVisibility.CHAT_OPEN;

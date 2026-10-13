@@ -31,6 +31,9 @@ public final class ClipboardImageClientTest implements FabricClientGameTest {
         var original = context.computeOnClient(client -> ConfigManager.snapshot());
         var originalSource = context.computeOnClient(client -> field(FhClipboardImages.class, null, "source"));
         var originalBackend = context.computeOnClient(client -> field(BackendSocialClient.class, null, "DEFAULT"));
+        int guiScale = context.computeOnClient(client -> client.options.guiScale().get());
+        int windowWidth = context.computeOnClient(client -> client.getWindow().getScreenWidth());
+        int windowHeight = context.computeOnClient(client -> client.getWindow().getScreenHeight());
         var submitted = new AtomicReference<byte[]>(); var caption = new AtomicReference<String>();
         var reads = new AtomicInteger(); var cancelled = new CountDownLatch(1);
         byte[] png;
@@ -83,6 +86,22 @@ public final class ClipboardImageClientTest implements FabricClientGameTest {
                         "Preview pixels have wrong channel order");
             });
             context.waitTicks(2); context.takeScreenshot("fh-clipboard-image");
+            context.runOnClient(client -> {
+                client.getWindow().setWindowed(1000, 760);
+            });
+            context.waitTicks(2);
+            context.runOnClient(client -> {
+                client.options.guiScale().set(3); client.resizeGui();
+                check(attach.width <= 360, "Compact attach fixture did not reach the intended GUI scale");
+                var input = (EditBox) field(FhImageAttachScreen.class, attach, "captionInput");
+                attach.mouseClicked(new MouseButtonEvent(input.getX() + 6, input.getY() + 8, new MouseButtonInfo(0, 0)), false);
+                check(input.isFocused() && input.getCursorPosition() == 0, "Themed input lost its native caret hit position");
+                var sendButton = (Button) field(FhImageAttachScreen.class, attach, "send");
+                check(sendButton.getRight() <= attach.width && sendButton.getBottom() <= attach.height, "Attach actions leave a compact GUI");
+                check(input.getValue().equals("Clipboard caption"), "Resize discarded image caption");
+            });
+            context.waitTicks(2); context.takeScreenshot("fh-clipboard-image-small");
+            context.runOnClient(client -> { client.options.guiScale().set(guiScale); client.getWindow().setWindowed(windowWidth, windowHeight); client.resizeGui(); });
             var pixels = context.computeOnClient(client -> {
                 var preview = (FhImageTexture) field(FhImageAttachScreen.class, attach, "preview");
                 return ((DynamicTexture) client.getTextureManager().getTexture(preview.id())).getPixels();
@@ -148,6 +167,7 @@ public final class ClipboardImageClientTest implements FabricClientGameTest {
                 client.gui.setScreen(null); set(FhClipboardImages.class, null, "source", originalSource);
                 set(BackendSocialClient.class, null, "DEFAULT", originalBackend);
                 ChatTabManager.getInstance().clearBackendMessages(); ConfigManager.restoreSnapshot(original);
+                client.options.guiScale().set(guiScale); client.getWindow().setWindowed(windowWidth, windowHeight); client.resizeGui();
             });
         }
     }

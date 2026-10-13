@@ -44,6 +44,10 @@ public class HudConfig {
     public OutgoingChatQueueConfig outgoingChatQueue = new OutgoingChatQueueConfig();
     public ProtocolGraphWidgetConfig protocolGraphWidget = new ProtocolGraphWidgetConfig();
     public LevelProgressConfig levelProgress = new LevelProgressConfig();
+    public LevelGoalConfig levelGoal = new LevelGoalConfig();
+    public NearbyMineWidgetConfig nearbyWorms = new NearbyMineWidgetConfig();
+    public NearbyMineWidgetConfig nearbyBarrels = new NearbyMineWidgetConfig();
+    public NearbyMineWidgetConfig nearbyCrystals = new NearbyMineWidgetConfig();
     public PopUpsConfig popUps = new PopUpsConfig();
     public BoostersConfig boosters = new BoostersConfig();
     public BossRespawnMessagesConfig bossRespawnMessages = new BossRespawnMessagesConfig();

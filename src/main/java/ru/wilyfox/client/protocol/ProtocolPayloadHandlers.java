@@ -526,6 +526,7 @@ final class ProtocolPayloadHandlers {
     }
 
     static void applyFishingSpots(ProtocolState state, DwFishingSpotsPacket packet) {
+        state.fishingRevision++;
         packet.locations().forEach((rawId, rawName) -> {
             String id = DiamondWorldProtocolClient.normalizeLocationId(rawId);
             if (id == null) {
@@ -538,6 +539,7 @@ final class ProtocolPayloadHandlers {
     }
 
     static void applySpotNibbles(ProtocolState state, DwSpotNibblesPacket packet) {
+        state.fishingRevision++;
         packet.nibbles().forEach((rawId, value) -> {
             String id = DiamondWorldProtocolClient.normalizeLocationId(rawId);
             if (id != null) {

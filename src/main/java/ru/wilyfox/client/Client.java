@@ -126,6 +126,7 @@ public class Client {
 
     public void init() {
         ModProfiler.getInstance().registerDiagnostics();
+        ru.wilyfox.client.profiler.DisplayProbe.register();
         ru.wilyfox.client.profiler.AutomaticDiagnostics.register();
         SodiumBrushableBlockEntityCulling.registerIfAvailable();
         ru.wilyfox.client.command.FhCommands.register();
@@ -222,6 +223,11 @@ public class Client {
         hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.MiningStatisticsWidget(20, 95, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
         hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.RouletteTimerWidget(20, 45, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
         hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.DailyCreditsTimerWidget(20, 70, HudLayer.CONTENT), ScreenAnchor.TOP_LEFT);
+        var levelGoal = new ru.wilyfox.client.hud.widget.LevelGoalWidget(20, 140, HudLayer.CONTENT, levelProgressStore);
+        hudRenderer.registerWidget(levelGoal, ScreenAnchor.TOP_LEFT);
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(levelGoal::tick);
+        for (var kind : ru.wilyfox.client.highlight.NearbyMineState.Kind.values())
+            hudRenderer.registerWidget(new ru.wilyfox.client.hud.widget.NearbyMineWidget(20, 175 + kind.ordinal() * 32, HudLayer.CONTENT, kind), ScreenAnchor.TOP_LEFT);
         hudRenderer.registerWidget(
                 new BoostersWidget(20, 20, HudLayer.CONTENT, boosterStore),
                 ScreenAnchor.TOP_RIGHT

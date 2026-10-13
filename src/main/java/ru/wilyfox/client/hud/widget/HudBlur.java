@@ -15,12 +15,26 @@ import ru.wilyfox.client.profiler.ModProfiler;
 /** Captures the world before GUI drawing and composites only the rounded panel regions. */
 public final class HudBlur {
     private static final Identifier BLUR_CHAIN = Identifier.fromNamespaceAndPath("froghelper", "hud_blur");
+    // The vanilla outline blit only writes RGB: after a transparent clear it loses the entire
+    // blur's alpha. This copy writes all RGBA channels without blending into the old frame.
+    private static final com.mojang.blaze3d.pipeline.RenderPipeline DOWNSAMPLE_PIPELINE =
+            com.mojang.blaze3d.pipeline.RenderPipeline.builder(net.minecraft.client.renderer.RenderPipelines.POST_PROCESSING_SNIPPET)
+                    .withLocation(Identifier.fromNamespaceAndPath("froghelper", "pipeline/hud_downsample"))
+                    .withVertexShader("core/screenquad")
+                    .withFragmentShader("core/blit_screen")
+                    .withBindGroupLayout(net.minecraft.client.renderer.BindGroupLayouts.IN_SAMPLER)
+                    .withColorTargetState(com.mojang.blaze3d.pipeline.ColorTargetState.DEFAULT)
+                    .withDepthStencilState(java.util.Optional.empty()).withCull(false).build();
     private static TextureTarget blurred;
     private static CrossFrameResourcePool pool;
     private static boolean requested;
     private static boolean available;
     private static long lastFailureLog;
     private static GuiGraphicsExtractor preparedContext;
+    private static int sourceWidth, sourceHeight;
+    private static final int DOWNSAMPLE = 4;
+
+    static int targetSize(int pixels) { return Math.max(1, Math.ceilDiv(pixels, DOWNSAMPLE)); }
 
     private HudBlur() {}
 
@@ -52,12 +66,15 @@ public final class HudBlur {
                 return;
             }
             var format = main.getColorTexture().getFormat();
-            if (blurred == null || blurred.width != window.width || blurred.height != window.height
+            int width = targetSize(window.width), height = targetSize(window.height);
+            if (blurred == null || blurred.width != width || blurred.height != height
                     || blurred.getColorTexture().getFormat() != format) {
-                TextureTarget replacement = new TextureTarget("FrogHelper HUD blur", window.width, window.height, false, format);
+                TextureTarget replacement = new TextureTarget("FrogHelper HUD blur", width, height, false, format);
                 if (blurred != null) blurred.destroyBuffers();
                 blurred = replacement;
             }
+            sourceWidth = window.width;
+            sourceHeight = window.height;
             available = true;
         } catch (Exception exception) {
             fail(exception);
@@ -71,16 +88,25 @@ public final class HudBlur {
         try (ModProfiler.Scope ignored = ModProfiler.getInstance().scope("hud/blur/capture")) {
             Minecraft mc = Minecraft.getInstance();
             RenderTarget main = mc.gameRenderer.mainRenderTarget();
-            if (main.width != blurred.width || main.height != blurred.height) {
+            if (main.width != sourceWidth || main.height != sourceHeight) {
                 // Never replace the texture here: the extracted GUI already owns its view.
                 throw new IllegalStateException("HUD blur target does not match the current framebuffer");
             }
-            RenderSystem.getDevice().createCommandEncoder().copyTextureToTexture(
-                    main.getColorTexture(), blurred.getColorTexture(), 0, 0, 0, 0, 0, blurred.width, blurred.height);
+            // Render a filtered copy: texture-to-texture copies cannot scale between resolutions.
+            try (var downsample = ModProfiler.getInstance().scope("hud/blur/downsample");
+                 var pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+                         () -> "FrogHelper HUD downsample", blurred.getColorTextureView(),
+                         java.util.Optional.of(new org.joml.Vector4f(0)))) {
+                pass.setPipeline(DOWNSAMPLE_PIPELINE);
+                RenderSystem.bindDefaultUniforms(pass);
+                pass.bindTexture("InSampler", main.getColorTextureView(),
+                        RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+                pass.draw(3, 1, 0, 0);
+            }
             var chain = mc.getShaderManager().getPostChain(BLUR_CHAIN, LevelTargetBundle.MAIN_TARGETS);
             if (chain == null) return;
             if (pool == null) pool = new CrossFrameResourcePool(3);
-            chain.process(blurred, pool);
+            try (var filter = ModProfiler.getInstance().scope("hud/blur/filter")) { chain.process(blurred, pool); }
             pool.endFrame();
         } catch (Exception exception) {
             fail(exception);
@@ -115,6 +141,7 @@ public final class HudBlur {
         available = false;
         lastFailureLog = 0;
         preparedContext = null;
+        sourceWidth = sourceHeight = 0;
     }
 
     private static void fail(Exception exception) {
