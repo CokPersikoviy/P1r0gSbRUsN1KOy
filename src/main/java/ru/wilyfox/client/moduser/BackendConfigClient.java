@@ -33,7 +33,9 @@ final class BackendConfigClient {
         if (!ready || token == null || now < nextPublish || upload != null && !upload.isDone()) return;
         nextPublish = now + 5_000;
         final String body;
-        try { body = SharedConfigCodec.encode(ConfigProfiles.primaryShared()); }
+        try (var ignored = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("config/share/prepare")) {
+            body = ConfigProfiles.primarySharedEncoded();
+        }
         catch (Exception failure) { nextPublish = now + 60_000; return; }
         if (body.equals(sent) && now - lastPublished < 30_000) return;
         long attempt = generation;

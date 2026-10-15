@@ -68,9 +68,7 @@ public final class ProfilerDebugCommand {
             case "report" -> showLines(profiler.buildReportLines(option));
             case "dump", "save" -> dumpReport(profiler, option);
             case "dump-full" -> dumpFullReport(profiler, option);
-            case "displays" -> showLocalMessage(option.isBlank() || option.equalsIgnoreCase("status")
-                    ? DisplayProbe.status() : DisplayProbe.start(minecraft, option));
-            default -> showLocalMessage("Usage: /fhprof <status|start|stop|reset|report [prefix]|dump [prefix]|dump-full [prefix]|displays [label|status]>");
+            default -> showLocalMessage("Usage: /fhprof <status|start|stop|reset|report [prefix]|dump [prefix]|dump-full [prefix]>");
         }
 
         return true;

@@ -12,8 +12,9 @@ public final class LevelProgressStore {
     private volatile long levelInfoRevision;
     private volatile boolean lastLevelInfoCompleted;
     private volatile long lastCompletionRevision;
+    private volatile LevelProgressSnapshot snapshot = createSnapshot();
 
-    public void updateCurrent(Integer level, Integer blocks, Double money) {
+    public synchronized void updateCurrent(Integer level, Integer blocks, Double money) {
         if (level == null && blocks == null && money == null) {
             return;
         }
@@ -28,9 +29,10 @@ public final class LevelProgressStore {
             this.money = Math.max(0.0D, money);
         }
         this.hasCurrentData = true;
+        snapshot = createSnapshot();
     }
 
-    public void updateRequirements(int requiredBlocks, double requiredMoney, boolean maxLevel) {
+    public synchronized void updateRequirements(int requiredBlocks, double requiredMoney, boolean maxLevel) {
         int sanitizedBlocks = Math.max(0, requiredBlocks);
         double sanitizedMoney = Math.max(0.0D, requiredMoney);
 
@@ -38,9 +40,10 @@ public final class LevelProgressStore {
         this.requiredMoney = sanitizedMoney;
         this.maxLevel = maxLevel;
         this.hasRequirementData = true;
+        snapshot = createSnapshot();
     }
 
-    public void updateFromLevelInfo(
+    public synchronized void updateFromLevelInfo(
             int level,
             int blocks,
             double money,
@@ -64,9 +67,14 @@ public final class LevelProgressStore {
             this.lastCompletionRevision = this.levelInfoRevision;
         }
         this.lastLevelInfoCompleted = completed;
+        snapshot = createSnapshot();
     }
 
     public LevelProgressSnapshot getSnapshot() {
+        return snapshot;
+    }
+
+    private LevelProgressSnapshot createSnapshot() {
         return new LevelProgressSnapshot(
                 level,
                 blocks,
@@ -80,7 +88,7 @@ public final class LevelProgressStore {
         );
     }
 
-    public void clear() {
+    public synchronized void clear() {
         level = 0;
         blocks = 0;
         money = 0.0D;
@@ -92,6 +100,7 @@ public final class LevelProgressStore {
         levelInfoRevision = 0L;
         lastLevelInfoCompleted = false;
         lastCompletionRevision = 0L;
+        snapshot = createSnapshot();
     }
 
     public record LevelProgressSnapshot(

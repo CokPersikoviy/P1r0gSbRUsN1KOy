@@ -8,7 +8,8 @@ import java.util.Set;
 public final class SharedConfigCodec {
     public static final int MAX_BYTES = 131_072;
     private static final Gson GSON = HudConfigCodec.createGson();
-    public static final Set<String> BINDINGS = Set.of("Clicker", "Editing Mode", "Quick Access", "Settings Menu",
+    private static final Gson WIRE_GSON = new Gson();
+    public static final Set<String> BINDINGS = Set.of("Clicker", "Clicker mode", "Editing Mode", "Quick Access", "Settings Menu",
             "Clan Hide", "Clan Siege Map", "Runes Bag", "Social");
     private SharedConfigCodec() {}
 
@@ -49,7 +50,7 @@ public final class SharedConfigCodec {
             throw new IllegalArgumentException("Config is too large");
         return normalize(JsonParser.parseString(text));
     }
-    public static String encode(JsonObject value) { return new Gson().toJson(value); }
+    public static String encode(JsonObject value) { return WIRE_GSON.toJson(value); }
     private static void checkTree(JsonElement value, int depth, int[] nodes) {
         if (depth > 24 || ++nodes[0] > 15_000) throw new IllegalArgumentException("Config is too complex");
         if (value.isJsonObject()) {

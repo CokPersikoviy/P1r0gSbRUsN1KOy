@@ -50,10 +50,15 @@ public final class GifAnimation implements AutoCloseable {
         }
     }
     public Frame nextFrame() throws IOException {
+        return readFrame(frame -> new Frame(copy(frame.pixels), frame.delayMillis));
+    }
+    /** Converts the composed canvas synchronously under the decoder lock. The borrowed image must not
+     * escape the callback or be flushed; only its converted result may cross to the render thread. */
+    public <T> T readFrame(java.util.function.Function<Frame, T> converter) throws IOException {
         lock.lock();
         try {
             if (closed) throw new IOException("GIF closed");
-            if (index == frameCount) { index = 0; previous = null; restore = null; }
+            if (index == frameCount) { index = 0; previous = null; }
             var tree = reader.getImageMetadata(index).getAsTree("javax_imageio_gif_image_1.0");
             Node descriptor = child(tree, "ImageDescriptor"), control = child(tree, "GraphicControlExtension");
             boolean transparent = "TRUE".equalsIgnoreCase(attribute(control, "transparentColorFlag", "FALSE"));
@@ -74,7 +79,10 @@ public final class GifAnimation implements AutoCloseable {
                     finally { graphics.dispose(); }
                 }
             }
-            restore = info.disposal.equals("restoreToPrevious") ? copy(canvas) : null;
+            if (info.disposal.equals("restoreToPrevious")) {
+                if (restore == null) restore = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+                copyInto(canvas, restore);
+            }
             var raw = reader.read(index);
             try {
                 var graphics = canvas.createGraphics();
@@ -82,7 +90,7 @@ public final class GifAnimation implements AutoCloseable {
                 finally { graphics.dispose(); }
             } finally { raw.flush(); }
             previous = info; index++;
-            return new Frame(copy(canvas), info.delay);
+            return converter.apply(new Frame(canvas, info.delay));
         } finally {
             if (closed) dispose();
             lock.unlock();
@@ -96,10 +104,13 @@ public final class GifAnimation implements AutoCloseable {
     }
     private static BufferedImage copy(BufferedImage source) {
         var result = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_ARGB);
-        var graphics = result.createGraphics();
+        copyInto(source, result);
+        return result;
+    }
+    private static void copyInto(BufferedImage source, BufferedImage destination) {
+        var graphics = destination.createGraphics();
         try { graphics.setComposite(AlphaComposite.Src); graphics.drawImage(source, 0, 0, null); }
         finally { graphics.dispose(); }
-        return result;
     }
     private static Node child(Node node, String name) {
         if (node != null) for (Node n = node.getFirstChild(); n != null; n = n.getNextSibling()) if (n.getNodeName().equals(name)) return n;

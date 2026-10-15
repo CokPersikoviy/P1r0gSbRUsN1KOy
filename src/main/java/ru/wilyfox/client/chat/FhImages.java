@@ -20,7 +20,12 @@ public final class FhImages {
                 && bytes[3] == '8' && (bytes[4] == '7' || bytes[4] == '9') && bytes[5] == 'a';
     }
     static NativeImage gifPixels(GifAnimation.Frame frame) {
-        var source = frame.pixels(); NativeImage result = null;
+        try { return gifPixelsBorrowed(frame.pixels()); }
+        finally { frame.pixels().flush(); }
+    }
+    /** Does not retain or flush the decoder-owned canvas. The returned native image is independent. */
+    static NativeImage gifPixelsBorrowed(java.awt.image.BufferedImage source) {
+        NativeImage result = null;
         try {
             int sample = Math.max(1, (int) Math.ceil(Math.max(source.getWidth(), source.getHeight()) / 1280d));
             int width = (source.getWidth() + sample - 1) / sample, height = (source.getHeight() + sample - 1) / sample;
@@ -41,7 +46,6 @@ public final class FhImages {
                 result.setPixel(x, y, pixels[y * sample * source.getWidth() + x * sample]);
             return result;
         } catch (RuntimeException failure) { if (result != null) result.close(); throw failure; }
-        finally { source.flush(); }
     }
     public static <T> CompletableFuture<T> supply(java.util.function.Supplier<T> task) {
         try { return CompletableFuture.supplyAsync(task, IO); }

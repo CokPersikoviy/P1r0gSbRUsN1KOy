@@ -11,6 +11,10 @@ import ru.wilyfox.client.level.LevelProgressStore;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
+import net.minecraft.locale.Language;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
+import ru.wilyfox.client.profiler.ModProfiler;
 
 public class LevelProgressWidget extends AbstractWidget {
     private static final int PADDING_X = 6;
@@ -19,8 +23,13 @@ public class LevelProgressWidget extends AbstractWidget {
     private static final int EMPTY_WIDTH = 150;
     private static final int EMPTY_HEIGHT = 34;
     private static final DecimalFormat MONEY_FORMAT = new DecimalFormat("#,##0.##", DecimalFormatSymbols.getInstance(Locale.US));
+    private static final double[] DIVISORS = {1e18, 1e15, 1e12, 1e9, 1e6, 1e3};
+    private static final String[] SUFFIXES = {"Q", "Qd", "T", "B", "M", "K"};
 
     private final LevelProgressStore store;
+    private LevelProgressStore.LevelProgressSnapshot textSnapshot;
+    private Language textLanguage;
+    private FormattedCharSequence title, blocksLine, moneyLine;
 
     public LevelProgressWidget(int x, int y, HudLayer layer, LevelProgressStore store) {
         super(x, y, layer);
@@ -44,15 +53,7 @@ public class LevelProgressWidget extends AbstractWidget {
             return;
         }
 
-        String title = snapshot.maxLevel()
-                ? "Level " + snapshot.level() + " · MAX"
-                : "Level " + snapshot.level();
-        String blocksLine = snapshot.maxLevel()
-                ? null
-                : "Blocks: " + formatInt(snapshot.blocks()) + "/" + formatInt(snapshot.requiredBlocks());
-        String moneyLine = snapshot.maxLevel()
-                ? null
-                : "Money: " + formatMoney(snapshot.money()) + "/" + formatMoney(snapshot.requiredMoney());
+        prepareText(snapshot);
         int width = getUnscaledWidth(mc, title, blocksLine, moneyLine);
         boolean showBar = !snapshot.maxLevel() && ConfigManager.get().levelProgress.showBar;
         int height = getUnscaledHeight(mc, snapshot.maxLevel(), showBar);
@@ -63,11 +64,15 @@ public class LevelProgressWidget extends AbstractWidget {
         context.pose().translate(startX, startY);
         context.pose().scale(scale, scale);
 
-        HudSurface.drawPanel(context, width, height);
-        context.text(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
-        if (!snapshot.maxLevel()) {
-            context.text(mc.font, blocksLine, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, blocksColor);
-            context.text(mc.font, moneyLine, PADDING_X, PADDING_Y + (mc.font.lineHeight + 2) * 2, moneyColor);
+        try (var ignored = ModProfiler.getInstance().scope("hud/LevelProgress/surface")) {
+            HudSurface.drawPanel(context, width, height);
+        }
+        try (var ignored = ModProfiler.getInstance().scope("hud/LevelProgress/textDraw")) {
+            context.text(mc.font, title, PADDING_X, PADDING_Y, WidgetTheme.TITLE);
+            if (!snapshot.maxLevel()) {
+                context.text(mc.font, blocksLine, PADDING_X, PADDING_Y + mc.font.lineHeight + 2, blocksColor);
+                context.text(mc.font, moneyLine, PADDING_X, PADDING_Y + (mc.font.lineHeight + 2) * 2, moneyColor);
+            }
         }
 
         if (showBar) {
@@ -87,9 +92,7 @@ public class LevelProgressWidget extends AbstractWidget {
         }
 
         Minecraft mc = Minecraft.getInstance();
-        String title = snapshot.maxLevel() ? "Level " + snapshot.level() + " · MAX" : "Level " + snapshot.level();
-        String blocksLine = snapshot.maxLevel() ? null : "Blocks: " + formatInt(snapshot.blocks()) + "/" + formatInt(snapshot.requiredBlocks());
-        String moneyLine = snapshot.maxLevel() ? null : "Money: " + formatMoney(snapshot.money()) + "/" + formatMoney(snapshot.requiredMoney());
+        prepareText(snapshot);
         return Math.round(getUnscaledWidth(mc, title, blocksLine, moneyLine) * getScale());
     }
 
@@ -115,7 +118,27 @@ public class LevelProgressWidget extends AbstractWidget {
         return "Level Progress";
     }
 
-    private int getUnscaledWidth(Minecraft mc, String title, String blocksLine, String moneyLine) {
+    private void prepareText(LevelProgressStore.LevelProgressSnapshot snapshot) {
+        Language language = Language.getInstance();
+        var previous = textSnapshot;
+        if (language == textLanguage && previous != null
+                && previous.level() == snapshot.level() && previous.maxLevel() == snapshot.maxLevel()
+                && previous.blocks() == snapshot.blocks() && previous.requiredBlocks() == snapshot.requiredBlocks()
+                && Double.compare(previous.money(), snapshot.money()) == 0
+                && Double.compare(previous.requiredMoney(), snapshot.requiredMoney()) == 0) return;
+        try (var ignored = ModProfiler.getInstance().scope("hud/LevelProgress/prepareText")) {
+            title = language.getVisualOrder(Component.literal(snapshot.maxLevel()
+                    ? "Level " + snapshot.level() + " · MAX" : "Level " + snapshot.level()));
+            blocksLine = snapshot.maxLevel() ? null : language.getVisualOrder(Component.literal(
+                    "Blocks: " + formatInt(snapshot.blocks()) + "/" + formatInt(snapshot.requiredBlocks())));
+            moneyLine = snapshot.maxLevel() ? null : language.getVisualOrder(Component.literal(
+                    "Money: " + formatMoney(snapshot.money()) + "/" + formatMoney(snapshot.requiredMoney())));
+            textSnapshot = snapshot;
+            textLanguage = language;
+        }
+    }
+
+    private int getUnscaledWidth(Minecraft mc, FormattedCharSequence title, FormattedCharSequence blocksLine, FormattedCharSequence moneyLine) {
         int maxWidth = mc.font.width(title);
         if (blocksLine != null) {
             maxWidth = Math.max(maxWidth, mc.font.width(blocksLine));
@@ -163,19 +186,9 @@ public class LevelProgressWidget extends AbstractWidget {
             return MONEY_FORMAT.format(value);
         }
 
-        double[] divisors = {
-                1_000_000_000_000_000_000D,
-                1_000_000_000_000_000D,
-                1_000_000_000_000D,
-                1_000_000_000D,
-                1_000_000D,
-                1_000D
-        };
-        String[] suffixes = {"Q", "Qd", "T", "B", "M", "K"};
-
-        for (int i = 0; i < divisors.length; i++) {
-            if (value >= divisors[i]) {
-                return MONEY_FORMAT.format(value / divisors[i]) + suffixes[i];
+        for (int i = 0; i < DIVISORS.length; i++) {
+            if (value >= DIVISORS[i]) {
+                return MONEY_FORMAT.format(value / DIVISORS[i]) + SUFFIXES[i];
             }
         }
 

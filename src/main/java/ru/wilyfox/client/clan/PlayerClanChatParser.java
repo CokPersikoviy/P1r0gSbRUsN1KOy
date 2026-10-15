@@ -9,11 +9,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class PlayerClanChatParser {
-    private static final Pattern TRAILING_LEVEL_PATTERN = Pattern.compile("\\[(\\d{1,3})]$");
+    // Level is a header delimiter, not a versioned server cap or an integer we need to store.
+    private static final Pattern TRAILING_LEVEL_PATTERN = Pattern.compile("\\[0*[1-9]\\d*]$");
     private static final Pattern TRAILING_BRACKET_PATTERN = Pattern.compile("\\[([^\\]]+)]$");
     private static final Pattern PLAYER_NAME_PATTERN = Pattern.compile("^[A-Za-z0-9_]{3,16}$");
-    private static final int MIN_LEVEL = 1;
-    private static final int MAX_LEVEL = 520;
 
     private PlayerClanChatParser() {
     }
@@ -76,11 +75,6 @@ public final class PlayerClanChatParser {
         String header = text.substring(0, colonIndex).trim();
         Matcher levelMatcher = TRAILING_LEVEL_PATTERN.matcher(header);
         if (!levelMatcher.find()) {
-            return null;
-        }
-
-        int level = Integer.parseInt(levelMatcher.group(1));
-        if (level < MIN_LEVEL || level > MAX_LEVEL) {
             return null;
         }
 

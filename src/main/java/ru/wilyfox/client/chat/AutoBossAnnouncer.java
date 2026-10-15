@@ -20,7 +20,6 @@ import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
 import ru.wilyfox.client.protocol.DwBossType;
 
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -265,8 +264,8 @@ public final class AutoBossAnnouncer {
     }
 
     private static String formatDuration(long millis) {
-        Duration duration = Duration.ofMillis(Math.max(0L, millis));
-        long totalSeconds = duration.getSeconds();
+        // The threshold is checked on ticks, so a few elapsed milliseconds must not lose a whole second.
+        long totalSeconds = Math.ceilDiv(Math.max(0L, millis), 1000L);
         long hours = totalSeconds / 3600L;
         long minutes = (totalSeconds % 3600L) / 60L;
         long seconds = totalSeconds % 60L;

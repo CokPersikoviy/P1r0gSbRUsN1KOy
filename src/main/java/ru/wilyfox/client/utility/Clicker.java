@@ -34,6 +34,20 @@ public final class Clicker {
             boolean allowed = client.player != null && client.level != null && client.player.isAlive()
                     && client.gui.screen() == null && !client.isPaused()
                     && (client.isWindowActive() || !client.options.pauseOnLostFocus);
+            boolean switchMode = false;
+            while (KeyBinds.CLICKER_MODE.consumeClick()) switchMode = !switchMode;
+            if (switchMode && allowed && client.isWindowActive()) {
+                releaseHeldKey(client);
+                var config = ConfigManager.get().clicker;
+                config.actionMode = config.actionMode == ru.wilyfox.client.hud.config.ClickerConfig.ActionMode.HOLD
+                        ? ru.wilyfox.client.hud.config.ClickerConfig.ActionMode.CLICK
+                        : ru.wilyfox.client.hud.config.ClickerConfig.ActionMode.HOLD;
+                lastAttackTime = 0L;
+                ConfigManager.save();
+                client.gui.hud.setOverlayMessage(net.minecraft.network.chat.Component.translatable(
+                        "froghelper.clicker.mode_changed", config.actionMode.name()), false);
+                ru.wilyfox.client.audio.UiSounds.toggle();
+            }
             if (client.player == null || client.level == null) activation.reset();
             boolean active = activation.update(mode, presses, KeyBinds.AUTO_ATTACK.isDown(), allowed);
             if (active != autoAttackEnabled && mode == ru.wilyfox.client.hud.config.ClickerConfig.Activation.TOGGLE && allowed) {
@@ -56,7 +70,8 @@ public final class Clicker {
                         // A real button press starts the action once; subsequent ticks only keep it down.
                         KeyMapping.click(com.mojang.blaze3d.platform.InputConstants.getKey(action.saveString()));
                     }
-                    heldKey.setDown(true);
+                    // Toggle Attack/Use interprets setDown(true) as another press; HOLD owns a state.
+                    ((ru.wilyfox.mixin.KeyMappingAccessorMixin) heldKey).froghelper$setDownDirect(true);
                     lastAttackTime = 0;
                     return;
                 }
@@ -86,7 +101,7 @@ public final class Clicker {
                 else if (input.getType() == com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM && input.getValue() >= 0)
                     physical = com.mojang.blaze3d.platform.InputConstants.isKeyDown(client.getWindow(), input.getValue());
             }
-            key.setDown(physical);
+            ((ru.wilyfox.mixin.KeyMappingAccessorMixin) key).froghelper$setDownDirect(physical);
         }
     }
     public static void click() {

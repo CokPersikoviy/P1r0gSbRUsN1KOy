@@ -1,5 +1,7 @@
 {
   "key.categories.froghelper.main": "FrogHelper",
+  "Clicker mode": "Clicker mode (HOLD / CLICK)",
+  "froghelper.clicker.mode_changed": "Clicker: %s",
   "froghelper.widgets.sort.alphabetical": "Sort: alphabetical",
   "froghelper.widgets.sort.active_first": "Sort: active widgets first",
   "froghelper.widgets.sort.inactive_first": "Sort: inactive widgets first",

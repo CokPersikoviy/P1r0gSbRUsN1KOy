@@ -5,8 +5,25 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 class LevelProgressStoreTest {
+    @Test void snapshotIsReusedUntilAnUpdateAndPublishedSnapshotsStayImmutable() {
+        var store = new LevelProgressStore();
+        var empty = store.getSnapshot();
+        assertSame(empty, store.getSnapshot());
+        store.updateFromLevelInfo(12, 50, 25, 100, 100, false);
+        var first = store.getSnapshot();
+        assertSame(first, store.getSnapshot());
+        store.updateCurrent(null, 75, null);
+        assertNotSame(first, store.getSnapshot());
+        assertEquals(50, first.blocks());
+        assertEquals(75, store.getSnapshot().blocks());
+        store.clear();
+        assertFalse(store.getSnapshot().available());
+        assertSame(store.getSnapshot(), store.getSnapshot());
+    }
     @Test
     void partialStatisticUpdatePreservesMissingValues() {
         LevelProgressStore store = new LevelProgressStore();

@@ -4,15 +4,17 @@ import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.registries.BuiltInRegistries;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import ru.wilyfox.client.hud.fishing.FishingParticleTypes;
 import ru.wilyfox.client.hud.fishing.FishingSpotTracker;
 import ru.wilyfox.client.profiler.ModProfiler;
-import ru.wilyfox.client.profiler.ProfilerScopeStack;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import net.minecraft.client.Camera;
+import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.state.level.ParticlesRenderState;
 
 
 import java.util.HashSet;
@@ -24,29 +26,19 @@ import static ru.wilyfox.client.debug.DebugLogger.info;
 @Mixin(ParticleEngine.class)
 public class ParticleEngineMixin {
     private static final Set<String> LOGGED_FISHING_PARTICLES = new HashSet<>();
-    @Unique
-    private final ProfilerScopeStack froghelper$particleTickScopes = new ProfilerScopeStack();
-    @Unique
-    private final ProfilerScopeStack froghelper$particleRenderScopes = new ProfilerScopeStack();
-
-    @Inject(method = "tick", at = @At("HEAD"))
-    private void froghelper$beginParticleTick(CallbackInfo ci) {
-        froghelper$particleTickScopes.push(ModProfiler.getInstance().scope("render/particles/tick"));
+    @WrapMethod(method = "tick")
+    private void froghelper$particleTick(Operation<Void> original) {
+        try (var ignored = ModProfiler.getInstance().scope("render/particles/tick")) {
+            original.call();
+        }
     }
 
-    @Inject(method = "tick", at = @At("RETURN"))
-    private void froghelper$endParticleTick(CallbackInfo ci) {
-        froghelper$particleTickScopes.closeLatest();
-    }
-
-    @Inject(method = "extract", at = @At("HEAD"))
-    private void froghelper$beginParticleRender(CallbackInfo ci) {
-        froghelper$particleRenderScopes.push(ModProfiler.getInstance().scope("render/particles/frame"));
-    }
-
-    @Inject(method = "extract", at = @At("RETURN"))
-    private void froghelper$endParticleRender(CallbackInfo ci) {
-        froghelper$particleRenderScopes.closeLatest();
+    @WrapMethod(method = "extract")
+    private void froghelper$particleFrame(ParticlesRenderState state, Frustum frustum, Camera camera,
+                                         float partialTick, Operation<Void> original) {
+        try (var ignored = ModProfiler.getInstance().scope("render/particles/frame")) {
+            original.call(state, frustum, camera, partialTick);
+        }
     }
 
     @Inject(method = "createParticle", at = @At("HEAD"))

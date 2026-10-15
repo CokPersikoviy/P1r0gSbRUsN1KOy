@@ -55,4 +55,24 @@ class ConfigProfileStoreTest {
         for (int i = 1; i < ConfigProfileStore.MAX_DOWNLOADS; i++) restarted.add("Fox", config(i));
         assertThrows(IOException.class, () -> restarted.add("Fox", config(5)));
     }
+    @Test void sharedConfigKeepsClickerModeAndItsNativeBinding() {
+        var source = config(4);
+        source.getAsJsonObject("settings").getAsJsonObject("clicker").addProperty("actionMode", "HOLD");
+        source.getAsJsonObject("keybinds").addProperty("Clicker mode", "key.mouse.4");
+        var clean = SharedConfigCodec.parse(SharedConfigCodec.encode(source));
+        assertEquals("HOLD", clean.getAsJsonObject("settings").getAsJsonObject("clicker").get("actionMode").getAsString());
+        assertEquals("key.mouse.4", clean.getAsJsonObject("keybinds").get("Clicker mode").getAsString());
+        source.getAsJsonObject("keybinds").remove("Clicker mode");
+        assertDoesNotThrow(() -> SharedConfigCodec.normalize(source));
+    }
+    @Test void sharedPayloadStaysCompactAndRetainsNewWidgetSettings() {
+        var value = config(4);
+        var settings = value.getAsJsonObject("settings");
+        for (String field : java.util.List.of("levelGoal", "nearbyWorms", "nearbyBarrels", "nearbyCrystals"))
+            assertTrue(settings.has(field), "Missing shared settings: " + field);
+        String encoded = SharedConfigCodec.encode(value);
+        assertFalse(encoded.contains("\n"), "Wire encoder must not use the pretty-printing settings Gson");
+        assertEquals(value, SharedConfigCodec.parse(encoded));
+        assertTrue(encoded.length() < HudConfigCodec.createGson().toJson(value).length());
+    }
 }

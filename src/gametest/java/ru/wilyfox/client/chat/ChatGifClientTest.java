@@ -47,8 +47,29 @@ public final class ChatGifClientTest implements FabricClientGameTest {
             context.runOnClient(client -> { client.gui.setScreen(late); late.onClose(); });
             pending.complete(bytes); context.waitTicks(3);
             check(context.computeOnClient(client -> client.gui.screen() == parent), "Late GIF download reopened viewer");
+            verifyHudTexture(context, bytes);
             System.out.println("FH GIF: actual animated texture, close cleanup and late completion passed");
         } finally { context.runOnClient(client -> client.gui.setScreen(null)); }
+    }
+    private static void verifyHudTexture(ClientGameTestContext context, byte[] bytes) {
+        var image = context.computeOnClient(client -> new FhImageTexture(() -> CompletableFuture.completedFuture(bytes), true));
+        try {
+            boolean red = false, blue = false;
+            long deadline = System.nanoTime() + 5_000_000_000L;
+            while (System.nanoTime() < deadline && !(red && blue)) {
+                int pixel = context.computeOnClient(client -> {
+                    if (!image.loaded()) return 0;
+                    image.advance();
+                    return ((DynamicTexture) client.getTextureManager().getTexture(image.id())).getPixels().getPixel(2, 2);
+                });
+                red |= (pixel & 0xFFFFFF) == 0xFF0000; blue |= (pixel & 0xFFFFFF) == 0x0000FF;
+                context.waitTicks(1);
+            }
+            check(red && blue, "HUD GIF did not animate through both decoder-owned frames");
+            var pixels = context.computeOnClient(client -> ((DynamicTexture) client.getTextureManager().getTexture(image.id())).getPixels());
+            context.runOnClient(client -> image.close());
+            check(pixels.isClosed(), "Closing HUD GIF retained native pixels");
+        } finally { context.runOnClient(client -> image.close()); }
     }
     private static void verifyPixelConversion() {
         int tested = 0;

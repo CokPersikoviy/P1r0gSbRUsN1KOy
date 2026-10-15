@@ -155,6 +155,9 @@ public final class ModProfiler {
             var environment = Map.of(
                     "context", SessionContext.capture(),
                     "visuals", new com.google.gson.Gson().toJsonTree(ConfigManager.get().visuals),
+                    "performance", Map.ofEntries(
+                            Map.entry("lightweightHud", ConfigManager.get().render.lightweightHud),
+                            Map.entry("nativeRenderer", ConfigManager.get().render.nativeRenderer)),
                     "jvmArguments", ManagementFactory.getRuntimeMXBean().getInputArguments(),
                     "java", System.getProperty("java.version"),
                     "os", System.getProperty("os.name") + " " + System.getProperty("os.version"),

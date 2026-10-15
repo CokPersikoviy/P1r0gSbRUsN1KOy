@@ -9,4 +9,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface KeyMappingAccessorMixin {
     @Accessor("key")
     InputConstants.Key froghelper$getKey();
+
+    @Accessor("isDown")
+    void froghelper$setDownDirect(boolean down);
 }

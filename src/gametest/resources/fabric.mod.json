@@ -6,11 +6,15 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
-      "ru.wilyfox.client.profiler.DisplayProbeClientTest",
+      "ru.wilyfox.client.performance.EntityVisibilityClientTest",
+      "ru.wilyfox.client.visuals.CrosshairBatchClientTest",
+      "ru.wilyfox.client.profiler.RenderProfilerAllocationClientTest",
+      "ru.wilyfox.client.hud.widget.LevelProgressCacheClientTest",
       "ru.wilyfox.client.highlight.HighlightScanBudgetClientTest",
       "ru.wilyfox.client.moduser.RenderTextCacheClientTest",
       "ru.wilyfox.client.hud.internal.SodiumGuiVerticesClientTest",
       "ru.wilyfox.client.utility.ClickerHoldClientTest",
+      "ru.wilyfox.client.utility.ClickerPhysicalHoldClientTest",
       "ru.wilyfox.client.hud.menu.GoalAndNearbyClientTest",
       "ru.wilyfox.client.hud.menu.ChatPlusImportClientTest",
       "ru.wilyfox.client.hud.menu.ChatTabLimitsClientTest",

@@ -1,5 +1,7 @@
 {
   "key.categories.froghelper.main": "FrogHelper",
+  "Clicker mode": "Режим кликера (HOLD / CLICK)",
+  "froghelper.clicker.mode_changed": "Кликер: %s",
   "froghelper.widgets.sort.alphabetical": "Сортировка: по алфавиту",
   "froghelper.widgets.sort.active_first": "Сортировка: сначала активные виджеты",
   "froghelper.widgets.sort.inactive_first": "Сортировка: сначала неактивные виджеты",

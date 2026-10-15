@@ -61,8 +61,9 @@ public final class FhImageScreen extends ru.wilyfox.client.hud.menu.FhDialogScre
             GifAnimation gif = null;
             try (var ignored = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("chat/imageDecode")) {
                 if (!FhImages.isGif(bytes)) return new Frame(FhImages.decode(bytes), null, 0);
-                gif = new GifAnimation(bytes); var frame = gif.nextFrame();
-                return new Frame(FhImages.gifPixels(frame), gif, frame.delayMillis());
+                gif = new GifAnimation(bytes);
+                var frame = gif.readFrame(f -> new Frame(FhImages.gifPixelsBorrowed(f.pixels()), null, f.delayMillis()));
+                return new Frame(frame.image, gif, frame.delayMillis);
             } catch (java.io.IOException | RuntimeException failure) {
                 if (gif != null) gif.close(); throw new java.util.concurrent.CompletionException(failure);
             }
@@ -109,7 +110,7 @@ public final class FhImageScreen extends ru.wilyfox.client.hud.menu.FhDialogScre
         decoding = true;
         FhImages.supply(() -> {
             try (var ignored = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("chat/gifFrameDecode")) {
-                var frame = animation.nextFrame(); return new Frame(FhImages.gifPixels(frame), null, frame.delayMillis());
+                return animation.readFrame(frame -> new Frame(FhImages.gifPixelsBorrowed(frame.pixels()), null, frame.delayMillis()));
             }
             catch (java.io.IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
         }).whenComplete((frame, error) -> minecraft.execute(() -> {

@@ -12,15 +12,20 @@ import java.util.List;
 public final class ConfigProfiles {
     private static ConfigProfileStore store;
     private static boolean initialized;
+    private static String primaryBody;
+    private static JsonObject savedBindings;
     private ConfigProfiles() {}
     private static List<KeyMapping> bindings() {
-        return List.of(KeyBinds.AUTO_ATTACK, KeyBinds.EDITING_MODE, KeyBinds.QUICK_ACCESS, KeyBinds.SETTINGS_MENU,
+        return List.of(KeyBinds.AUTO_ATTACK, KeyBinds.CLICKER_MODE, KeyBinds.EDITING_MODE, KeyBinds.QUICK_ACCESS, KeyBinds.SETTINGS_MENU,
                 KeyBinds.CLAN_HIDE, KeyBinds.CLAN_SIEGE_MAP, KeyBinds.RUNES_BAG, KeyBinds.SOCIAL);
     }
-    private static JsonObject capture() {
+    private static JsonObject currentBindings() {
         var keys = new JsonObject();
         for (var binding : bindings()) keys.addProperty(binding.getName(), binding.saveString());
-        return SharedConfigCodec.pack(ConfigManager.snapshot(), keys);
+        return keys;
+    }
+    private static JsonObject capture() {
+        return SharedConfigCodec.pack(ConfigManager.snapshot(), currentBindings());
     }
     public static void register() {
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -31,6 +36,8 @@ public final class ConfigProfiles {
         });
     }
     public static void init() {
+        primaryBody = null;
+        savedBindings = null;
         try {
             store = new ConfigProfileStore(FabricLoader.getInstance().getConfigDir().resolve("froghelper-profiles"), capture());
             apply(store.read(store.activeId()));
@@ -40,14 +47,34 @@ public final class ConfigProfiles {
         }
     }
     public static void saveIfReady() throws IOException {
-        if (store != null) store.saveActive(capture());
+        if (store != null) {
+            var value = capture();
+            store.saveActive(value);
+            savedBindings = value.getAsJsonObject("keybinds");
+            if (ConfigProfileStore.MAIN.equals(store.activeId())) primaryBody = null;
+        }
     }
     public static List<ConfigProfileStore.Entry> entries() { return store == null ? List.of() : store.entries(); }
     public static String activeId() { return store == null ? ConfigProfileStore.MAIN : store.activeId(); }
     public static JsonObject primaryShared() throws IOException {
         if (store == null) throw new IOException("Config library unavailable");
-        saveIfReady();
+        saveChangedBindings();
         return store.read(ConfigProfileStore.MAIN);
+    }
+    /** Publish the saved profile; only native Controls changes need polling outside our save path. */
+    public static String primarySharedEncoded() throws IOException {
+        if (store == null) throw new IOException("Config library unavailable");
+        saveChangedBindings();
+        if (primaryBody == null) {
+            try (var ignored = ru.wilyfox.client.profiler.ModProfiler.getInstance().scope("config/share/encode")) {
+                primaryBody = SharedConfigCodec.encode(store.read(ConfigProfileStore.MAIN));
+            }
+        }
+        return primaryBody;
+    }
+    private static void saveChangedBindings() throws IOException {
+        // Small key strings instead of copying and normalizing the complete settings tree.
+        if (!currentBindings().equals(savedBindings)) saveIfReady();
     }
     public static String download(String author, JsonObject value) throws IOException {
         if (store == null) throw new IOException("Config library unavailable");

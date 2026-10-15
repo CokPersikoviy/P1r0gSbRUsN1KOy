@@ -34,9 +34,10 @@ public final class FhImageTexture implements AutoCloseable {
             GifAnimation decoder = null;
             try (var ignored = ModProfiler.getInstance().scope(decodeSection)) {
                 if (!FhImages.isGif(bytes)) return new Frame(FhImages.decode(bytes), null, 0);
-                decoder = new GifAnimation(bytes); var frame = decoder.nextFrame(); var image = FhImages.gifPixels(frame);
+                decoder = new GifAnimation(bytes);
+                var frame = decoder.readFrame(f -> new Frame(FhImages.gifPixelsBorrowed(f.pixels()), null, f.delayMillis()));
                 if (!animated) { decoder.close(); decoder = null; }
-                return new Frame(image, decoder, frame.delayMillis());
+                return new Frame(frame.image, decoder, frame.delay);
             } catch (java.io.IOException | RuntimeException error) {
                 if (decoder != null) decoder.close(); throw new java.util.concurrent.CompletionException(error);
             }
@@ -71,7 +72,7 @@ public final class FhImageTexture implements AutoCloseable {
         decoding = true; var decoder = gif;
         FhImages.supply(() -> {
             try (var ignored = ModProfiler.getInstance().scope(gifDecodeSection)) {
-                var frame = decoder.nextFrame(); return new Frame(FhImages.gifPixels(frame), null, frame.delayMillis());
+                return decoder.readFrame(frame -> new Frame(FhImages.gifPixelsBorrowed(frame.pixels()), null, frame.delayMillis()));
             } catch (java.io.IOException error) { throw new java.util.concurrent.CompletionException(error); }
         }).whenComplete((frame, error) -> client.execute(() -> {
             decoding = false;

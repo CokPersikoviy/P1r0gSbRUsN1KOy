@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class ConfigSharingClientTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
         var originalId = context.computeOnClient(client -> ConfigProfiles.activeId());
+        context.runOnClient(client -> verifyPublicationCache());
         var before = context.computeOnClient(client -> ConfigProfiles.entries());
         var downloaded = new AtomicReference<String>();
         var published = new AtomicReference<JsonObject>();
@@ -122,4 +123,36 @@ public final class ConfigSharingClientTest implements FabricClientGameTest {
         } catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
     }
     private static void check(boolean value, String message) { if (!value) throw new AssertionError(message); }
+    private static void verifyPublicationCache() {
+        String original = ConfigProfiles.activeId();
+        com.google.gson.JsonElement snapshot = null;
+        String binding = null;
+        try {
+            ConfigProfiles.select("main");
+            snapshot = ConfigManager.snapshot();
+            binding = KeyBinds.SOCIAL.saveString();
+            String first = ConfigProfiles.primarySharedEncoded();
+            for (int i = 0; i < 1000; i++)
+                check(first == ConfigProfiles.primarySharedEncoded(), "Unchanged config rebuilt its publication payload");
+            ConfigManager.get().playerHealthBars.verticalOffset += 1;
+            ConfigManager.save();
+            String changed = ConfigProfiles.primarySharedEncoded();
+            check(!first.equals(changed), "Saved settings were hidden by the publication cache");
+            KeyBinds.SOCIAL.setKey(com.mojang.blaze3d.platform.InputConstants.getKey(
+                    binding.equals("key.keyboard.g") ? "key.keyboard.h" : "key.keyboard.g"));
+            String rebound = ConfigProfiles.primarySharedEncoded();
+            check(!changed.equals(rebound), "Native Controls rebinding did not invalidate publication");
+            check(SharedConfigCodec.parse(rebound).getAsJsonObject("keybinds").get("Social").getAsString()
+                    .equals(KeyBinds.SOCIAL.saveString()), "Published config lost a new binding");
+            System.out.println("Config publication cache: 1000 polls reused one payload; settings saves and native Controls changes invalidated it");
+        } catch (Exception failure) { throw new AssertionError(failure); }
+        finally {
+            if (snapshot != null) {
+                KeyBinds.SOCIAL.setKey(com.mojang.blaze3d.platform.InputConstants.getKey(binding));
+                net.minecraft.client.KeyMapping.resetMapping();
+                ConfigManager.restoreSnapshot(snapshot);
+            }
+            try { ConfigProfiles.select(original); } catch (java.io.IOException failure) { throw new AssertionError(failure); }
+        }
+    }
 }

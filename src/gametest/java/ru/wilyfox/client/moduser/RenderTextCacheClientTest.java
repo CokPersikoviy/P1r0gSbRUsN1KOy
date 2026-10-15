@@ -39,8 +39,20 @@ public final class RenderTextCacheClientTest implements FabricClientGameTest {
                     argument.append(" changed");
                     check(sequenceText(PlayerNameFormatter.apply(translated, "CacheTest").getVisualOrderText()).contains("Argument changed"),
                             "Mutable translation arguments were hidden by the name cache");
-                    PlayerClanStorage.update("CacheTest", "Other");
+                    ru.wilyfox.client.chat.IncomingChatHandler.handle(Component.literal("Ⓖ ꀕ CacheTest [Other] [541]: hello"));
                     check(PlayerNameFormatter.apply(input, "CacheTest").getString().contains("[Other]"), "Clan update was delayed");
+                    ru.wilyfox.client.chat.IncomingChatHandler.handle(Component.literal("Ⓜ ꀕ CacheTest [590]: hello"));
+                    check(PlayerClanStorage.getClan("CacheTest") == null
+                            && !PlayerNameFormatter.apply(input, "CacheTest").getString().contains("[Other]"),
+                            "High-level clanless chat retained the old tag");
+                    ru.wilyfox.client.chat.IncomingChatHandler.handle(Component.literal("Ⓖ ꀕ CacheTest [New Clan] [1000]: hello"));
+                    check(PlayerNameFormatter.apply(input, "CacheTest").getString().contains("[New Clan]"),
+                            "Four-digit player levels prevented a new clan from being displayed");
+                    var persisted = com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(
+                            net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("froghelper-player-clans.json")));
+                    check(persisted.getAsJsonObject().getAsJsonObject("entries").getAsJsonObject("cachetest")
+                                    .get("clanName").getAsString().equals("New Clan"),
+                            "The new clan was not persisted for the next login");
                     PresenceStore.clear();
                     check(!PlayerNameFormatter.apply(input, "CacheTest").getString().contains("\uf8ff"), "Presence update left a badge");
                     config.cleanPlayerNames = true;
@@ -63,7 +75,7 @@ public final class RenderTextCacheClientTest implements FabricClientGameTest {
                     PlayerNameFormatter.clearCache();
                     check(((java.util.Map<?, ?>) field.get(null)).isEmpty(), "Disconnect cleanup retained names");
                     System.out.println("Render text caches: names 5000 frames=" + bytes + " bytes; immediate data/mutation updates and bounded eviction passed");
-                } catch (ReflectiveOperationException error) { throw new AssertionError(error); }
+                } catch (ReflectiveOperationException | java.io.IOException error) { throw new AssertionError(error); }
                 finally { PlayerClanStorage.update("CacheTest", oldClan); PresenceStore.clear(); PlayerNameFormatter.clearCache(); }
             });
         } finally { context.runOnClient(client -> ConfigManager.restoreSnapshot(snapshot)); }

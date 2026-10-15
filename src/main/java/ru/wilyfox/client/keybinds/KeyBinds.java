@@ -22,6 +22,10 @@ public final class KeyBinds {
     );
 
 
+    public static final KeyMapping CLICKER_MODE = KeyMappingHelper.registerKeyMapping(
+            new KeyMapping("Clicker mode", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, CATEGORY)
+    );
+
     public static final KeyMapping EDITING_MODE = KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                     "Editing Mode",

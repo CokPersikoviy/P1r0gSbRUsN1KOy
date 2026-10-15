@@ -4,8 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Interaction;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.BowItem;
@@ -16,7 +14,6 @@ import ru.wilyfox.client.hud.config.VisualsConfig;
 import ru.wilyfox.client.profiler.ModProfiler;
 
 public final class VisualCrosshair {
-    private static final Identifier WHITE = Identifier.fromNamespaceAndPath("froghelper", "textures/gui/visuals_white.png");
     private static final CrosshairGeometry GEOMETRY = new CrosshairGeometry();
     private static final CrosshairGeometry PREVIEW = new CrosshairGeometry();
     private static double spread, lastDraw = -1;
@@ -86,10 +83,7 @@ public final class VisualCrosshair {
         return flash > 0 ? Visuals.mix(color, color | 0xFFFFFF, flash * 0.8) : color;
     }
     private static void fills(GuiGraphicsExtractor graphics, int x, int y, List<CrosshairGeometry.Rect> rects, int color, boolean inverted) {
-        for (var r : rects) {
-            if (inverted) graphics.blit(RenderPipelines.CROSSHAIR, WHITE, x + r.x(), y + r.y(), 0f, 0f, r.width(), r.height(), r.width(), r.height(), -1);
-            else graphics.fill(x + r.x(), y + r.y(), x + r.x() + r.width(), y + r.y() + r.height(), color);
-        }
+        CrosshairRenderState.fill(graphics, x, y, rects, color, inverted);
     }
     private static void indicator(GuiGraphicsExtractor graphics, int x, int y, double scale, double progress, double flash, CrosshairGeometry.Shape shape, VisualsConfig.Crosshair c) {
         int size = Math.clamp(px(c.indicatorSize, scale), 1, 128), t = Math.max(1, px(c.indicatorThickness, scale));
