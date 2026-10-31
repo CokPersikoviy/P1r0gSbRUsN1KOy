@@ -23,6 +23,7 @@ class MiningRewardParserTest {
         assertEquals(500, MiningRewardParser.reward("Руна принесла 500 денег").money());
         assertEquals(0, MiningRewardParser.actionBarPrice("Комбо +10"));
         assertEquals(0, MiningRewardParser.actionBarPrice("+12.5 здоровья"));
+        assertEquals(1200, MiningRewardParser.actionBarPrice("Комбо +10 | +1.2K"));
     }
     @Test void onlyServerRewardPhrasesMatchAndShardMultipliersRemainDistinctFromMoney() {
         assertNull(MiningRewardParser.reward("Ⓛ Fox: Руна принесла 12B"));

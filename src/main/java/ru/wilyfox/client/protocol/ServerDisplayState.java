@@ -26,7 +26,7 @@ final class ServerDisplayState {
 
     String displayName() {
         if (tab.isKnown() && (!protocol.isKnown() || tabRevision > protocolRevision)) {
-            if (tab.mirror() == 0 && tab.family().equals(protocol.family())
+            if (!tab.hasMirror() && tab.family().equals(protocol.family())
                     && tab.serverNumber() == protocol.serverNumber()) return protocol.displayName();
             return tab.displayName();
         }

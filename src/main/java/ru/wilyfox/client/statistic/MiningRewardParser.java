@@ -22,13 +22,15 @@ public final class MiningRewardParser {
     }
     public static double actionBarPrice(String text) {
         String value = normalize(text);
-        int plus = value.indexOf('+');
-        if (plus < 0) return 0;
-        String gain = value.substring(plus + 1).stripLeading();
-        var amount = AMOUNT.matcher(gain);
-        if (amount.lookingAt()) return parse(amount.group(1), amount.group(2));
-        var money = MONEY.matcher(gain);
-        return money.lookingAt() ? parse(money.group(1), "") : 0;
+        // The bar may carry other "+N" counters (combo, xp) before the money gain.
+        for (int plus = value.indexOf('+'); plus >= 0; plus = value.indexOf('+', plus + 1)) {
+            String gain = value.substring(plus + 1).stripLeading();
+            var amount = AMOUNT.matcher(gain);
+            if (amount.lookingAt()) return parse(amount.group(1), amount.group(2));
+            var money = MONEY.matcher(gain);
+            if (money.lookingAt()) return parse(money.group(1), "");
+        }
+        return 0;
     }
     public static Reward reward(String text) {
         String message = normalize(text);

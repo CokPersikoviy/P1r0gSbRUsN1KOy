@@ -31,6 +31,17 @@ class ServerDisplayStateTest {
         assertEquals("PrisonEvo-2", display.displayName());
     }
 
+    @Test void mirrorZeroIsARealMirror() {
+        var display = new ServerDisplayState();
+        display.protocolUpdated(CurrentServerInfo.fromProtocol("PRISONEVO1", 0));
+        assertEquals("PrisonEvo-1 #0", display.displayName());
+        display.tabUpdated("PrisonEvo-1");
+        assertEquals("PrisonEvo-1 #0", display.displayName());
+        display.tabUpdated("PrisonEvo-1 #2");
+        display.tabUpdated("PrisonEvo-1 #0");
+        assertEquals("PrisonEvo-1 #0", display.displayName());
+    }
+
     @Test void unknownTabAndUnchangedProtocolDoNotResurrectOldData() {
         var display = new ServerDisplayState();
         var previous = CurrentServerInfo.fromProtocol("PRISONEVO1", 2);

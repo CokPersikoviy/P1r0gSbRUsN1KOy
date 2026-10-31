@@ -18,7 +18,7 @@ class WidgetSettingsSectionsTest {
                 Map.entry(WidgetCatalog.CRAFT_RECIPE, 1), Map.entry(WidgetCatalog.BOOSTERS, 1),
                 Map.entry(WidgetCatalog.POTION_TIMERS, 3), Map.entry(WidgetCatalog.SELLERS, 1),
                 Map.entry(WidgetCatalog.COMBO, 1), Map.entry(WidgetCatalog.WAND, 1),
-                Map.entry(WidgetCatalog.VISIBILITY, 1), Map.entry(WidgetCatalog.MAP, 6),
+                Map.entry(WidgetCatalog.VISIBILITY, 2), Map.entry(WidgetCatalog.MAP, 6),
                 Map.entry(WidgetCatalog.BOSS_TIMERS, 27), Map.entry(WidgetCatalog.POP_UPS, 4),
                 Map.entry(WidgetCatalog.FISHING_NIBBLES, 2), Map.entry(WidgetCatalog.FISHING_QUESTS, 3));
         var labels = new HashSet<String>();
@@ -34,7 +34,7 @@ class WidgetSettingsSectionsTest {
             for (var control : controls) assertTrue(labels.add(control.label) || widget == WidgetCatalog.BOSS_TIMERS && control.label.equals("Color code")
                     || widget == WidgetCatalog.NEARBY_BARRELS || widget == WidgetCatalog.NEARBY_CRYSTALS, "Duplicated control: " + control.label);
         }
-        assertEquals(109, labels.size());
+        assertEquals(110, labels.size());
     }
 
     @Test void globalMenuKeepsAppearanceAndGameplayFeaturesWithoutWidgetContentDuplicates() {

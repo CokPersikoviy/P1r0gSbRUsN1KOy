@@ -405,7 +405,7 @@ public final class DiscordRpcService {
         if (config.showServer && serverInfo.isKnown()) {
             if ("PRISONEVO".equals(serverInfo.family())) {
                 String base = serverInfo.serverNumber() > 0 ? "PrisonEvo-" + serverInfo.serverNumber() : "PrisonEvo";
-                if (config.showMirror && serverInfo.mirror() > 0) {
+                if (config.showMirror && serverInfo.hasMirror()) {
                     return base + " #" + serverInfo.mirror();
                 }
                 return base;

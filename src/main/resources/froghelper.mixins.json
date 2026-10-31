@@ -18,6 +18,7 @@
     "AbstractContainerScreenMixin",
     "ArmorStandMixin",
     "BlockBreakMixin",
+    "ClientLevelPredictionAccessor",
     "EntityRendererMixin",
     "BossHealthOverlay",
     "ConnectionMixin",

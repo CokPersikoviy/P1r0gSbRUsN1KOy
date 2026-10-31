@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockChangedAckPacket;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
@@ -15,6 +16,7 @@ import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
 import net.minecraft.network.protocol.game.ClientboundTabListPacket;
 import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundSetActionBarTextPacket;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -27,6 +29,8 @@ import ru.wilyfox.client.dungeon.DungeonMapTracker;
 import ru.wilyfox.client.highlight.UsefulWorldHighlightRenderHook;
 import ru.wilyfox.client.profiler.ModProfiler;
 import ru.wilyfox.client.protocol.DiamondWorldProtocolClient;
+import ru.wilyfox.client.statistic.MiningStatisticsTracker;
+import ru.wilyfox.client.utility.PendingBlockBreaks;
 import net.minecraft.core.particles.ParticleTypes;
 
 @Mixin(ClientPacketListener.class)
@@ -71,6 +75,16 @@ public class ClientPacketListenerMixin {
         return ServerEmojiRegistry.replaceSymbolsWithKeys(message);
     }
 
+    @Inject(method = "setActionBarText", at = @At("TAIL"))
+    private void froghelper$trackMiningActionBar(ClientboundSetActionBarTextPacket packet, CallbackInfo ci) {
+        MiningStatisticsTracker.actionBar(packet.text());
+    }
+
+    @Inject(method = "handleBlockChangedAck", at = @At("TAIL"))
+    private void froghelper$confirmBlockBreaks(ClientboundBlockChangedAckPacket packet, CallbackInfo ci) {
+        PendingBlockBreaks.acknowledged(packet.sequence(), Minecraft.getInstance().level);
+    }
+
     @Inject(method = "handleBlockUpdate", at = @At("TAIL"))
     private void froghelper$markUsefulHighlightChunkDirty(ClientboundBlockUpdatePacket packet, CallbackInfo ci) {
         UsefulWorldHighlightRenderHook.markBlockDirty(packet.getPos());
@@ -112,6 +126,7 @@ public class ClientPacketListenerMixin {
     @Inject(method = "handleLogin", at = @At("TAIL"))
     private void froghelper$resetUsefulHighlightOnLogin(ClientboundLoginPacket packet, CallbackInfo ci) {
         FishingSpotTracker.getInstance().clear();
+        PendingBlockBreaks.clear();
         ModProfiler.getInstance().recordClientEvent("login", packet.getClass().getSimpleName());
         UsefulWorldHighlightRenderHook.onPlayerTeleport();
     }
@@ -120,6 +135,7 @@ public class ClientPacketListenerMixin {
     private void froghelper$resetUsefulHighlightOnRespawn(ClientboundRespawnPacket packet, CallbackInfo ci) {
         DiamondWorldProtocolClient.onWorldRespawn();
         FishingSpotTracker.getInstance().clear();
+        PendingBlockBreaks.clear();
         ModProfiler.getInstance().recordClientEvent("respawn", packet.getClass().getSimpleName());
         UsefulWorldHighlightRenderHook.onPlayerTeleport();
     }

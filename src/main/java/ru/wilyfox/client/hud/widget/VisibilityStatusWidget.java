@@ -4,8 +4,10 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import ru.wilyfox.client.hud.HudEditingScreen;
+import ru.wilyfox.client.hud.config.ClickerConfig;
 import ru.wilyfox.client.hud.config.ConfigManager;
 import ru.wilyfox.client.hud.layer.HudLayer;
+import ru.wilyfox.client.utility.Clicker;
 import ru.wilyfox.client.visibility.VisibilityStatusStore;
 
 public class VisibilityStatusWidget extends AbstractWidget {
@@ -80,6 +82,9 @@ public class VisibilityStatusWidget extends AbstractWidget {
         int max = mc.font.width("Clan [" + statusText(store.isClanVisible()) + "]");
         max = Math.max(max, mc.font.width("Players [" + statusText(store.isPlayersVisible()) + "]"));
         max = Math.max(max, mc.font.width("Pets [" + store.getPetsVisibility().displayName() + "]"));
+        if (showClicker()) {
+            max = Math.max(max, mc.font.width(clickerText()));
+        }
         return max + PADDING_X * 2;
     }
 
@@ -92,7 +97,24 @@ public class VisibilityStatusWidget extends AbstractWidget {
             return PADDING_Y * 2 + mc.font.lineHeight;
         }
 
-        return PADDING_Y * 2 + mc.font.lineHeight * 3 + ROW_GAP * 2;
+        int rows = showClicker() ? 4 : 3;
+        return PADDING_Y * 2 + mc.font.lineHeight * rows + ROW_GAP * (rows - 1);
+    }
+
+    private boolean showClicker() {
+        return ConfigManager.get().visibilityStatus.showClicker;
+    }
+
+    private String clickerMode() {
+        return ConfigManager.get().clicker.actionMode == ClickerConfig.ActionMode.HOLD ? "Hold" : "Click";
+    }
+
+    private String clickerText() {
+        return "Clicker [" + compactStatus(Clicker.isActive()) + " · " + clickerMode() + "]";
+    }
+
+    private String compactClickerText() {
+        return "Ck [" + compactStatus(Clicker.isActive()) + "·" + clickerMode().charAt(0) + "]";
     }
 
     private boolean isEditorPreview() {
@@ -126,6 +148,14 @@ public class VisibilityStatusWidget extends AbstractWidget {
         context.text(mc.font, "Players [" + statusText(store.isPlayersVisible()) + "]", PADDING_X, y, statusColor(store.isPlayersVisible()));
         y += mc.font.lineHeight + ROW_GAP;
         context.text(mc.font, "Pets [" + store.getPetsVisibility().displayName() + "]", PADDING_X, y, petsStatusColor(store.getPetsVisibility()));
+        if (showClicker()) {
+            y += mc.font.lineHeight + ROW_GAP;
+            context.text(mc.font, clickerText(), PADDING_X, y, clickerColor());
+        }
+    }
+
+    private int clickerColor() {
+        return Clicker.isActive() ? WidgetTheme.STATUS_SUCCESS : WidgetTheme.TEXT_MUTED;
     }
 
     private void renderCompact(GuiGraphicsExtractor context, Minecraft mc) {
@@ -134,7 +164,10 @@ public class VisibilityStatusWidget extends AbstractWidget {
         x += SEGMENT_GAP;
         x = drawCompactSegment(context, mc, x, "Pl [" + compactStatus(store.isPlayersVisible()) + "]", statusColor(store.isPlayersVisible()));
         x += SEGMENT_GAP;
-        drawCompactSegment(context, mc, x, "Pt [" + store.getPetsVisibility().compactName() + "]", petsStatusColor(store.getPetsVisibility()));
+        x = drawCompactSegment(context, mc, x, "Pt [" + store.getPetsVisibility().compactName() + "]", petsStatusColor(store.getPetsVisibility()));
+        if (showClicker()) {
+            drawCompactSegment(context, mc, x + SEGMENT_GAP, compactClickerText(), clickerColor());
+        }
     }
 
     private int drawCompactSegment(GuiGraphicsExtractor context, Minecraft mc, int x, String text, int color) {
@@ -145,7 +178,8 @@ public class VisibilityStatusWidget extends AbstractWidget {
     private String compactText() {
         return "Cl [" + compactStatus(store.isClanVisible()) + "]"
                 + "  Pl [" + compactStatus(store.isPlayersVisible()) + "]"
-                + "  Pt [" + store.getPetsVisibility().compactName() + "]";
+                + "  Pt [" + store.getPetsVisibility().compactName() + "]"
+                + (showClicker() ? "  " + compactClickerText() : "");
     }
 }
 

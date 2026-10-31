@@ -7,6 +7,8 @@ import java.util.regex.Pattern;
 public record CurrentServerInfo(String family, int serverNumber, int mirror, String rawName) {
     private static final Pattern SERVER_NAME_PATTERN = Pattern.compile("^([A-Z]+)(\\d*)$");
     private static final CurrentServerInfo UNKNOWN = new CurrentServerInfo("UNKNOWN", 0, 0, "");
+    /** TAB text without "#N"; the protocol always reports a real mirror, and #0 is a real mirror. */
+    public static final int NO_MIRROR = -1;
 
     public static CurrentServerInfo unknown() {
         return UNKNOWN;
@@ -38,7 +40,7 @@ public record CurrentServerInfo(String family, int serverNumber, int mirror, Str
             return new CurrentServerInfo(
                     "PRISONEVO",
                     parseIntOrZero(prisonMatcher.group(1)),
-                    parseIntOrZero(prisonMatcher.group(2)),
+                    prisonMatcher.group(2) == null ? NO_MIRROR : parseIntOrZero(prisonMatcher.group(2)),
                     normalized
             );
         }
@@ -54,12 +56,16 @@ public record CurrentServerInfo(String family, int serverNumber, int mirror, Str
         return !"UNKNOWN".equals(family) && !family.isBlank();
     }
 
+    public boolean hasMirror() {
+        return mirror != NO_MIRROR;
+    }
+
     public String displayName() {
         return switch (family) {
             case "HUB" -> "Хаб";
             case "PRISONEVO" -> {
                 String base = serverNumber > 0 ? "PrisonEvo-" + serverNumber : "PrisonEvo";
-                yield mirror > 0 ? base + " #" + mirror : base;
+                yield hasMirror() ? base + " #" + mirror : base;
             }
             case "UNKNOWN" -> "";
             default -> rawName == null ? family : rawName;

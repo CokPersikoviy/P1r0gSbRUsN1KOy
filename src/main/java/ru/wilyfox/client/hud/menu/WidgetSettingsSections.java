@@ -144,6 +144,8 @@ final class WidgetSettingsSections {
             case VISIBILITY -> {
                 toggle(items, "Compact Visibility Status", () -> ConfigManager.get().visibilityStatus.compact,
                         value -> ConfigManager.get().visibilityStatus.compact = value);
+                toggle(items, "Show Clicker State", () -> ConfigManager.get().visibilityStatus.showClicker,
+                        value -> ConfigManager.get().visibilityStatus.showClicker = value);
             }
             case MAP -> {
                 toggle(items, "Center Dungeon Map on Player", () -> ConfigManager.get().dungeonMap.anchorDungeonMap,

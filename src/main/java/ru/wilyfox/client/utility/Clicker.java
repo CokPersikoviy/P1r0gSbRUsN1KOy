@@ -104,6 +104,10 @@ public final class Clicker {
             ((ru.wilyfox.mixin.KeyMappingAccessorMixin) key).froghelper$setDownDirect(physical);
         }
     }
+    public static boolean isActive() {
+        return autoAttackEnabled;
+    }
+
     public static void click() {
         Minecraft minecraft = Minecraft.getInstance();
         KeyMapping.click(com.mojang.blaze3d.platform.InputConstants.getKey(getActionKey(minecraft).saveString()));

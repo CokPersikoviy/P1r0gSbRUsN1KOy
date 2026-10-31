@@ -51,6 +51,13 @@ public final class MiningStatisticsTracker {
             STORE.recordBreak(ConfigManager.get().miningStatistics);
         }
     }
+    /** Dedicated action-bar packets bypass Fabric's GAME message event; the per-block price arrives there. */
+    public static void actionBar(net.minecraft.network.chat.Component text) {
+        if (Minecraft.getInstance().player == null) return;
+        try (var profile = ModProfiler.getInstance().scope("mining/statistics/actionBar")) {
+            STORE.actionBar(text.getString(), ConfigManager.get().miningStatistics);
+        }
+    }
     public static void togglePause() { STORE.togglePause(ConfigManager.get().miningStatistics); UiSounds.toggle(); }
     public static void reset() { STORE.reset(); UiSounds.play(ru.wilyfox.client.audio.UiSound.SUCCESS); }
 }
